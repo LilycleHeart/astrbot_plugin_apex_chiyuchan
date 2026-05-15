@@ -1,0 +1,33 @@
+{
+  "apex_api_key": {
+    "description": "Apex Legends API Key",
+    "type": "string",
+    "hint": "在 https://portal.apexlegendsapi.com 免费注册获取",
+    "obvious_hint": true
+  },
+  "timezone": {
+    "description": "卡片显示时区（地图轮换时间）",
+    "type": "string",
+    "default": "Asia/Shanghai",
+    "hint": "例如 Asia/Shanghai, America/New_York, UTC"
+  },
+  "color_scheme": {
+    "description": "卡片主题色调",
+    "type": "string",
+    "default": "auto",
+    "options": ["auto", "dark", "light"],
+    "hint": "auto=按北京时间自动切换(06-18亮色), dark=深色, light=亮色"
+  },
+  "monitor_interval": {
+    "description": "服务器状态监控检查间隔（秒）",
+    "type": "int",
+    "default": 900,
+    "hint": "建议 300~3600"
+  },
+  "use_local_fonts": {
+    "description": "使用系统字体代替 Google Fonts（避免外链加载）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后 LFG 卡片使用 Microsoft YaHei 等系统字体"
+  }
+}
