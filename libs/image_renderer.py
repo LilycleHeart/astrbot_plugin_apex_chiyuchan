@@ -1061,11 +1061,14 @@ async def _draw_server_status_card_pillow(server_status) -> bytes:
             s_lower = sec.status.lower()
             icon = "🔴" if "down" in s_lower else ("⚠" if "unstable" in s_lower or "slow" in s_lower else "✓")
             lines.append(f"[{icon}] {_pl_name(sec.name)}  →  {_pl_status(sec.status)}")
+            sec_abnormal = "down" in s_lower or "unstable" in s_lower or "slow" in s_lower
             for entry in sec.entries[:5]:
                 e_upper = entry.status.upper()
                 if "DOWN" in e_upper:
                     dot = "🔴"
                 elif "UNSTABLE" in e_upper or "SLOW" in e_upper:
+                    dot = "⚠"
+                elif sec_abnormal:
                     dot = "⚠"
                 else:
                     dot = "✓"

@@ -688,14 +688,14 @@ def _build_als_sections_html(als) -> str:
                 <span class="als-pill {pill_class}">{_escape_html(sec_pill)}</span>
             </div>"""
         for entry in sec.entries[:5]:
-            s_upper = entry.status.upper()
-            is_down = "DOWN" in s_upper
-            is_slow = "SLOW" in s_upper
-            is_unstable = "UNSTABLE" in s_upper
-            if is_down:
+            e_upper = entry.status.upper()
+            if "DOWN" in e_upper:
                 state_class = "state-down"
                 dot_color = "#FF4444"
-            elif is_unstable or is_slow:
+            elif "UNSTABLE" in e_upper or "SLOW" in e_upper:
+                state_class = "state-unstable"
+                dot_color = "#FFA500"
+            elif is_down or is_unstable:  # section abnormal → override UP entries to orange
                 state_class = "state-unstable"
                 dot_color = "#FFA500"
             else:
