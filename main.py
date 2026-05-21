@@ -388,22 +388,25 @@ class XiaoChiyu(Star):
 
     @filter.command("monitor", alias={"监控", "服务器监控"})
     async def cmd_monitor(self, event: AstrMessageEvent, action: str = ""):
-        """服务器状态监控 — /monitor on|off|status"""
         session = event.unified_msg_origin
         action = (action or "").strip().lower()
 
         if action == "on":
             await self.db.set_monitor(session, True)
+            logger.debug(f"[Monitor] 开启 session={session}")
             yield event.plain_result("✅ 服务器状态监控已开启，每 15 分钟检查一次，异常时自动推送")
         elif action == "off":
             await self.db.set_monitor(session, False)
+            logger.debug(f"[Monitor] 关闭 session={session}")
             yield event.plain_result("✅ 服务器状态监控已关闭")
         elif action in ("status", ""):
             row = await self.db.get_monitor(session)
             if row and row["enabled"]:
                 state = {"": "待首次检查", "normal": "正常", "unstable": "异常"}.get(row["last_state"], row["last_state"])
+                logger.debug(f"[Monitor] status session={session} enabled=1 last_state={row['last_state']!r}")
                 yield event.plain_result(f"📡 监控状态: 开启\n当前状态: {state}")
             else:
+                logger.debug(f"[Monitor] status session={session} enabled=0")
                 yield event.plain_result("📡 监控状态: 关闭\n使用 /monitor on 开启")
         else:
             yield event.plain_result("用法: /monitor on|off|status")
@@ -425,7 +428,6 @@ class XiaoChiyu(Star):
         return "normal"
 
     async def _monitor_tick(self):
-        """一次监控检查: 抓取 ALS 状态, 对比所有已开启会话, 状态变化时推送"""
         import types
         from astrbot.api.message_components import MessageChain, Image, Plain
 
@@ -437,9 +439,11 @@ class XiaoChiyu(Star):
             logger.warning("[Monitor] ALS scrape failed", exc_info=True)
 
         current_state = self._detect_als_state(als) if als else ""
+        logger.debug(f"[Monitor] tick → state={current_state!r}  alert_banner={'…' if als and als.alert_banner else '—'}  outage={als.outage_announcement if als else '—'}  sections={len(als.sections) if als and als.sections else 0}")
 
         sessions = await self.db.list_monitor_sessions()
         if not sessions:
+            logger.debug("[Monitor] tick → 无监控会话, 跳过")
             return
 
         wrapper = types.SimpleNamespace(als=als)
@@ -447,6 +451,7 @@ class XiaoChiyu(Star):
         for row in sessions:
             sid = row["session_id"]
             old_state = row.get("last_state", "")
+            logger.debug(f"[Monitor] tick → session={sid}  old={old_state!r}  new={current_state!r}")
 
             if old_state == "unstable" and current_state == "normal":
                 text = f"🟢 服务器状态已恢复\n{als.alert_banner[:120] if als and als.alert_banner else '所有服务恢复正常'}"
@@ -456,6 +461,7 @@ class XiaoChiyu(Star):
                 except Exception:
                     await self.context.send_message(sid, MessageChain([Plain(text)]))
                 await self.db.update_monitor_state(sid, current_state)
+                logger.debug(f"[Monitor] → 恢复推送 {sid}")
 
             elif current_state == "unstable" and old_state != "unstable":
                 text = f"🔴 服务器状态异常\n{als.alert_banner[:120] if als and als.alert_banner else '检测到服务不稳定'}"
@@ -465,6 +471,7 @@ class XiaoChiyu(Star):
                 except Exception:
                     await self.context.send_message(sid, MessageChain([Plain(text)]))
                 await self.db.update_monitor_state(sid, current_state)
+                logger.debug(f"[Monitor] → 异常推送 {sid}")
 
             elif old_state == "" and current_state:
                 if current_state == "unstable":
@@ -474,13 +481,15 @@ class XiaoChiyu(Star):
                         await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
                     except Exception:
                         await self.context.send_message(sid, MessageChain([Plain(text)]))
+                    logger.debug(f"[Monitor] → 初始异常推送 {sid}")
                 await self.db.update_monitor_state(sid, current_state)
 
     async def _monitor_loop(self):
-        """每 15 分钟监控循环"""
+        logger.debug("[Monitor] loop 启动, 每 900s 检查一次")
         while True:
             await asyncio.sleep(900)
             try:
+                logger.debug("[Monitor] loop → tick")
                 await self._monitor_tick()
             except Exception as e:
                 logger.error(f"[Monitor] tick 异常: {e}")
