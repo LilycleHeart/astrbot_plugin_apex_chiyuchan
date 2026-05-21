@@ -467,6 +467,13 @@ class XiaoChiyu(Star):
                 await self.db.update_monitor_state(sid, current_state)
 
             elif old_state == "" and current_state:
+                if current_state == "unstable":
+                    text = f"🔴 服务器状态异常\n{als.alert_banner[:120] if als and als.alert_banner else '检测到服务不稳定'}"
+                    try:
+                        img = await renderer.draw_server_status_card(wrapper)
+                        await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
+                    except Exception:
+                        await self.context.send_message(sid, MessageChain([Plain(text)]))
                 await self.db.update_monitor_state(sid, current_state)
 
     async def _monitor_loop(self):
