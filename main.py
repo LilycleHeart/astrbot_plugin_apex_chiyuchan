@@ -413,17 +413,18 @@ class XiaoChiyu(Star):
 
     @staticmethod
     def _detect_als_state(als) -> str:
-        """根据 ALS 数据判断整体状态: 'normal' 或 'unstable'"""
         if als and als.outage_announcement:
             return "unstable"
         if als and als.alert_banner:
             return "unstable"
         if als and als.sections:
             for sec in als.sections:
-                if "unstable" in sec.status.lower() or "slow" in sec.status.lower():
+                s_lower = sec.status.lower()
+                if "unstable" in s_lower or "slow" in s_lower or "down" in s_lower:
                     return "unstable"
                 for entry in sec.entries:
-                    if "unstable" in entry.status.upper():
+                    e_upper = entry.status.upper()
+                    if any(x in e_upper for x in ("UNSTABLE", "SLOW", "DOWN")):
                         return "unstable"
         return "normal"
 
