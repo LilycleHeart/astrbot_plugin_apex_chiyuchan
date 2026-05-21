@@ -633,37 +633,68 @@ async def draw_profile_card(data: dict) -> bytes:
 # ══════════════════════════════════════════
 
 
+# ALS 服务区块名汉化映射
+_ALS_SECTION_NAMES = {
+    "Crossplay auth (any platform)": "跨平台认证",
+    "Lobby/Matchmaking servers": "大厅/匹配服务器",
+    "PC/Desktop logins": "PC 登录",
+    "Player accounts": "玩家账户",
+    "ALS website": "ALS 网站",
+    "PSN/Xbox Live status": "PSN/Xbox Live 状态",
+}
+
+# ALS 状态汉化
+_ALS_STATUS_TEXT = {
+    "UNSTABLE": "不稳定",
+    "UP": "正常",
+    "SLOW": "缓慢",
+    "DOWN": "宕机",
+    "Unstable / Slow": "不稳定 / 缓慢",
+}
+
+
+def _locale_status(status: str) -> str:
+    return _ALS_STATUS_TEXT.get(status.strip().upper(), status) if status else status
+
+
+def _locale_section_name(name: str) -> str:
+    return _ALS_SECTION_NAMES.get(name.strip(), name)
+
+
 def _build_als_alert_html(als) -> str:
-    """Build ALS alert banner + outage announcement HTML."""
     parts = ""
     if als and als.alert_banner:
         parts += f"""<div class="als-alert"><i class="warning-icon">⚠</i><span>{_escape_html(als.alert_banner)}</span></div>"""
     if als and als.outage_announcement:
-        parts += """<div class="als-alert als-outage"><i class="warning-icon">🔴</i><span>Outage in progress</span></div>"""
+        parts += """<div class="als-alert als-outage"><i class="warning-icon">🔴</i><span>服务中断进行中</span></div>"""
     return parts
 
 
 def _build_als_sections_html(als) -> str:
-    """Build ALS section-level status cards."""
     if not als or not als.sections:
         return ""
     html = ""
     for sec in als.sections:
-        pill_class = "pill-unstable" if "unstable" in sec.status.lower() or "slow" in sec.status.lower() else "pill-up"
+        is_unstable = "unstable" in sec.status.lower() or "slow" in sec.status.lower()
+        pill_class = "pill-unstable" if is_unstable else "pill-up"
+        sec_name = _locale_section_name(sec.name)
+        sec_pill = _locale_status(sec.status)
         html += f"""
         <div class="als-section">
             <div class="als-section-head">
-                <span class="als-section-name">{_escape_html(sec.name)}</span>
-                <span class="als-pill {pill_class}">{_escape_html(sec.status)}</span>
+                <span class="als-section-name">{_escape_html(sec_name)}</span>
+                <span class="als-pill {pill_class}">{_escape_html(sec_pill)}</span>
             </div>"""
-        for entry in sec.entries[:5]:  # max 5 entries per section
-            state_class = "state-unstable" if "unstable" in entry.status.upper() else "state-up"
-            dot_color = "#E31B39" if "unstable" in entry.status.upper() else "#4CE5B1"
+        for entry in sec.entries[:5]:
+            is_entry_unstable = "unstable" in entry.status.upper()
+            state_class = "state-unstable" if is_entry_unstable else "state-up"
+            dot_color = "#FFA500" if is_entry_unstable else "#4CE5B1"
+            entry_status = _locale_status(entry.status)
             html += f"""
             <div class="als-row">
                 <span class="dot" style="background:{dot_color}"></span>
                 <span class="als-row-name">{_escape_html(entry.name)}</span>
-                <span class="als-row-state {state_class}">{_escape_html(entry.status)}</span>
+                <span class="als-row-state {state_class}">{_escape_html(entry_status)}</span>
                 <span class="als-row-rt">{_escape_html(entry.response_time)}</span>
             </div>"""
         html += "</div>"
@@ -683,21 +714,21 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 .card{{width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;box-shadow:0 10px 20px rgba(0,0,0,.4)}}
 .header{{background:linear-gradient(135deg,{_C_CARD},{_C_CARD2});padding:20px 24px;border-bottom:1px solid {_C_OUTLINE}}}
 .header h2{{font-size:22px;font-weight:800}}
-.als-alert{{display:flex;align-items:flex-start;gap:8px;padding:12px 24px;background:rgba(227,27,57,.12);border-bottom:1px solid {_C_OUTLINE};font-size:12px;color:#E86A6A;line-height:1.5}}
-.als-outage{{background:rgba(227,27,57,.18);font-weight:700}}
+.als-alert{{display:flex;align-items:flex-start;gap:8px;padding:12px 24px;background:rgba(255,165,0,.12);border-bottom:1px solid {_C_OUTLINE};font-size:12px;color:#FFB347;line-height:1.5}}
+.als-outage{{background:rgba(255,69,0,.18);font-weight:700;color:#FF6347}}
 .warning-icon{{flex-shrink:0;font-size:16px}}
 .als-section{{border-bottom:1px solid {_C_OUTLINE};padding:12px 24px}}
 .als-section:last-child{{border-bottom:none}}
 .als-section-head{{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}}
 .als-section-name{{font-size:14px;font-weight:700}}
-.als-pill{{font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px;text-transform:uppercase}}
-.pill-unstable{{background:rgba(227,27,57,.2);color:#E8A0A0}}
+.als-pill{{font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px}}
+.pill-unstable{{background:rgba(255,165,0,.2);color:#FFB347}}
 .pill-up{{background:rgba(76,229,177,.15);color:#4CE5B1}}
 .als-row{{display:flex;align-items:center;padding:6px 0;gap:8px}}
 .als-row .dot{{width:8px;height:8px}}
 .als-row-name{{flex:1;font-size:13px}}
 .als-row-state{{font-size:12px;font-weight:700;width:70px;text-align:center}}
-.state-unstable{{color:#E8A0A0}}
+.state-unstable{{color:#FFB347}}
 .state-up{{color:#4CE5B1}}
 .als-row-rt{{font-size:11px;color:{_C_MUTED};width:64px;text-align:right}}
 .footer{{padding:12px 24px;border-top:1px solid {_C_OUTLINE};font-size:11px;color:{_C_MUTED};text-align:center}}
@@ -706,7 +737,7 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 <div class="header"><h2>Apex 服务器状态</h2></div>
 {alert_html}
 {als_sections_html}
-<div class="footer">Data: apexlegendsstatus.com</div>
+<div class="footer">数据来源: apexlegendsstatus.com</div>
 </div>
 </body></html>"""
 

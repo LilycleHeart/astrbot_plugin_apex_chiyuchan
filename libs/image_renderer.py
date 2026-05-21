@@ -1024,8 +1024,31 @@ async def draw_master_card(predator) -> bytes:
     return await _draw_master_card_pillow(predator)
 
 
+_PL_SECTION_NAMES = {
+    "Crossplay auth (any platform)": "跨平台认证",
+    "Lobby/Matchmaking servers": "大厅/匹配服务器",
+    "PC/Desktop logins": "PC 登录",
+    "Player accounts": "玩家账户",
+    "ALS website": "ALS 网站",
+    "PSN/Xbox Live status": "PSN/Xbox Live 状态",
+}
+_PL_STATUS_MAP = {
+    "UNSTABLE": "不稳定",
+    "UP": "正常",
+    "SLOW": "缓慢",
+    "DOWN": "宕机",
+    "Unstable / Slow": "不稳定 / 缓慢",
+}
+
+
+def _pl_status(s: str) -> str:
+    return _PL_STATUS_MAP.get(s.strip().upper(), s) if s else s
+
+def _pl_name(n: str) -> str:
+    return _PL_SECTION_NAMES.get(n.strip(), n)
+
+
 async def _draw_server_status_card_pillow(server_status) -> bytes:
-    """服务器状态 Pillow 回退 — 简洁文本卡片"""
     lines = []
     als = getattr(server_status, "als", None)
 
@@ -1035,11 +1058,11 @@ async def _draw_server_status_card_pillow(server_status) -> bytes:
 
     if als and als.sections:
         for sec in als.sections:
-            status_icon = "⚠" if "unstable" in sec.status.lower() or "slow" in sec.status.lower() else "✓"
-            lines.append(f"[{status_icon}] {sec.name}  →  {sec.status}")
+            icon = "⚠" if "unstable" in sec.status.lower() or "slow" in sec.status.lower() else "✓"
+            lines.append(f"[{icon}] {_pl_name(sec.name)}  →  {_pl_status(sec.status)}")
             for entry in sec.entries[:5]:
                 dot = "⚠" if "unstable" in entry.status.upper() else "✓"
-                lines.append(f"  {dot} {entry.name}  {entry.status}  {entry.response_time}")
+                lines.append(f"  {dot} {entry.name}  {_pl_status(entry.status)}  {entry.response_time}")
             lines.append("")
 
     return await draw_text_card("服务器状态", "\n".join(lines) if lines else "无数据")
