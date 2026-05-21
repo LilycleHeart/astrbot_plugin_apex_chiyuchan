@@ -430,8 +430,11 @@ class XiaoChiyu(Star):
 
     async def _monitor_tick(self):
         import types
-        from astrbot.api.event import MessageChain
         from astrbot.api.message_components import Image, Plain
+        try:
+            from astrbot.api.event import MessageChain
+        except ImportError:
+            from astrbot.api.all import MessageChain
 
         als = None
         try:
