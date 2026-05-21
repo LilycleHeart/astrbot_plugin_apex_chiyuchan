@@ -1,13 +1,145 @@
-"""ALS 网站徽章抓取器 / 名字搜索"""
+"""ALS 网站徽章抓取器 / 名字搜索 / 服务器状态"""
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass, field
 from urllib.parse import quote
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from .playwright_manager import run_with_page
 from .ttl_cache import get as cache_get, set as cache_set
+
+
+# ══════════════════════════════════════════
+#  服务器状态数据类型
+# ══════════════════════════════════════════
+
+
+@dataclass
+class AlsServerEntry:
+    name: str
+    status: str  # UNSTABLE / UP / SLOW
+    response_time: str  # "72 ms", "100% up", ""
+
+
+@dataclass
+class AlsServerSection:
+    name: str
+    status: str  # "Unstable / Slow", "UNSTABLE", "UP"
+    entries: list[AlsServerEntry] = field(default_factory=list)
+
+
+@dataclass
+class AlsServerStatus:
+    sections: list[AlsServerSection] = field(default_factory=list)
+    alert_banner: str = ""  # overall alert text from the banner
+    outage_announcement: bool = False
+
+
+async def scrape_als_server_status() -> AlsServerStatus | None:
+    """从 ALS 主页抓取服务器状态"""
+    from .ttl_cache import get as cache_get, set as cache_set
+
+    cache_key = "als_server_status"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = AlsServerStatus()
+
+    async def _do_scrape(page):
+        nonlocal result
+        await page.route(
+            "**/*",
+            lambda route: route.abort()
+            if route.request.resource_type in ("image", "font", "media", "stylesheet")
+            or "analytics" in (route.request.url or "")
+            or "googletagmanager" in (route.request.url or "")
+            or "cookieconsent" in (route.request.url or "")
+            else route.continue_(),
+        )
+        await page.goto("https://apexlegendsstatus.com/", wait_until="domcontentloaded", timeout=20000)
+
+        content = await page.content()
+
+        # Parse alert banner
+        m = re.search(
+            r'<div class="alert alert-danger tmpal"[^>]*>(.*?)</div>',
+            content,
+            re.DOTALL,
+        )
+        if m:
+            text = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+            result.alert_banner = text
+
+        # Parse outage announcement
+        if 'v2-alert--danger' in content and 'Outage in progress' in content:
+            result.outage_announcement = True
+
+        # Parse status sections
+        # Each section: v2-lb-card v2-status-card v2-status-card--xxx
+        sec_pattern = re.compile(
+            r'<div class="v2-lb-card v2-status-card[^"]*">(.*?)</div>\s*</div>',
+            re.DOTALL,
+        )
+        for sec_match in sec_pattern.finditer(content):
+            sec_html = sec_match.group(1)
+
+            # Section name and pill status
+            name_m = re.search(
+                r'v2-status-card__name[^>]*>(?:<[^>]*>)*\s*([^<]+)',
+                sec_html,
+            )
+            pill_m = re.search(
+                r'v2-status-pill[^>]*>([^<]+)',
+                sec_html,
+            )
+            if not name_m:
+                continue
+
+            section = AlsServerSection(
+                name=name_m.group(1).strip(),
+                status=pill_m.group(1).strip() if pill_m else "",
+            )
+
+            # Parse rows
+            row_pattern = re.compile(
+                r'<div class="v2-status-row">(.*?)</div>\s*</div>',
+                re.DOTALL,
+            )
+            for row_match in row_pattern.finditer(sec_html):
+                row_html = row_match.group(1)
+                row_name_m = re.search(
+                    r'v2-status-row__name[^>]*>([^<]+)',
+                    row_html,
+                )
+                row_status_m = re.search(
+                    r'v2-status-row__state[^>]*>([^<]+)',
+                    row_html,
+                )
+                row_rt_m = re.search(
+                    r'v2-status-row__rt[^>]*>([^<]+)',
+                    row_html,
+                )
+                if row_name_m:
+                    section.entries.append(AlsServerEntry(
+                        name=row_name_m.group(1).strip(),
+                        status=row_status_m.group(1).strip() if row_status_m else "",
+                        response_time=row_rt_m.group(1).strip() if row_rt_m else "",
+                    ))
+
+            result.sections.append(section)
+
+        return result
+
+    try:
+        await run_with_page(_do_scrape)
+        await cache_set(cache_key, result, 120)
+        return result
+    except Exception:
+        return None
 
 
 async def _block_noise(page):

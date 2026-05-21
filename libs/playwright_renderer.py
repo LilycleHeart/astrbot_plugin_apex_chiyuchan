@@ -23,6 +23,10 @@ _C_DIAMOND = "#5D9FF0"
 _C_MASTER = "#C58BFF"
 _C_PRED = "#DA292A"
 
+def _escape_html(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
 # ── MD3 每段位动态深色主题 ──
 _RANK_THEMES = {
     "Bronze": {
@@ -522,8 +526,6 @@ body{{
 
 def _render_moe_number_base64(number: int) -> str:
     import base64
-    import io
-    from PIL import Image
     from .image_renderer import _moe_digit_frames, _load_moe_digits
 
     _load_moe_digits()
@@ -631,7 +633,54 @@ async def draw_profile_card(data: dict) -> bytes:
 # ══════════════════════════════════════════
 
 
-def _build_server_status_html(servers: list) -> str:
+def _build_als_alert_html(als) -> str:
+    """Build ALS alert banner + outage announcement HTML."""
+    parts = ""
+    if als and als.alert_banner:
+        parts += f"""<div class="als-alert"><i class="warning-icon">⚠</i><span>{_escape_html(als.alert_banner)}</span></div>"""
+    if als and als.outage_announcement:
+        parts += """<div class="als-alert als-outage"><i class="warning-icon">🔴</i><span>Outage in progress</span></div>"""
+    return parts
+
+
+def _build_als_sections_html(als) -> str:
+    """Build ALS section-level status cards."""
+    if not als or not als.sections:
+        return ""
+    html = ""
+    for sec in als.sections:
+        pill_class = "pill-unstable" if "unstable" in sec.status.lower() or "slow" in sec.status.lower() else "pill-up"
+        html += f"""
+        <div class="als-section">
+            <div class="als-section-head">
+                <span class="als-section-name">{_escape_html(sec.name)}</span>
+                <span class="als-pill {pill_class}">{_escape_html(sec.status)}</span>
+            </div>"""
+        for entry in sec.entries[:5]:  # max 5 entries per section
+            state_class = "state-unstable" if "unstable" in entry.status.upper() else "state-up"
+            dot_color = "#E31B39" if "unstable" in entry.status.upper() else "#4CE5B1"
+            html += f"""
+            <div class="als-row">
+                <span class="dot" style="background:{dot_color}"></span>
+                <span class="als-row-name">{_escape_html(entry.name)}</span>
+                <span class="als-row-state {state_class}">{_escape_html(entry.status)}</span>
+                <span class="als-row-rt">{_escape_html(entry.response_time)}</span>
+            </div>"""
+        html += "</div>"
+    return html
+
+
+def _build_server_status_html(server_status) -> str:
+    als = getattr(server_status, "als", None)
+    servers = getattr(server_status, "servers", None) or []
+
+    # ALS alert banner
+    alert_html = _build_als_alert_html(als)
+
+    # ALS section status
+    als_sections_html = _build_als_sections_html(als)
+
+    # Individual server rows from API
     rows = ""
     for s in servers:
         dot_color = (
@@ -646,8 +695,8 @@ def _build_server_status_html(servers: list) -> str:
         rows += f"""
             <div class="server-row">
                 <span class="dot" style="background:{dot_color}"></span>
-                <span class="server-name">{s.display_name}</span>
-                <span class="server-status" style="color:{status_color}">{s.status_text}</span>
+                <span class="server-name">{_escape_html(s.display_name)}</span>
+                <span class="server-status" style="color:{status_color}">{_escape_html(s.status_text)}</span>
                 <span class="server-rt">{rt}</span>
             </div>"""
 
@@ -658,6 +707,23 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 .card{{width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;box-shadow:0 10px 20px rgba(0,0,0,.4)}}
 .header{{background:linear-gradient(135deg,{_C_CARD},{_C_CARD2});padding:20px 24px;border-bottom:1px solid {_C_OUTLINE}}}
 .header h2{{font-size:22px;font-weight:800}}
+.als-alert{{display:flex;align-items:flex-start;gap:8px;padding:12px 24px;background:rgba(227,27,57,.12);border-bottom:1px solid {_C_OUTLINE};font-size:12px;color:#E86A6A;line-height:1.5}}
+.als-outage{{background:rgba(227,27,57,.18);font-weight:700}}
+.warning-icon{{flex-shrink:0;font-size:16px}}
+.als-section{{border-bottom:1px solid {_C_OUTLINE};padding:12px 24px}}
+.als-section:last-child{{border-bottom:none}}
+.als-section-head{{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}}
+.als-section-name{{font-size:14px;font-weight:700}}
+.als-pill{{font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px;text-transform:uppercase}}
+.pill-unstable{{background:rgba(227,27,57,.2);color:#E8A0A0}}
+.pill-up{{background:rgba(76,229,177,.15);color:#4CE5B1}}
+.als-row{{display:flex;align-items:center;padding:6px 0;gap:8px}}
+.als-row .dot{{width:8px;height:8px}}
+.als-row-name{{flex:1;font-size:13px}}
+.als-row-state{{font-size:12px;font-weight:700;width:70px;text-align:center}}
+.state-unstable{{color:#E8A0A0}}
+.state-up{{color:#4CE5B1}}
+.als-row-rt{{font-size:11px;color:{_C_MUTED};width:64px;text-align:right}}
 .server-row{{display:flex;align-items:center;padding:14px 24px;border-bottom:1px solid {_C_OUTLINE};gap:12px}}
 .server-row:last-child{{border-bottom:none}}
 .dot{{width:10px;height:10px;border-radius:50%;flex-shrink:0}}
@@ -668,6 +734,8 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 </style></head><body>
 <div class="card">
 <div class="header"><h2>Apex 服务器状态</h2></div>
+{alert_html}
+{als_sections_html}
 {rows}
 <div class="footer">Data: apexlegendsstatus.com</div>
 </div>
@@ -675,7 +743,7 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 
 
 async def draw_server_status_card(server_status) -> bytes:
-    html = _build_server_status_html(server_status.servers)
+    html = _build_server_status_html(server_status)
     return await _render_card_sync(html, 720)
 
 

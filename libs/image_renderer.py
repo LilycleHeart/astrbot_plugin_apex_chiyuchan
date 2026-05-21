@@ -1027,9 +1027,28 @@ async def draw_master_card(predator) -> bytes:
 async def _draw_server_status_card_pillow(server_status) -> bytes:
     """服务器状态 Pillow 回退 — 简洁文本卡片"""
     lines = []
+
+    # ALS alert banner
+    als = getattr(server_status, "als", None)
+    if als and als.alert_banner:
+        lines.append("⚠ " + als.alert_banner)
+        lines.append("")
+
+    # ALS sections
+    if als and als.sections:
+        for sec in als.sections:
+            status_icon = "⚠" if "unstable" in sec.status.lower() or "slow" in sec.status.lower() else "✓"
+            lines.append(f"[{status_icon}] {sec.name}  →  {sec.status}")
+            for entry in sec.entries[:5]:
+                dot = "⚠" if "unstable" in entry.status.upper() else "✓"
+                lines.append(f"  {dot} {entry.name}  {entry.status}  {entry.response_time}")
+            lines.append("")
+
+    # Individual server data
     for s in server_status.servers:
         dot = "●" if s.is_up else "○"
         lines.append(f"{dot} {s.display_name}  {s.status_text}  {s.response_time}ms")
+
     return await draw_text_card("服务器状态", "\n".join(lines) if lines else "无数据")
 
 
