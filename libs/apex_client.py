@@ -346,34 +346,12 @@ class ApexClient:
         except Exception:
             return None
 
-    async def get_server_status(self) -> Optional[ServerStatus]:
+    async def get_server_status(self):
+        """从 ALS 网站获取服务器状态"""
+        from .als_scraper import scrape_als_server_status
+
         try:
-            from .als_scraper import scrape_als_server_status
-            from .ttl_cache import get as cache_get, set as cache_set
-
-            # Try ALS website first (more accurate overall status)
             als = await scrape_als_server_status()
-
-            # Still get individual server data from API
-            cache_key = "server_status"
-            cached = await cache_get(cache_key)
-            if cached is not None:
-                result = ServerStatus(cached)
-                result.als = als
-                return result
-
-            data = await self._get("/servers")
-            if data:
-                logger.info(
-                    f"[ApexClient] Server status raw keys: {list(data.keys())[:5]}"
-                )
-                await cache_set(cache_key, data, 120)
-                result = ServerStatus(data)
-                result.als = als
-                logger.info(f"[ApexClient] Parsed {len(result.servers)} servers")
-                return result
-
-            # Fallback: ALS-only
             if als:
                 result = ServerStatus({})
                 result.als = als

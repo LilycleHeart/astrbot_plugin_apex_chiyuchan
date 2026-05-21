@@ -374,7 +374,7 @@ class XiaoChiyu(Star):
     async def cmd_server(self, event: AstrMessageEvent):
         """查询 Apex 服务器状态"""
         server_status = await self.apex.get_server_status()
-        if not server_status or (not server_status.servers and not getattr(server_status, "als", None)):
+        if not server_status or not getattr(server_status, "als", None):
             img = await renderer.draw_text_card(
                 "查询失败", "无法获取服务器状态", is_error=True
             )
@@ -875,22 +875,18 @@ class XiaoChiyu(Star):
         from mcp.types import CallToolResult, TextContent, ImageContent
 
         server_status = await self.apex.get_server_status()
-        if not server_status or (not server_status.servers and not getattr(server_status, "als", None)):
+        if not server_status or not getattr(server_status, "als", None):
             return CallToolResult(
                 content=[TextContent(type="text", text="获取服务器状态失败")]
             )
         img_bytes = await renderer.draw_server_status_card(server_status)
         img_b64 = base64.b64encode(img_bytes).decode()
         als = getattr(server_status, "als", None)
-        if server_status.servers:
-            up = sum(1 for s in server_status.servers if s.is_up)
-            total = len(server_status.servers)
-            down_servers = [s.display_name for s in server_status.servers if not s.is_up]
-            text = f"服务器状态: {up}/{total} 正常\n"
-            if down_servers:
-                text += f"异常服务: {', '.join(down_servers)}\n"
-        elif als and als.alert_banner:
+        if als and als.alert_banner:
             text = f"ALS 报告: {als.alert_banner[:100]}\n"
+        elif als and als.sections:
+            unstable = sum(1 for s in als.sections if "unstable" in s.status.lower() or "slow" in s.status.lower())
+            text = f"ALS 报告: {len(als.sections)} 个服务中 {unstable} 个异常\n"
         else:
             text = "服务器状态数据获取成功\n"
         text += "\n请根据服务器状态评论一下，然后用 send_message_to_user 发送服务器状态卡片图片。发送后不要再发任何额外消息。"

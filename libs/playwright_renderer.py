@@ -672,33 +672,9 @@ def _build_als_sections_html(als) -> str:
 
 def _build_server_status_html(server_status) -> str:
     als = getattr(server_status, "als", None)
-    servers = getattr(server_status, "servers", None) or []
 
-    # ALS alert banner
     alert_html = _build_als_alert_html(als)
-
-    # ALS section status
     als_sections_html = _build_als_sections_html(als)
-
-    # Individual server rows from API
-    rows = ""
-    for s in servers:
-        dot_color = (
-            "#4CE5B1"
-            if s.is_up
-            else "#E31B39"
-            if s.status.upper() == "DOWN"
-            else "#FFD700"
-        )
-        status_color = dot_color
-        rt = f"{s.response_time}ms" if s.response_time else "--"
-        rows += f"""
-            <div class="server-row">
-                <span class="dot" style="background:{dot_color}"></span>
-                <span class="server-name">{_escape_html(s.display_name)}</span>
-                <span class="server-status" style="color:{status_color}">{_escape_html(s.status_text)}</span>
-                <span class="server-rt">{rt}</span>
-            </div>"""
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
@@ -724,19 +700,12 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 .state-unstable{{color:#E8A0A0}}
 .state-up{{color:#4CE5B1}}
 .als-row-rt{{font-size:11px;color:{_C_MUTED};width:64px;text-align:right}}
-.server-row{{display:flex;align-items:center;padding:14px 24px;border-bottom:1px solid {_C_OUTLINE};gap:12px}}
-.server-row:last-child{{border-bottom:none}}
-.dot{{width:10px;height:10px;border-radius:50%;flex-shrink:0}}
-.server-name{{flex:1;font-size:14px;font-weight:500}}
-.server-status{{font-size:13px;font-weight:700;width:60px;text-align:center}}
-.server-rt{{font-size:13px;color:{_C_MUTED};width:64px;text-align:right}}
 .footer{{padding:12px 24px;border-top:1px solid {_C_OUTLINE};font-size:11px;color:{_C_MUTED};text-align:center}}
 </style></head><body>
 <div class="card">
 <div class="header"><h2>Apex 服务器状态</h2></div>
 {alert_html}
 {als_sections_html}
-{rows}
 <div class="footer">Data: apexlegendsstatus.com</div>
 </div>
 </body></html>"""
