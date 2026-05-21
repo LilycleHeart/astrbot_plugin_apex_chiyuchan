@@ -1,7 +1,6 @@
 name: apex_chiyuchan
-display_name: 小赤羽
-desc: Apex Legends 多功能 Bot — 战绩查询 / 地图轮换 / 大师数据 / 组队系统
+display_name: 小赤羽 Apex数据查询插件
+desc: 一个专注于 Apex 英雄数据查询 · 组队 · 状态追踪 的 AstrBot 多功能插件
 version: v1.0.0
-author: xiaochiyu
+author: 赤羽真白
 repo: https://github.com/LilycleHeart/astrbot_plugin_apex_chiyuchan
-short_desc: Apex 小赤羽 Bot
