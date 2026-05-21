@@ -649,7 +649,7 @@ _ALS_STATUS_TEXT = {
     "UP": "正常",
     "SLOW": "缓慢",
     "DOWN": "宕机",
-    "Unstable / Slow": "不稳定 / 缓慢",
+    "UNSTABLE / SLOW": "不稳定 / 缓慢",
 }
 
 
@@ -675,8 +675,10 @@ def _build_als_sections_html(als) -> str:
         return ""
     html = ""
     for sec in als.sections:
-        is_unstable = "unstable" in sec.status.lower() or "slow" in sec.status.lower()
-        pill_class = "pill-unstable" if is_unstable else "pill-up"
+        s_lower = sec.status.lower()
+        is_unstable = "unstable" in s_lower or "slow" in s_lower
+        is_down = "down" in s_lower
+        pill_class = "pill-down" if is_down else ("pill-unstable" if is_unstable else "pill-up")
         sec_name = _locale_section_name(sec.name)
         sec_pill = _locale_status(sec.status)
         html += f"""
@@ -686,9 +688,19 @@ def _build_als_sections_html(als) -> str:
                 <span class="als-pill {pill_class}">{_escape_html(sec_pill)}</span>
             </div>"""
         for entry in sec.entries[:5]:
-            is_entry_unstable = "unstable" in entry.status.upper()
-            state_class = "state-unstable" if is_entry_unstable else "state-up"
-            dot_color = "#FFA500" if is_entry_unstable else "#4CE5B1"
+            s_upper = entry.status.upper()
+            is_down = "DOWN" in s_upper
+            is_slow = "SLOW" in s_upper
+            is_unstable = "UNSTABLE" in s_upper
+            if is_down:
+                state_class = "state-down"
+                dot_color = "#FF4444"
+            elif is_unstable or is_slow:
+                state_class = "state-unstable"
+                dot_color = "#FFA500"
+            else:
+                state_class = "state-up"
+                dot_color = "#4CE5B1"
             entry_status = _locale_status(entry.status)
             html += f"""
             <div class="als-row">
@@ -722,6 +734,7 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 .als-section-head{{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}}
 .als-section-name{{font-size:14px;font-weight:700}}
 .als-pill{{font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px}}
+.pill-down{{background:rgba(255,68,68,.18);color:#FF4444}}
 .pill-unstable{{background:rgba(255,165,0,.2);color:#FFB347}}
 .pill-up{{background:rgba(76,229,177,.15);color:#4CE5B1}}
 .als-row{{display:flex;align-items:center;padding:6px 0;gap:8px}}
@@ -729,6 +742,7 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 .als-row-name{{flex:1;font-size:13px}}
 .als-row-state{{font-size:12px;font-weight:700;width:70px;text-align:center}}
 .state-unstable{{color:#FFB347}}
+.state-down{{color:#FF4444}}
 .state-up{{color:#4CE5B1}}
 .als-row-rt{{font-size:11px;color:{_C_MUTED};width:64px;text-align:right}}
 .footer{{padding:12px 24px;border-top:1px solid {_C_OUTLINE};font-size:11px;color:{_C_MUTED};text-align:center}}

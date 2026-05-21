@@ -1037,7 +1037,7 @@ _PL_STATUS_MAP = {
     "UP": "正常",
     "SLOW": "缓慢",
     "DOWN": "宕机",
-    "Unstable / Slow": "不稳定 / 缓慢",
+    "UNSTABLE / SLOW": "不稳定 / 缓慢",
 }
 
 
@@ -1058,10 +1058,17 @@ async def _draw_server_status_card_pillow(server_status) -> bytes:
 
     if als and als.sections:
         for sec in als.sections:
-            icon = "⚠" if "unstable" in sec.status.lower() or "slow" in sec.status.lower() else "✓"
+            s_lower = sec.status.lower()
+            icon = "🔴" if "down" in s_lower else ("⚠" if "unstable" in s_lower or "slow" in s_lower else "✓")
             lines.append(f"[{icon}] {_pl_name(sec.name)}  →  {_pl_status(sec.status)}")
             for entry in sec.entries[:5]:
-                dot = "⚠" if "unstable" in entry.status.upper() else "✓"
+                e_upper = entry.status.upper()
+                if "DOWN" in e_upper:
+                    dot = "🔴"
+                elif "UNSTABLE" in e_upper or "SLOW" in e_upper:
+                    dot = "⚠"
+                else:
+                    dot = "✓"
                 lines.append(f"  {dot} {entry.name}  {_pl_status(entry.status)}  {entry.response_time}")
             lines.append("")
 
