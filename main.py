@@ -6,10 +6,11 @@ import asyncio
 import uuid
 from pathlib import Path
 
-from astrbot.api.event import filter, AstrMessageEvent, MessageChain
-from astrbot.api.message_components import Image, Plain
+from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
+from astrbot.core.message.message_event_result import MessageChain
+from astrbot.api.message_components import Image, Plain
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from .libs.apex_client import ApexClient
