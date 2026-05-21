@@ -76,6 +76,12 @@ class Database:
                 recorded_at TEXT DEFAULT (datetime('now','localtime')),
                 PRIMARY KEY (uid, platform)
             );
+
+            CREATE TABLE IF NOT EXISTS monitor (
+                session_id    TEXT PRIMARY KEY,
+                enabled       INTEGER DEFAULT 1,
+                last_state    TEXT DEFAULT ''
+            );
         """)
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_teams_expires ON teams(expires_at)")
@@ -319,5 +325,42 @@ class Database:
         await conn.execute(
             "INSERT OR REPLACE INTO rp_history (uid, platform, rank_score, recorded_at) VALUES (?, ?, ?, ?)",
             (uid, platform, rank_score, now),
+        )
+        await conn.commit()
+
+    async def get_monitor(self, session_id: str) -> dict | None:
+        conn = await self._get_conn()
+        async with conn.execute(
+            "SELECT * FROM monitor WHERE session_id = ?", (session_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+        return dict(row) if row else None
+
+    async def set_monitor(self, session_id: str, enabled: bool, last_state: str = ""):
+        conn = await self._get_conn()
+        await conn.execute(
+            "INSERT OR REPLACE INTO monitor (session_id, enabled, last_state) VALUES (?, ?, ?)",
+            (session_id, int(enabled), last_state),
+        )
+        await conn.commit()
+
+    async def remove_monitor(self, session_id: str):
+        conn = await self._get_conn()
+        await conn.execute("DELETE FROM monitor WHERE session_id = ?", (session_id,))
+        await conn.commit()
+
+    async def list_monitor_sessions(self) -> list[dict]:
+        conn = await self._get_conn()
+        async with conn.execute(
+            "SELECT * FROM monitor WHERE enabled = 1"
+        ) as cursor:
+            rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    async def update_monitor_state(self, session_id: str, last_state: str):
+        conn = await self._get_conn()
+        await conn.execute(
+            "UPDATE monitor SET last_state = ? WHERE session_id = ?",
+            (last_state, session_id),
         )
         await conn.commit()

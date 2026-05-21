@@ -62,6 +62,7 @@ class XiaoChiyu(Star):
         asyncio.create_task(get_browser())
         asyncio.create_task(_download_moe_digits_async())
         start_cleaner()
+        self._fire_and_forget(self._monitor_loop(), "服务器监控")
 
     async def terminate(self):
         await self.apex.close()
@@ -384,6 +385,98 @@ class XiaoChiyu(Star):
         img = await renderer.draw_server_status_card(server_status)
         async for r in self._send_card(event, img):
             yield r
+
+    @filter.command("monitor", alias={"监控", "服务器监控"})
+    async def cmd_monitor(self, event: AstrMessageEvent, action: str = ""):
+        """服务器状态监控 — /monitor on|off|status"""
+        session = event.unified_msg_origin
+        action = (action or "").strip().lower()
+
+        if action == "on":
+            await self.db.set_monitor(session, True)
+            yield event.plain_result("✅ 服务器状态监控已开启，每 15 分钟检查一次，异常时自动推送")
+        elif action == "off":
+            await self.db.set_monitor(session, False)
+            yield event.plain_result("✅ 服务器状态监控已关闭")
+        elif action in ("status", ""):
+            row = await self.db.get_monitor(session)
+            if row and row["enabled"]:
+                state = {"": "待首次检查", "normal": "正常", "unstable": "异常"}.get(row["last_state"], row["last_state"])
+                yield event.plain_result(f"📡 监控状态: 开启\n当前状态: {state}")
+            else:
+                yield event.plain_result("📡 监控状态: 关闭\n使用 /monitor on 开启")
+        else:
+            yield event.plain_result("用法: /monitor on|off|status")
+
+    @staticmethod
+    def _detect_als_state(als) -> str:
+        """根据 ALS 数据判断整体状态: 'normal' 或 'unstable'"""
+        if als and als.outage_announcement:
+            return "unstable"
+        if als and als.alert_banner:
+            return "unstable"
+        if als and als.sections:
+            for sec in als.sections:
+                if "unstable" in sec.status.lower() or "slow" in sec.status.lower():
+                    return "unstable"
+                for entry in sec.entries:
+                    if "unstable" in entry.status.upper():
+                        return "unstable"
+        return "normal"
+
+    async def _monitor_tick(self):
+        """一次监控检查: 抓取 ALS 状态, 对比所有已开启会话, 状态变化时推送"""
+        import types
+        from astrbot.api.message_components import MessageChain, Image, Plain
+
+        als = None
+        try:
+            from .libs.als_scraper import scrape_als_server_status
+            als = await scrape_als_server_status()
+        except Exception:
+            logger.warning("[Monitor] ALS scrape failed", exc_info=True)
+
+        current_state = self._detect_als_state(als) if als else ""
+
+        sessions = await self.db.list_monitor_sessions()
+        if not sessions:
+            return
+
+        wrapper = types.SimpleNamespace(als=als)
+
+        for row in sessions:
+            sid = row["session_id"]
+            old_state = row.get("last_state", "")
+
+            if old_state == "unstable" and current_state == "normal":
+                text = f"🟢 服务器状态已恢复\n{als.alert_banner[:120] if als and als.alert_banner else '所有服务恢复正常'}"
+                try:
+                    img = await renderer.draw_server_status_card(wrapper)
+                    await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
+                except Exception:
+                    await self.context.send_message(sid, MessageChain([Plain(text)]))
+                await self.db.update_monitor_state(sid, current_state)
+
+            elif current_state == "unstable" and old_state != "unstable":
+                text = f"🔴 服务器状态异常\n{als.alert_banner[:120] if als and als.alert_banner else '检测到服务不稳定'}"
+                try:
+                    img = await renderer.draw_server_status_card(wrapper)
+                    await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
+                except Exception:
+                    await self.context.send_message(sid, MessageChain([Plain(text)]))
+                await self.db.update_monitor_state(sid, current_state)
+
+            elif old_state == "" and current_state:
+                await self.db.update_monitor_state(sid, current_state)
+
+    async def _monitor_loop(self):
+        """每 15 分钟监控循环"""
+        while True:
+            await asyncio.sleep(900)
+            try:
+                await self._monitor_tick()
+            except Exception as e:
+                logger.error(f"[Monitor] tick 异常: {e}")
 
     @filter.command("perf", alias={"性能"})
     async def cmd_perf(self, event: AstrMessageEvent):
