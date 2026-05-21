@@ -106,7 +106,7 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
 
             # Parse rows
             row_pattern = re.compile(
-                r'<div class="v2-status-row">(.*?)</div>\s*</div>',
+                r'<div class="v2-status-row">(.*?)</div>',
                 re.DOTALL,
             )
             for row_match in row_pattern.finditer(sec_html):
@@ -135,7 +135,8 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
         return result
 
     try:
-        await run_with_page(_do_scrape)
+        async with run_with_page() as page:
+            await _do_scrape(page)
         await cache_set(cache_key, result, 120)
         return result
     except Exception:
