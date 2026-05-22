@@ -37,6 +37,7 @@ class XiaoChiyu(Star):
         self._temp_dir.mkdir(parents=True, exist_ok=True)
 
         self._last_search: dict[str, list[dict]] = {}
+        self._monitor_task: asyncio.Task | None = None
 
         from .libs.config import preload_fonts
         preload_fonts()
@@ -64,9 +65,11 @@ class XiaoChiyu(Star):
         asyncio.create_task(get_browser())
         asyncio.create_task(_download_moe_digits_async())
         start_cleaner()
-        self._fire_and_forget(self._monitor_loop(), "服务器监控")
+        self._monitor_task = asyncio.create_task(self._monitor_loop())
 
     async def terminate(self):
+        if self._monitor_task and not self._monitor_task.done():
+            self._monitor_task.cancel()
         await self.apex.close()
         await self.db.close()
         from .libs.playwright_manager import close_browser
