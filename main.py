@@ -395,8 +395,9 @@ class XiaoChiyu(Star):
 
         if action == "on":
             await self.db.set_monitor(session, True)
+            interval = max(60, int(self.config.get("monitor_interval", 900)))
             logger.info(f"[Monitor] 开启 session={session}")
-            yield event.plain_result("✅ 服务器状态监控已开启，每 15 分钟检查一次，异常时自动推送")
+            yield event.plain_result(f"✅ 服务器状态监控已开启，每 {interval} 秒检查一次，异常时自动推送")
         elif action == "off":
             await self.db.set_monitor(session, False)
             logger.info(f"[Monitor] 关闭 session={session}")
@@ -487,11 +488,12 @@ class XiaoChiyu(Star):
                 await self.db.update_monitor_state(sid, current_state)
 
     async def _monitor_loop(self):
-        logger.debug("[Monitor] loop 启动, 每 900s 检查一次")
+        interval = max(60, int(self.config.get("monitor_interval", 900)))
+        logger.info(f"[Monitor] loop 启动, 每 {interval}s 检查一次")
         while True:
-            await asyncio.sleep(900)
+            await asyncio.sleep(interval)
             try:
-                logger.debug("[Monitor] loop → tick")
+                logger.info("[Monitor] loop → tick")
                 await self._monitor_tick()
             except Exception as e:
                 logger.error(f"[Monitor] tick 异常: {e}")
