@@ -1,4 +1,9 @@
 {
+  "apex_api_key": {
+    "description": "Apex Legends API Key (从 https://apexlegendsapi.com 获取)",
+    "type": "string",
+    "default": ""
+  },
   "monitor_interval": {
     "description": "服务器状态监控检查间隔（秒）",
     "type": "int",
