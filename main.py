@@ -439,7 +439,11 @@ class XiaoChiyu(Star):
         except Exception:
             logger.warning("[Monitor] ALS scrape failed", exc_info=True)
 
-        current_state = self._detect_als_state(als) if als else ""
+        if als is None:
+            logger.warning("[Monitor] ALS scrape failed, 跳过本轮 tick")
+            return
+
+        current_state = self._detect_als_state(als)
         logger.info(f"[Monitor] tick → state={current_state!r}  alert_banner={'…' if als and als.alert_banner else '—'}  outage={als.outage_announcement if als else '—'}  sections={len(als.sections) if als and als.sections else 0}")
 
         sessions = await self.db.list_monitor_sessions()
