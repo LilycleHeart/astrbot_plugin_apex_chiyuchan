@@ -4,11 +4,3 @@ desc: 一个专注于 Apex 英雄数据查询 · 组队 · 状态追踪 的 Astr
 version: v1.0.0
 author: 赤羽真白
 repo: https://github.com/LilycleHeart/astrbot_plugin_apex_chiyuchan
-
-config:
-  monitor_interval:
-    name: 监控间隔(秒)
-    description: 服务器状态监控的检查间隔，单位秒，默认 900 (15分钟)
-    type: int
-    default: 900
-    hint: "建议 300~3600"
