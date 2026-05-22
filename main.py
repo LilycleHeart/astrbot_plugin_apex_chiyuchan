@@ -511,12 +511,20 @@ class XiaoChiyu(Star):
                     logger.info(f"[Monitor] → 初始异常推送 {sid}")
                 else:
                     await self.db.update_monitor_state(sid, current_state)
+            else:
+                # 兜底：未知 old_state（如旧版遗留），静默同步到 current_state
+                if old_state != current_state:
+                    await self.db.update_monitor_state(sid, current_state)
 
     async def _monitor_loop(self):
         interval = max(60, int(self.config.get("monitor_interval", 900)))
         logger.info(f"[Monitor] loop 启动, 每 {interval}s 检查一次")
         while True:
-            await asyncio.sleep(interval)
+            try:
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                logger.info("[Monitor] loop 被终止")
+                return
             try:
                 logger.info("[Monitor] loop → tick")
                 await self._monitor_tick()
