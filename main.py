@@ -461,8 +461,14 @@ class XiaoChiyu(Star):
                 await self.db.update_monitor_state(sid, current_state)
                 try:
                     img = await renderer.draw_server_status_card(wrapper)
-                    await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
                 except Exception:
+                    img = None
+                if img:
+                    try:
+                        await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
+                    except Exception:
+                        await self.context.send_message(sid, MessageChain([Plain(text)]))
+                else:
                     await self.context.send_message(sid, MessageChain([Plain(text)]))
                 logger.info(f"[Monitor] → 恢复推送 {sid}")
 
@@ -471,8 +477,14 @@ class XiaoChiyu(Star):
                 await self.db.update_monitor_state(sid, current_state)
                 try:
                     img = await renderer.draw_server_status_card(wrapper)
-                    await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
                 except Exception:
+                    img = None
+                if img:
+                    try:
+                        await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
+                    except Exception:
+                        await self.context.send_message(sid, MessageChain([Plain(text)]))
+                else:
                     await self.context.send_message(sid, MessageChain([Plain(text)]))
                 logger.info(f"[Monitor] → 异常推送 {sid}")
 
@@ -482,8 +494,14 @@ class XiaoChiyu(Star):
                     await self.db.update_monitor_state(sid, current_state)
                     try:
                         img = await renderer.draw_server_status_card(wrapper)
-                        await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
                     except Exception:
+                        img = None
+                    if img:
+                        try:
+                            await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
+                        except Exception:
+                            await self.context.send_message(sid, MessageChain([Plain(text)]))
+                    else:
                         await self.context.send_message(sid, MessageChain([Plain(text)]))
                     logger.info(f"[Monitor] → 初始异常推送 {sid}")
                 else:
