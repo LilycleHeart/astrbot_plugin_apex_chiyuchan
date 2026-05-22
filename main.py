@@ -19,6 +19,21 @@ from .libs import image_renderer as renderer
 from .libs.als_scraper import fetch_badges, search_players
 
 
+async def _send_status_card(context, sid: str, text: str, wrapper):
+    """渲染并推送服务器状态卡片，发送失败自动降级为纯文字"""
+    try:
+        img = await renderer.draw_server_status_card(wrapper)
+    except Exception:
+        img = None
+    if img:
+        try:
+            await context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
+        except Exception:
+            await context.send_message(sid, MessageChain([Plain(text)]))
+    else:
+        await context.send_message(sid, MessageChain([Plain(text)]))
+
+
 @register(
     "apex_chiyuchan",
     "小赤羽",
@@ -461,60 +476,33 @@ class XiaoChiyu(Star):
             old_state = row.get("last_state", "")
             logger.info(f"[Monitor] tick → session={sid}  old={old_state!r}  new={current_state!r}")
 
-            if old_state == "unstable" and current_state == "normal":
-                text = f"🟢 服务器状态已恢复\n{als.alert_banner[:120] if als and als.alert_banner else '所有服务恢复正常'}"
-                await self.db.update_monitor_state(sid, current_state)
-                try:
-                    img = await renderer.draw_server_status_card(wrapper)
-                except Exception:
-                    img = None
-                if img:
-                    try:
-                        await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
-                    except Exception:
-                        await self.context.send_message(sid, MessageChain([Plain(text)]))
-                else:
-                    await self.context.send_message(sid, MessageChain([Plain(text)]))
-                logger.info(f"[Monitor] → 恢复推送 {sid}")
+            # 每个 session 独立 try/except，防止一个发送失败拖垮整个 tick
+            try:
+                if old_state == "unstable" and current_state == "normal":
+                    text = f"🟢 服务器状态已恢复\n{als.alert_banner[:120] if als and als.alert_banner else '所有服务恢复正常'}"
+                    await self.db.update_monitor_state(sid, current_state)
+                    await _send_status_card(self.context, sid, text, wrapper)
+                    logger.info(f"[Monitor] → 恢复推送 {sid}")
 
-            elif current_state == "unstable" and old_state != "unstable":
-                text = f"🔴 服务器状态异常\n{als.alert_banner[:120] if als and als.alert_banner else '检测到服务不稳定'}"
-                await self.db.update_monitor_state(sid, current_state)
-                try:
-                    img = await renderer.draw_server_status_card(wrapper)
-                except Exception:
-                    img = None
-                if img:
-                    try:
-                        await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
-                    except Exception:
-                        await self.context.send_message(sid, MessageChain([Plain(text)]))
-                else:
-                    await self.context.send_message(sid, MessageChain([Plain(text)]))
-                logger.info(f"[Monitor] → 异常推送 {sid}")
-
-            elif old_state == "" and current_state:
-                if current_state == "unstable":
+                elif current_state == "unstable" and old_state != "unstable":
                     text = f"🔴 服务器状态异常\n{als.alert_banner[:120] if als and als.alert_banner else '检测到服务不稳定'}"
                     await self.db.update_monitor_state(sid, current_state)
-                    try:
-                        img = await renderer.draw_server_status_card(wrapper)
-                    except Exception:
-                        img = None
-                    if img:
-                        try:
-                            await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
-                        except Exception:
-                            await self.context.send_message(sid, MessageChain([Plain(text)]))
+                    await _send_status_card(self.context, sid, text, wrapper)
+                    logger.info(f"[Monitor] → 异常推送 {sid}")
+
+                elif old_state == "" and current_state:
+                    if current_state == "unstable":
+                        text = f"🔴 服务器状态异常\n{als.alert_banner[:120] if als and als.alert_banner else '检测到服务不稳定'}"
+                        await self.db.update_monitor_state(sid, current_state)
+                        await _send_status_card(self.context, sid, text, wrapper)
+                        logger.info(f"[Monitor] → 初始异常推送 {sid}")
                     else:
-                        await self.context.send_message(sid, MessageChain([Plain(text)]))
-                    logger.info(f"[Monitor] → 初始异常推送 {sid}")
+                        await self.db.update_monitor_state(sid, current_state)
                 else:
-                    await self.db.update_monitor_state(sid, current_state)
-            else:
-                # 兜底：未知 old_state（如旧版遗留），静默同步到 current_state
-                if old_state != current_state:
-                    await self.db.update_monitor_state(sid, current_state)
+                    if old_state != current_state:
+                        await self.db.update_monitor_state(sid, current_state)
+            except Exception:
+                logger.warning(f"[Monitor] session={sid} 处理异常", exc_info=True)
 
     async def _monitor_loop(self):
         interval = max(60, int(self.config.get("monitor_interval", 900)))
