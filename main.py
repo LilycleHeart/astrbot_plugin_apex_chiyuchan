@@ -458,34 +458,36 @@ class XiaoChiyu(Star):
 
             if old_state == "unstable" and current_state == "normal":
                 text = f"🟢 服务器状态已恢复\n{als.alert_banner[:120] if als and als.alert_banner else '所有服务恢复正常'}"
+                await self.db.update_monitor_state(sid, current_state)
                 try:
                     img = await renderer.draw_server_status_card(wrapper)
                     await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
                 except Exception:
                     await self.context.send_message(sid, MessageChain([Plain(text)]))
-                await self.db.update_monitor_state(sid, current_state)
                 logger.info(f"[Monitor] → 恢复推送 {sid}")
 
             elif current_state == "unstable" and old_state != "unstable":
                 text = f"🔴 服务器状态异常\n{als.alert_banner[:120] if als and als.alert_banner else '检测到服务不稳定'}"
+                await self.db.update_monitor_state(sid, current_state)
                 try:
                     img = await renderer.draw_server_status_card(wrapper)
                     await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
                 except Exception:
                     await self.context.send_message(sid, MessageChain([Plain(text)]))
-                await self.db.update_monitor_state(sid, current_state)
                 logger.info(f"[Monitor] → 异常推送 {sid}")
 
             elif old_state == "" and current_state:
                 if current_state == "unstable":
                     text = f"🔴 服务器状态异常\n{als.alert_banner[:120] if als and als.alert_banner else '检测到服务不稳定'}"
+                    await self.db.update_monitor_state(sid, current_state)
                     try:
                         img = await renderer.draw_server_status_card(wrapper)
                         await self.context.send_message(sid, MessageChain([Plain(text), Image.fromBytes(img)]))
                     except Exception:
                         await self.context.send_message(sid, MessageChain([Plain(text)]))
                     logger.info(f"[Monitor] → 初始异常推送 {sid}")
-                await self.db.update_monitor_state(sid, current_state)
+                else:
+                    await self.db.update_monitor_state(sid, current_state)
 
     async def _monitor_loop(self):
         interval = max(60, int(self.config.get("monitor_interval", 900)))
