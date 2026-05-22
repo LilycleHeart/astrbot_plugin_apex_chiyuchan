@@ -23,7 +23,7 @@ from .libs.als_scraper import fetch_badges, search_players
     "apex_chiyuchan",
     "小赤羽",
     "Apex 战绩查询 / 地图轮换 / 大师数据 / 组队系统",
-    "1.0.0",
+    "1.1.0",
 )
 class XiaoChiyu(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
