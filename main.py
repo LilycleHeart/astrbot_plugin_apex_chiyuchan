@@ -418,8 +418,6 @@ class XiaoChiyu(Star):
     def _detect_als_state(als) -> str:
         if als and als.outage_announcement:
             return "unstable"
-        if als and als.alert_banner:
-            return "unstable"
         if als and als.sections:
             for sec in als.sections:
                 s_lower = sec.status.lower()

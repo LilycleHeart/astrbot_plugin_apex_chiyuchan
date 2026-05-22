@@ -647,9 +647,12 @@ _ALS_SECTION_NAMES = {
 _ALS_STATUS_TEXT = {
     "UNSTABLE": "不稳定",
     "UP": "正常",
+    "RUNNING": "正常",
     "SLOW": "缓慢",
     "DOWN": "宕机",
     "UNSTABLE / SLOW": "不稳定 / 缓慢",
+    "MOSTLY OPERATIONAL": "正常",
+    "OPERATIONAL": "正常",
 }
 
 
