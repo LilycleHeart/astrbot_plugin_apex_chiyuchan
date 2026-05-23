@@ -54,7 +54,7 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
         await page.route(
             "**/*",
             lambda route: route.abort()
-            if route.request.resource_type in ("image", "font", "media", "stylesheet")
+            if route.request.resource_type in ("image", "font", "media")
             or "analytics" in (route.request.url or "")
             or "googletagmanager" in (route.request.url or "")
             or "cookieconsent" in (route.request.url or "")
@@ -144,11 +144,11 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
 
 
 async def _block_noise(page):
-    """拦截图片/字体/媒体/统计请求，加速页面加载"""
+    """拦截图片/字体/媒体/统计请求，加速页面加载（放行 stylesheet 以免破坏懒加载）"""
     await page.route(
         "**/*",
         lambda route: route.abort()
-        if route.request.resource_type in ("image", "font", "media", "stylesheet")
+        if route.request.resource_type in ("image", "font", "media")
         or "analytics" in (route.request.url or "")
         or "googletagmanager" in (route.request.url or "")
         or "cookieconsent" in (route.request.url or "")
