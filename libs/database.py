@@ -12,7 +12,13 @@ from astrbot.api import logger
 
 class Database:
     def __init__(self):
-        data_dir = Path(get_astrbot_data_path()) / "plugin_data" / "apex_chiyuchan"
+        base = Path(get_astrbot_data_path()) / "plugin_data"
+        old_dir = base / "apex_chiyuchan"
+        new_dir = base / "astrbot_plugin_apex_chiyuchan"
+        if old_dir.is_dir() and not new_dir.is_dir():
+            old_dir.rename(new_dir)
+            logger.info("[Database] 迁移数据目录 apex_chiyuchan → astrbot_plugin_apex_chiyuchan")
+        data_dir = new_dir
         data_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = data_dir / "chiyuchan.db"
         self._conn: aiosqlite.Connection | None = None
