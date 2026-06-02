@@ -10,5 +10,11 @@
     "type": "int",
     "default": 900,
     "hint": "建议 300~3600"
+  },
+  "server_llm_prompt": {
+    "description": "LLM 服务器状态查询的额外提示词",
+    "type": "string",
+    "default": "",
+    "hint": "留空则使用默认提示词"
   }
 }

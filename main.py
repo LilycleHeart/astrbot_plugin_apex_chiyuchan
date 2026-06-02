@@ -1023,7 +1023,11 @@ class XiaoChiyu(Star):
             text = f"ALS 报告: {len(als.sections)} 个服务中 {unstable} 个异常\n"
         else:
             text = "服务器状态数据获取成功\n"
-        text += "\n请根据服务器状态评论一下，然后用 send_message_to_user 发送服务器状态卡片图片。发送后不要再发任何额外消息。"
+        custom_prompt = self.config.get("server_llm_prompt", "")
+        if custom_prompt:
+            text += custom_prompt + "\n"
+        else:
+            text += "\n请根据服务器状态评论一下，然后用 send_message_to_user 发送服务器状态卡片图片。发送后不要再发任何额外消息。"
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
