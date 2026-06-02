@@ -439,11 +439,11 @@ class XiaoChiyu(Star):
         if als and als.sections:
             for sec in als.sections:
                 s_lower = sec.status.lower()
-                if "unstable" in s_lower or "slow" in s_lower or "down" in s_lower:
+                if "down" in s_lower or "unstable" in s_lower:
                     return "unstable"
                 for entry in sec.entries:
                     e_upper = entry.status.upper()
-                    if any(x in e_upper for x in ("UNSTABLE", "SLOW", "DOWN")):
+                    if "DOWN" in e_upper or "UNSTABLE" in e_upper:
                         return "unstable"
         return "normal"
 
@@ -831,7 +831,7 @@ class XiaoChiyu(Star):
                 + ", ".join(f"{e.name} {e.pct}%" for e in rank_dist.entries)
                 + "\n"
             )
-        text += "\n请根据以上数据评论一下用户的战绩，然后用 send_message_to_user 发送战绩卡片图片。发送后不要再发任何额外消息。"
+        text += "\n请根据以上数据评论一下用户的战绩，然后用 send_message_to_user 发送战绩卡片图片。"
 
         return CallToolResult(
             content=[
@@ -856,7 +856,7 @@ class XiaoChiyu(Star):
             return CallToolResult(
                 content=[
                     TextContent(
-                        type="text", text="平台仅支持 PC / PS4 / X1，请提示用户"
+                        type="text", text="平台仅支持 PC / PS / XBOX ，请提示用户"
                     )
                 ]
             )
@@ -994,7 +994,7 @@ class XiaoChiyu(Star):
         )
         if r_next:
             text += f"下一张排位: {r_next}\n"
-        text += "\n请简单介绍一下地图，然后用 send_message_to_user 发送地图卡片图片。发送后不要再发任何额外消息。"
+        text += "\n请简单介绍一下地图，然后用 send_message_to_user 发送地图卡片图片。"
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
@@ -1023,7 +1023,7 @@ class XiaoChiyu(Star):
             text = f"ALS 报告: {len(als.sections)} 个服务中 {unstable} 个异常\n"
         else:
             text = "服务器状态数据获取成功\n"
-        text += "\n请根据服务器状态评论一下，然后用 send_message_to_user 发送服务器状态卡片图片。发送后不要再发任何额外消息。"
+        text += "\n请根据服务器状态评论一下，然后用 send_message_to_user 发送服务器状态卡片图片。"
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
@@ -1049,7 +1049,7 @@ class XiaoChiyu(Star):
             pd = predator.platforms.get(plat)
             if pd:
                 text += f"{plat}: 猎杀线 {pd.predator_cap:,} RP | 大师/猎杀 {pd.masters_and_preds:,} 人\n"
-        text += "\n请简单评论各平台数据，然后用 send_message_to_user 发送大师数据卡片图片。发送后不要再发任何额外消息。"
+        text += "\n请简单评论各平台数据，然后用 send_message_to_user 发送大师数据卡片图片。"
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
