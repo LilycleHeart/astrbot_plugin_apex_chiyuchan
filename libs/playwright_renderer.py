@@ -283,7 +283,6 @@ def _build_stats_html(**d) -> str:
     state_dot = "#4CE5B1" if online in ("online", "in_game") else "#555"
     prestige_str = f"P{prestige}" if prestige else ""
     rank_c = _rank_color(rank_name)
-    top_als = f"{rank_top_pct}%"
     top_global = f"{rank_top_pct_global}%"
     rp_delta_html = ""
     if rp_delta is not None:
@@ -483,8 +482,7 @@ body{{
     <div class="rank-rp">{rank_score:,} RP{rp_delta_html}</div>
   </div>
   <div class="rank-stats">
-    <div><div class="rank-stat-val">{top_als}</div><div class="rank-stat-label">Top (ALS)</div></div>
-    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top (Global)</div></div>
+    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top</div></div>
   </div>
 </div>
 
