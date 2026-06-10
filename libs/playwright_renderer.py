@@ -258,6 +258,7 @@ def _build_stats_html(**d) -> str:
     rank_img = d.get("rank_img", d.get("rank_icon_url", ""))
     rank_top_pct = d.get("rank_top_pct", 0)
     rank_top_pct_global = d.get("rank_top_pct_global", rank_top_pct)
+    rank_ladder_pos = d.get("rank_ladder_pos", 0)
 
     # ── 根据段位动态取色 ──
     _theme = _theme_for_rank(rank_name)
@@ -482,7 +483,7 @@ body{{
   <img class="rank-img" src="{rank_img}" onerror="this.remove()">
   <div>
     <div class="rank-tier">{_rank_zh(rank_name)}{_rank_div_zh(rank_div, rank_name)}</div>
-    <div class="rank-rp">{rank_score:,} RP{rp_delta_html}</div>
+    <div class="rank-rp">{rank_score:,} RP{rp_delta_html}{'  #' + str(rank_ladder_pos) if rank_ladder_pos and rank_name.startswith('Predator') else ''}</div>
   </div>
   <div class="rank-stats">
     <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top</div></div>
