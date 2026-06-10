@@ -432,6 +432,7 @@ body{{
 }}
 .rank-img{{width:80px;height:80px;filter:drop-shadow(0 4px 8px {rank_c}44)}}
 .rank-tier{{font-size:28px;font-weight:800;color:{rank_c};line-height:1}}
+.rank-pos{{font-size:18px;font-weight:600;color:{rank_c};opacity:.85;margin-left:10px}}
 .rank-div{{font-size:16px;color:{rank_c};opacity:.9}}
 .rank-rp{{font-size:14px;color:{_C_MUTED};margin-top:4px}}
 .rank-stats{{display:flex;gap:24px;text-align:center;margin-left:auto}}
@@ -482,8 +483,8 @@ body{{
 <div class="rank-section">
   <img class="rank-img" src="{rank_img}" onerror="this.remove()">
   <div>
-    <div class="rank-tier">{_rank_zh(rank_name)}{_rank_div_zh(rank_div, rank_name)}</div>
-    <div class="rank-rp">{rank_score:,} RP{rp_delta_html}{'  #' + str(rank_ladder_pos) if rank_ladder_pos and rank_name.startswith('Predator') else ''}</div>
+    <div class="rank-tier">{_rank_zh(rank_name)}{_rank_div_zh(rank_div, rank_name)}{' <span class="rank-pos">#' + str(rank_ladder_pos) + '</span>' if rank_ladder_pos and (rank_name.startswith('Predator') or rank_name.startswith('Master')) else ''}</div>
+    <div class="rank-rp">{rank_score:,} RP{rp_delta_html}</div>
   </div>
   <div class="rank-stats">
     <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top</div></div>
