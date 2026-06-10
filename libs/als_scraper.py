@@ -199,19 +199,23 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
         });
         const text = document.body.innerText;
         const gIdx = text.indexOf('\\nGlobal\\n');
-        let kills = 0;
+        let kills = 0, wins = 0, rankScore = 0;
         if (gIdx >= 0) {
             const gSection = text.substring(gIdx, gIdx + 500);
             const ck = gSection.match(/Career Kills\\s*\\n([\\d,]+)\\n/);
             if (ck) kills = parseInt(ck[1].replace(/,/g,''));
+            const cw = gSection.match(/Wins\\s*\\n([\\d,]+)\\n/);
+            if (cw) wins = parseInt(cw[1].replace(/,/g,''));
         }
         let level = 0, prestige = 0;
         const lv = text.match(/LEVEL\\s*\\n(\\d+)\\s*\\nPRESTIGE\\s*(\\d+)/);
         if (lv) { level = parseInt(lv[1]); prestige = parseInt(lv[2]); }
         let rankPos = 0;
-        const brRank = text.match(/BR Rank[\\s\\S]*?#(\\d{1,6})/);
+        const brRank = text.match(/BR Rank[\\s\\S]*?#([\\d,]{1,12})\\b/);
         if (brRank) rankPos = parseInt(brRank[1].replace(/,/g,''));
-        return {seasons, special: special.slice(0, 5), kills, level, prestige, rankPos};
+        const brScore = text.match(/BR Rank[\\s\\S]*?([\\d,]+)\\s*RP/);
+        if (brScore) rankScore = parseInt(brScore[1].replace(/,/g,''));
+        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore};
     }""")
 
 

@@ -1257,7 +1257,7 @@ def _draw_profile_sync(
     draw.text((rank_text_x, cy - 2), rank_full, font=FONT_TITLE, fill=rank_color)
 
     rp_text = f"{rank_score:,} RP"
-    if rank_ladder_pos and rank_name.startswith("Predator"):
+    if rank_ladder_pos and (rank_name.startswith("Predator") or rank_name.startswith("Master")):
         rp_text += f"  #{rank_ladder_pos}"
     draw.text(
         (rank_text_x, cy + FONT_SIZES["title"] + 4),
