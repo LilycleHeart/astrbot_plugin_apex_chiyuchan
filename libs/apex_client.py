@@ -42,6 +42,7 @@ class PlayerStats:
         self.rank_score = rank.get("rankScore", 0)
         self.rank_img = rank.get("rankImg", "")
         self.rank_top_pct = rank.get("ALStopPercent", 0)
+        self.rank_ladder_pos = rank.get("ladderPos", 0)
 
         self.state = realtime.get("currentState", "offline")
         self.selected_legend = realtime.get("selectedLegend", "")

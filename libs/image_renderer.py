@@ -1252,12 +1252,16 @@ def _draw_profile_sync(
     else:
         rank_text_x = rank_icon_x
 
+    rank_ladder_pos = data.get("rank_ladder_pos", 0)
     rank_full = f"{rank_name}{' ' + _rank_div_label(rank_div, rank_name) if rank_div else ''}"
     draw.text((rank_text_x, cy - 2), rank_full, font=FONT_TITLE, fill=rank_color)
 
+    rp_text = f"{rank_score:,} RP"
+    if rank_ladder_pos and rank_name.startswith("Predator"):
+        rp_text += f"  #{rank_ladder_pos}"
     draw.text(
         (rank_text_x, cy + FONT_SIZES["title"] + 4),
-        f"{rank_score:,} RP",
+        rp_text,
         font=FONT_SUBTITLE,
         fill=ON_SURFACE,
     )
