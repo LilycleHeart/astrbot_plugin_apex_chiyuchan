@@ -1252,7 +1252,7 @@ def _draw_profile_sync(
     else:
         rank_text_x = rank_icon_x
 
-    rank_full = f"{rank_name}{' ' + _rank_div_label(rank_div) if rank_div else ''}"
+    rank_full = f"{rank_name}{' ' + _rank_div_label(rank_div, rank_name) if rank_div else ''}"
     draw.text((rank_text_x, cy - 2), rank_full, font=FONT_TITLE, fill=rank_color)
 
     draw.text(
@@ -1452,7 +1452,10 @@ def _draw_profile_sync(
     return buf.getvalue()
 
 
-def _rank_div_label(div: int) -> str:
+def _rank_div_label(div: int, rank_name: str = "") -> str:
+    major = rank_name.split(" ")[0] if rank_name else ""
+    if major in ("Master", "Predator"):
+        return ""
     mapping = {0: "IV", 1: "III", 2: "II", 3: "I"}
     return mapping.get(div, str(div))
 

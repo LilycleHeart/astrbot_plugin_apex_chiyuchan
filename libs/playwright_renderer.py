@@ -131,7 +131,10 @@ def _rank_zh(name: str) -> str:
     return _RANK_ZH.get(major, major)
 
 
-def _rank_div_zh(div: int) -> str:
+def _rank_div_zh(div: int, rank_name: str = "") -> str:
+    major = rank_name.split(" ")[0] if rank_name else ""
+    if major in ("Master", "Predator"):
+        return ""
     return str(div) if div > 0 else ""
 
 
@@ -478,7 +481,7 @@ body{{
 <div class="rank-section">
   <img class="rank-img" src="{rank_img}" onerror="this.remove()">
   <div>
-    <div class="rank-tier">{_rank_zh(rank_name)}{_rank_div_zh(rank_div)}</div>
+    <div class="rank-tier">{_rank_zh(rank_name)}{_rank_div_zh(rank_div, rank_name)}</div>
     <div class="rank-rp">{rank_score:,} RP{rp_delta_html}</div>
   </div>
   <div class="rank-stats">
