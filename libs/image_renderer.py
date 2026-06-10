@@ -1264,7 +1264,7 @@ def _draw_profile_sync(
 
     draw.text(
         (rank_text_x, cy + FONT_SIZES["title"] + FONT_SIZES["subtitle"] + 8),
-        f"ALS Top {rank_top_pct}%  |  Global Top {rank_top_pct_global}%",
+        f"全服 Top {data.get('rank_top_pct_global', '--')}%",
         font=FONT_CAPTION,
         fill=MUTED,
     )

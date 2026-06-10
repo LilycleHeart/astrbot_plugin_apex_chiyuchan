@@ -95,8 +95,29 @@ class XiaoChiyu(Star):
 
     async def _save_temp(self, img_bytes: bytes, suffix: str = ".png") -> str:
         path = self._temp_dir / f"{uuid.uuid4()}{suffix}"
-        await asyncio.to_thread(path.write_bytes, img_bytes)
+        path.write_bytes(img_bytes)
         return str(path)
+
+    @staticmethod
+    def _calc_global_pct(rank_name: str, rank_div: int, rank_dist) -> float | None:
+        if not rank_dist or not rank_dist.entries:
+            return None
+        total = sum(e.count for e in rank_dist.entries if e.count)
+        if total == 0:
+            return None
+        major = rank_name.split(" ")[0] if rank_name else ""
+        above = 0
+        found = False
+        for e in rank_dist.entries:
+            if e.name == major:
+                found = True
+                continue
+            if found:
+                above += e.count
+        tier_count = next((e.count for e in rank_dist.entries if e.name == major), 0)
+        div = min(rank_div, 3)
+        above += tier_count * (3 - div) / 4
+        return round(above / total * 100, 2)
 
     async def _send_card(
         self, event: AstrMessageEvent, img_bytes: bytes, suffix: str = ".png", **kwargs
@@ -301,8 +322,7 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
-        # ── 构建渲染数据 ──
-        qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+        global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
 
         # ── 构建渲染数据 ──
         profile_data = {
@@ -320,7 +340,7 @@ class XiaoChiyu(Star):
             "rank_score": stats.rank_score,
             "rank_img": stats.rank_img,
             "rank_top_pct": stats.rank_top_pct,
-            "rank_top_pct_global": stats.rank_top_pct,
+            "rank_top_pct_global": global_pct,
             "rp_delta": rp_delta,
             "kills": badges.get("kills", 0) or stats.kills,
             "damage": stats.damage,
@@ -755,6 +775,8 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
+        global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
         profile_data = {
             "name": stats.name,
@@ -771,7 +793,7 @@ class XiaoChiyu(Star):
             "rank_score": stats.rank_score,
             "rank_img": stats.rank_img,
             "rank_top_pct": stats.rank_top_pct,
-            "rank_top_pct_global": stats.rank_top_pct,
+            "rank_top_pct_global": global_pct,
             "rp_delta": rp_delta,
             "kills": badges.get("kills", 0) or stats.kills,
             "damage": stats.damage,
