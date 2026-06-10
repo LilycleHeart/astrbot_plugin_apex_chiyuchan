@@ -672,7 +672,7 @@ class XiaoChiyu(Star):
 
     @filter.llm_tool(name="apex_stats")
     async def llm_stats(self, event: AstrMessageEvent, player_name: str = ""):
-        """查询 Apex 玩家战绩并生成卡片。不传玩家名则查已绑定账号。
+        """获取 Apex Legends 游戏内战绩数据并生成卡片。仅当用户明确要求查询 Apex 段位、击杀、胜场、KD 等游戏数据时调用。不要因为用户说"介绍我"或"评价我"就触发。
 
         Args:
             player_name(string): 玩家名或UID，留空查绑定账号
