@@ -486,7 +486,7 @@ body{{
     <div class="rank-rp">{rank_score:,} RP{rp_delta_html}</div>
   </div>
   <div class="rank-stats">
-    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top</div></div>
+    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top (全平台)</div></div>
   </div>
 </div>
 
@@ -504,7 +504,7 @@ body{{
 
 {selected_html}
 
-<div style="font-size:14px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:2px;padding:16px 24px 8px;">段位分布参考</div>
+<div style="font-size:14px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:2px;padding:16px 24px 8px;">段位分布参考 (全平台)</div>
 {rank_dist}
 
 <div style="font-size:14px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:2px;padding:16px 24px 8px;">常用英雄</div>
