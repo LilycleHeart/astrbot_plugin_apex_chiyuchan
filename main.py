@@ -325,6 +325,7 @@ class XiaoChiyu(Star):
         global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
 
         # ── 构建渲染数据 ──
+        qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
