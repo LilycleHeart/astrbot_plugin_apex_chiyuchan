@@ -208,7 +208,10 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
         let level = 0, prestige = 0;
         const lv = text.match(/LEVEL\\s*\\n(\\d+)\\s*\\nPRESTIGE\\s*(\\d+)/);
         if (lv) { level = parseInt(lv[1]); prestige = parseInt(lv[2]); }
-        return {seasons, special: special.slice(0, 5), kills, level, prestige};
+        let rankPos = 0;
+        const brRank = text.match(/BR Rank[\\s\\S]*?#(\\d{1,6})/);
+        if (brRank) rankPos = parseInt(brRank[1].replace(/,/g,''));
+        return {seasons, special: special.slice(0, 5), kills, level, prestige, rankPos};
     }""")
 
 
