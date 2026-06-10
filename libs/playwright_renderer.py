@@ -515,6 +515,7 @@ body{{
 
 <div class="footer">
   <span>Data: <span style="color:{_C_PRED};">Apex Legends Status</span></span>
+  <span style="color:{_C_MUTED};">auth.赤羽真白 · Apex Chiyuchan</span>
   <span>UID: {uid}</span>
 </div>
 
