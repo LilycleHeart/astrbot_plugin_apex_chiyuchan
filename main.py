@@ -418,6 +418,7 @@ class XiaoChiyu(Star):
                 return
 
             entries = []
+            rank_dist = await self.apex.get_rank_distribution()
             for u in lfg_users:
                 # cw: look up QQ name via OneBot API, cache in db
                 qq_name = u.get("qq_name", "") or ""
@@ -433,7 +434,6 @@ class XiaoChiyu(Star):
                 if not stats:
                     continue
                 badges = await fetch_lfg_stats(u["uid"], u["platform"])
-                rank_dist = await self.apex.get_rank_distribution()
                 global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
                 level_raw = badges.get("level") or stats.level
                 prestige_raw = badges.get("prestige") or stats.prestige
