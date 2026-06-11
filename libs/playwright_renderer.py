@@ -1067,21 +1067,20 @@ def _build_lfg_html(entries: list[dict]) -> str:
         chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
         mode_label = "排位赛" if mode == "ranked" else "娱乐匹配"
 
+        display_name = e.get("qq_name") or apex_name
+        qq_avatar = e.get("qq_avatar", "")
+
         rows += f"""
         <div class="player-row">
             <div class="col-player">
-                <div class="avatar">
-                    <span class="material-symbols-rounded">person</span>
-                </div>
-                <div>
-                    <div style="font-weight: 700;">{apex_name}</div>
+                <img class="avatar" src="{qq_avatar}" alt="">
+                <div class="player-info">
+                    <div class="player-name">{display_name}</div>
                     <div class="status-tag"><span class="material-symbols-rounded dot-online" style="font-variation-settings: 'FILL' 1;font-size:8px">circle</span> 在线 · {platform}</div>
                 </div>
             </div>
             <div class="col-rank">
-                <div class="rank-badge-bg">
-                    <img class="rank-icon" src="{rank_img}" alt="{rank_name}">
-                </div>
+                <img class="rank-icon" src="{rank_img}" alt="{rank_name}">
                 <div class="rank-text">
                     <span class="rank-score text-{rank_type}">{rank_score:,}</span>
                     <span class="rank-label">{rank_display}</span>
@@ -1102,29 +1101,30 @@ def _build_lfg_html(entries: list[dict]) -> str:
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{background:#1c1b1f;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:24px}}
-.lfg-list{{width:100%;max-width:1000px;display:flex;flex-direction:column;gap:8px;background:#1c1b1f;border-radius:28px;padding:24px}}
-.list-header{{display:grid;grid-template-columns:2fr 2fr 3fr 1fr 1fr;padding:0 24px 12px 24px;font-size:0.85rem;font-weight:500;color:#938f99}}
-.player-row{{display:grid;grid-template-columns:2fr 2fr 3fr 1fr 1fr;align-items:center;background:#2b2930;padding:16px 24px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent}}
-.player-row:hover{{background:#36343b;transform:translateY(-2px);border-color:#49454f}}
-.col-player{{display:flex;align-items:center;gap:16px}}
-.avatar{{width:44px;height:44px;border-radius:12px;background:#4f378b;display:flex;justify-content:center;align-items:center;color:#eaddff}}
-.col-rank{{display:flex;align-items:center;gap:12px}}
-.rank-badge-bg{{background:rgba(0,0,0,0.2);padding:6px;border-radius:12px;display:flex}}
-.rank-icon{{width:34px;height:34px}}
-.rank-text{{display:flex;flex-direction:column}}
-.rank-score{{font-weight:700;font-size:1.05rem}}
-.rank-label{{font-size:0.75rem;color:#938f99}}
+body{{background:#1e1e2e;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:32px 24px}}
+.lfg-list{{width:100%;max-width:1080px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
+.list-header{{display:grid;grid-template-columns:2.5fr 2fr 2.5fr 1fr 1fr;padding:0 28px 16px 28px;font-size:0.85rem;font-weight:500;color:#938f99}}
+.player-row{{display:grid;grid-template-columns:2.5fr 2fr 2.5fr 1fr 1fr;align-items:center;background:#282838;padding:20px 28px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent}}
+.player-row:hover{{background:#303042;transform:translateY(-2px);border-color:#49454f}}
+.col-player{{display:flex;align-items:center;gap:18px}}
+.avatar{{width:52px;height:52px;border-radius:14px;object-fit:cover}}
+.player-info{{display:flex;flex-direction:column;gap:4px}}
+.player-name{{font-weight:700;font-size:1rem}}
+.status-tag{{font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px}}
+.dot-online{{color:#b7f397;font-size:8px}}
+.col-rank{{display:flex;align-items:center;gap:14px}}
+.rank-icon{{width:44px;height:44px}}
+.rank-text{{display:flex;flex-direction:column;gap:2px}}
+.rank-score{{font-weight:700;font-size:1.15rem}}
+.rank-label{{font-size:0.78rem;color:#938f99}}
 .col-wants{{display:flex;gap:8px;flex-wrap:wrap}}
 .md3-chip{{background:#333537;color:#e3e2e6;padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px}}
 .chip-highlight{{background:#633b48;color:#ffd8e4}}
-.col-data{{font-weight:700;font-size:1.1rem}}
+.col-data{{font-weight:700;font-size:1.1rem;text-align:right}}
 .text-predator{{color:#ffb4ab}} .text-master{{color:#d0bcff}} .text-diamond{{color:#bac3ff}}
 .text-platinum{{color:#99f1ff}} .text-gold{{color:#ffd966}} .text-silver{{color:#c0c0c0}}
 .text-bronze{{color:#cd7f32}} .text-unranked{{color:#938f99}}
-.status-tag{{font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px}}
-.dot-online{{color:#b7f397;font-size:8px}}
-.footer{{padding:12px 24px;font-size:11px;color:#938f99;display:flex;justify-content:space-between;border-top:1px solid #49454f;margin-top:8px}}
+.footer{{padding:16px 28px 0 28px;font-size:11px;color:#555;display:flex;justify-content:space-between;border-top:1px solid #383850;margin-top:8px}}
 </style></head><body>
 <div class="lfg-list">
     <div class="list-header">

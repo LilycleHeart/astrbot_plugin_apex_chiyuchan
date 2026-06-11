@@ -417,6 +417,8 @@ class XiaoChiyu(Star):
                 global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
                 entries.append({
                     "qq_id": u["qq_id"],
+                    "qq_name": u.get("qq_name", ""),
+                    "qq_avatar": f"https://q1.qlogo.cn/g?b=qq&nk={u['qq_id']}&s=640",
                     "mode": u["mode"],
                     "apex_name": stats.name,
                     "platform": u["platform"],
@@ -500,7 +502,7 @@ class XiaoChiyu(Star):
             return
 
         await self.db.upsert_lfg_user(
-            qq_id, cached["uid"], cached["name"], cached["platform"], mode
+            qq_id, cached["uid"], cached["name"], cached["platform"], mode, qq_name=event.get_sender_name() or ""
         )
 
         img = await renderer.draw_text_card(

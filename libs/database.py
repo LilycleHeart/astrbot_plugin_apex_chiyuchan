@@ -87,6 +87,7 @@ class Database:
                 qq_id       TEXT PRIMARY KEY,
                 uid         TEXT NOT NULL,
                 name        TEXT NOT NULL,
+                qq_name     TEXT DEFAULT '',
                 platform    TEXT DEFAULT 'PC',
                 mode        TEXT DEFAULT 'ranked',
                 registered_at TEXT DEFAULT (datetime('now','localtime'))
@@ -374,11 +375,11 @@ class Database:
         )
         await conn.commit()
 
-    async def upsert_lfg_user(self, qq_id: str, uid: str, name: str, platform: str, mode: str = "ranked"):
+    async def upsert_lfg_user(self, qq_id: str, uid: str, name: str, platform: str, mode: str = "ranked", qq_name: str = ""):
         conn = await self._get_conn()
         await conn.execute(
-            "INSERT OR REPLACE INTO lfg_users (qq_id, uid, name, platform, mode, registered_at) VALUES (?, ?, ?, ?, ?, datetime('now','localtime'))",
-            (qq_id, uid, name, platform, mode),
+            "INSERT OR REPLACE INTO lfg_users (qq_id, uid, name, qq_name, platform, mode, registered_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
+            (qq_id, uid, name, qq_name, platform, mode),
         )
         await conn.commit()
 
