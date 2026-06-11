@@ -418,7 +418,6 @@ class XiaoChiyu(Star):
                 return
 
             entries = []
-            debug_lines = []
             rank_dist = await self.apex.get_rank_distribution()
             for u in lfg_users:
                 # cw: look up QQ name via OneBot API, cache in db
@@ -438,7 +437,6 @@ class XiaoChiyu(Star):
                 bind_user = await self.db.get_user(u["qq_id"])
                 als_lookup = bind_user["uid"] if bind_user else u["uid"]
                 badges = await fetch_lfg_stats(als_lookup, u["platform"])
-                debug_lines.append(f"{u['name']}: scraper={badges}, api_kills={stats.kills}, api_level={stats.level}, api_prestige={getattr(stats,'prestige',0)}, api_ladder={stats.rank_ladder_pos}")
                 global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
                 level_raw = badges.get("level") or stats.level
                 prestige_raw = badges.get("prestige") or stats.prestige
@@ -469,7 +467,6 @@ class XiaoChiyu(Star):
             img = await renderer.draw_lfg_card(entries)
             async for r in self._send_card(event, img):
                 yield r
-            yield event.plain_result("\n".join(debug_lines))
             return
 
         if arg in ("leave", "退出", "取消"):
