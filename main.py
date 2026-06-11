@@ -884,7 +884,18 @@ class XiaoChiyu(Star):
 
         qq_id = event.get_sender_id()
         if player_name:
-            if player_name.strip().isdigit():
+            # 处理 @提及：查对方绑定
+            at_match = re.search(r'\[CQ:at,qq=(\d+)\]', player_name) or re.search(r'@(\d+)', player_name)
+            if at_match:
+                target_qq = at_match.group(1)
+                target_user = await self.db.get_user(target_qq)
+                if not target_user:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"对方 (QQ {target_qq}) 未绑定 Apex 账号")]
+                    )
+                uid = target_user["uid"]
+                platform = target_user.get("platform", "PC")
+            elif player_name.strip().isdigit():
                 idx = int(player_name.strip())
                 cached = self._last_search.get(qq_id, [])
                 if 1 <= idx <= len(cached):
