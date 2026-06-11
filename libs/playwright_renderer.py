@@ -616,10 +616,10 @@ async def _embed_images(html: str) -> str:
 async def _render_card_sync(html: str, width: int) -> bytes:
     html = await _embed_images(html)
     async with run_with_page(viewport={"width": width, "height": 100}, device_scale_factor=2) as page:
-        await page.set_content(html, wait_until="domcontentloaded", timeout=15000)
-        await page.wait_for_selector(".card", timeout=10000)
+        await page.set_content(html, wait_until="networkidle", timeout=30000)
+        await page.wait_for_selector(".card, .lfg-list", timeout=10000)
         card_height = await page.evaluate(
-            "() => document.querySelector('.card')?.offsetHeight || 600"
+            "() => (document.querySelector('.card') || document.querySelector('.lfg-list'))?.offsetHeight || 600"
         )
         await page.set_viewport_size({"width": width, "height": card_height + 48})
         return await page.screenshot(full_page=False, type="png")
@@ -1004,22 +1004,36 @@ async def draw_predator_card(predator) -> bytes:
 
 
 def _build_lfg_mode_card() -> str:
-    return """<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head><body>
-<div class="card" style="width:420px;background:#2b2930;border-radius:28px;padding:24px;font-family:'Microsoft YaHei','Noto Sans SC',sans-serif">
-    <div style="font-size:1.5rem;font-weight:700;margin-bottom:8px;color:#e6e1e5">找队友</div>
-    <div style="font-size:0.85rem;margin-bottom:24px;color:#938f99">选择你要玩的模式</div>
-    <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="padding:20px;border-radius:16px;background:#1c1b1f;border:1px solid #49454f">
-            <div style="font-size:1rem;font-weight:700;margin-bottom:4px;color:#e6e1e5">排位赛</div>
-            <div style="font-size:0.8rem;color:#938f99">/lfg 排位</div>
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#1c1b1f;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:40px 20px}}
+.card{{width:420px;background:#2b2930;border-radius:28px;padding:24px}}
+.title{{font-size:1.5rem;font-weight:700;margin-bottom:8px}}
+.subtitle{{font-size:0.85rem;color:#938f99;margin-bottom:24px}}
+.options{{display:flex;flex-direction:column;gap:12px}}
+.opt{{padding:20px;border-radius:16px;background:#1c1b1f;border:1px solid #49454f;cursor:pointer;transition:all 0.2s ease}}
+.opt:hover{{background:#36343b;border-color:#4f378b}}
+.opt-title{{font-size:1rem;font-weight:700;margin-bottom:4px}}
+.opt-sub{{font-size:0.8rem;color:#938f99}}
+.footer{{margin-top:24px;text-align:center;font-size:0.75rem;color:#938f99}}
+</style></head><body>
+<div class="card">
+    <div class="title">找队友</div>
+    <div class="subtitle">选择你要玩的模式</div>
+    <div class="options">
+        <div class="opt">
+            <div class="opt-title">排位赛</div>
+            <div class="opt-sub">/lfg 排位</div>
         </div>
-        <div style="padding:20px;border-radius:16px;background:#1c1b1f;border:1px solid #49454f">
-            <div style="font-size:1rem;font-weight:700;margin-bottom:4px;color:#e6e1e5">娱乐匹配</div>
-            <div style="font-size:0.8rem;color:#938f99">/lfg 娱乐</div>
+        <div class="opt">
+            <div class="opt-title">娱乐匹配</div>
+            <div class="opt-sub">/lfg 娱乐</div>
         </div>
     </div>
-    <div style="margin-top:24px;text-align:center;font-size:0.75rem;color:#938f99">auth.赤羽真白 · Apex Chiyuchan</div>
+    <div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
 </div>
 </body></html>"""
 
@@ -1044,53 +1058,80 @@ def _build_lfg_html(entries: list[dict]) -> str:
         ladder_pos = e.get("rank_ladder_pos", 0)
 
         rank_type = rank_name.lower().split(" ")[0] if rank_name else "unranked"
+        text_color = rank_colors.get(rank_name, "#938f99")
         rank_display = _rank_zh(rank_name)
         if ladder_pos and rank_name in ("Predator", "Master"):
             rank_display += f" #{ladder_pos}"
 
-        chip_bg = "#633b48" if mode == "ranked" else "#333537"
-        chip_color = "#ffd8e4" if mode == "ranked" else "#e3e2e6"
-        chip_icon = '<span style="font-size:16px">&#127942;</span>' if mode == "ranked" else ""
+        chip_class = "chip-highlight" if mode == "ranked" else ""
+        chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
         mode_label = "排位赛" if mode == "ranked" else "娱乐匹配"
 
         rows += f"""
-        <div style="display:grid;grid-template-columns:2fr 2fr 3fr 1fr 1fr;align-items:center;background:#2b2930;padding:16px 24px;border-radius:20px;border:1px solid #49454f">
-            <div style="display:flex;align-items:center;gap:16px">
-                <div style="width:44px;height:44px;border-radius:12px;background:#4f378b;display:flex;justify-content:center;align-items:center;color:#eaddff;font-size:24px">&#128100;</div>
+        <div class="player-row">
+            <div class="col-player">
+                <div class="avatar">
+                    <span class="material-symbols-rounded">person</span>
+                </div>
                 <div>
-                    <div style="font-weight:700;color:#e6e1e5">{apex_name}</div>
-                    <div style="font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px"><span style="color:#b7f397;font-size:8px">&#9679;</span> 在线 · {platform}</div>
+                    <div style="font-weight: 700;">{apex_name}</div>
+                    <div class="status-tag"><span class="material-symbols-rounded dot-online" style="font-variation-settings: 'FILL' 1;font-size:8px">circle</span> 在线 · {platform}</div>
                 </div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px">
-                <div style="background:rgba(0,0,0,0.2);padding:6px;border-radius:12px;display:flex">
-                    <img style="width:34px;height:34px" src="{rank_img}" alt="{rank_name}">
+            <div class="col-rank">
+                <div class="rank-badge-bg">
+                    <img class="rank-icon" src="{rank_img}" alt="{rank_name}">
                 </div>
-                <div style="display:flex;flex-direction:column">
-                    <span style="font-weight:700;font-size:1.05rem;color:{rank_colors.get(rank_name, '#938f99')}">{rank_score:,}</span>
-                    <span style="font-size:0.75rem;color:#938f99">{rank_display}</span>
+                <div class="rank-text">
+                    <span class="rank-score text-{rank_type}">{rank_score:,}</span>
+                    <span class="rank-label">{rank_display}</span>
                 </div>
             </div>
-            <div style="display:flex;gap:8px">
-                <div style="background:{chip_bg};color:{chip_color};padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px">{chip_icon} {mode_label}</div>
+            <div class="col-wants">
+                <div class="md3-chip {chip_class}">{chip_icon} {mode_label}</div>
             </div>
-            <div style="font-weight:700;font-size:1.1rem;color:#e6e1e5">{level}</div>
-            <div style="font-weight:700;font-size:1.1rem;color:#e6e1e5">{kills:,}</div>
+            <div class="col-data">{level}</div>
+            <div class="col-data">{kills:,}</div>
         </div>"""
 
     if not rows:
-        rows = '<div style="text-align:center;padding:40px;color:#938f99">目前没有玩家在线发起组队</div>'
+        rows = '<div style="text-align:center;padding:40px;color:#938f99;">目前没有玩家在线发起组队</div>'
 
     return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head><body>
-<div class="card" style="background:#1c1b1f;padding:24px;font-family:'Microsoft YaHei','Noto Sans SC',sans-serif">
-    <div style="display:grid;grid-template-columns:2fr 2fr 3fr 1fr 1fr;padding:0 24px 12px 24px;font-size:0.85rem;font-weight:500;color:#938f99">
+<html lang="zh-CN"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#1c1b1f;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:24px}}
+.lfg-list{{width:100%;max-width:1000px;display:flex;flex-direction:column;gap:8px;background:#1c1b1f;border-radius:28px;padding:24px}}
+.list-header{{display:grid;grid-template-columns:2fr 2fr 3fr 1fr 1fr;padding:0 24px 12px 24px;font-size:0.85rem;font-weight:500;color:#938f99}}
+.player-row{{display:grid;grid-template-columns:2fr 2fr 3fr 1fr 1fr;align-items:center;background:#2b2930;padding:16px 24px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent}}
+.player-row:hover{{background:#36343b;transform:translateY(-2px);border-color:#49454f}}
+.col-player{{display:flex;align-items:center;gap:16px}}
+.avatar{{width:44px;height:44px;border-radius:12px;background:#4f378b;display:flex;justify-content:center;align-items:center;color:#eaddff}}
+.col-rank{{display:flex;align-items:center;gap:12px}}
+.rank-badge-bg{{background:rgba(0,0,0,0.2);padding:6px;border-radius:12px;display:flex}}
+.rank-icon{{width:34px;height:34px}}
+.rank-text{{display:flex;flex-direction:column}}
+.rank-score{{font-weight:700;font-size:1.05rem}}
+.rank-label{{font-size:0.75rem;color:#938f99}}
+.col-wants{{display:flex;gap:8px;flex-wrap:wrap}}
+.md3-chip{{background:#333537;color:#e3e2e6;padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px}}
+.chip-highlight{{background:#633b48;color:#ffd8e4}}
+.col-data{{font-weight:700;font-size:1.1rem}}
+.text-predator{{color:#ffb4ab}} .text-master{{color:#d0bcff}} .text-diamond{{color:#bac3ff}}
+.text-platinum{{color:#99f1ff}} .text-gold{{color:#ffd966}} .text-silver{{color:#c0c0c0}}
+.text-bronze{{color:#cd7f32}} .text-unranked{{color:#938f99}}
+.status-tag{{font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px}}
+.dot-online{{color:#b7f397;font-size:8px}}
+.footer{{padding:12px 24px;font-size:11px;color:#938f99;display:flex;justify-content:space-between;border-top:1px solid #49454f;margin-top:8px}}
+</style></head><body>
+<div class="lfg-list">
+    <div class="list-header">
         <div>玩家</div><div>段位 / 分数</div><div>寻找队友</div><div>等级</div><div>击杀数</div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px">
     {rows}
-    </div>
-    <div style="padding:12px 24px;font-size:11px;color:#938f99;display:flex;justify-content:space-between;border-top:1px solid #49454f;margin-top:8px">
+    <div class="footer">
         <span>Data: apexlegendsstatus.com</span>
         <span>auth.赤羽真白 · Apex Chiyuchan</span>
     </div>
