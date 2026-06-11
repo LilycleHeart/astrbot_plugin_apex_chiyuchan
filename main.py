@@ -156,12 +156,13 @@ class XiaoChiyu(Star):
         return target_qq or event.get_sender_id(), cleaned, None
 
     async def _get_badges_cached(self, uid: str, platform: str) -> dict:
-        """从 DB 获取徽章数据（永久缓存），不存在时爬 ALS 并存入。"""
+        """从 DB 获取徽章数据（永久缓存），不存在时爬 ALS 并存入。空结果不缓存，下次重试。"""
         cached = await self.db.get_badge_cache(uid, platform)
         if cached:
             return cached["data"]
         badges = await fetch_badges(uid, platform)
-        await self.db.set_badge_cache(uid, platform, badges)
+        if badges.get("seasons") or badges.get("special"):
+            await self.db.set_badge_cache(uid, platform, badges)
         return badges
 
     async def _send_card(
