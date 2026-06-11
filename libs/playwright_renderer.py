@@ -1004,113 +1004,161 @@ async def draw_predator_card(predator) -> bytes:
 
 
 def _build_lfg_mode_card() -> str:
-    _C = "#171A22"
-    _T = "#E4EAF5"
-    _M = "#8B95AD"
-    _O = "#2A3148"
-    _A = "#6DA8FF"
-
     return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<style>
+:root {{
+    --md-sys-color-surface: #1c1b1f;
+    --md-sys-color-on-surface: #e6e1e5;
+    --md-sys-color-surface-container: #2b2930;
+    --md-sys-color-primary-container: #4f378b;
+    --md-sys-color-on-primary-container: #eaddff;
+    --md-sys-color-secondary-container: #333537;
+    --md-sys-color-on-secondary-container: #e3e2e6;
+    --md-sys-color-outline-variant: #49454f;
+    --md-sys-color-tertiary-container: #633b48;
+    --md-sys-color-on-tertiary-container: #ffd8e4;
+}}
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:#0F1218;color:{_T};display:flex;justify-content:center;padding:24px}}
-.card{{width:420px;background:{_C};border-radius:24px;overflow:hidden;border:1px solid {_O}}}
-.header{{padding:20px 24px;border-bottom:1px solid {_O}}}
-.title{{font-size:20px;font-weight:800;color:{_T}}}
-.subtitle{{font-size:12px;color:{_M};margin-top:4px}}
-.body{{padding:20px 24px}}
-.desc{{font-size:13px;color:{_M};line-height:1.6;margin-bottom:16px}}
-.options{{display:flex;flex-direction:column;gap:10px}}
-.opt{{padding:14px 16px;background:#1D222C;border-radius:12px;border:1px solid {_O};cursor:pointer;font-size:14px;font-weight:600;color:{_T};text-align:center}}
-.opt .sub{{font-size:11px;color:{_M};font-weight:400;margin-top:4px}}
-.footer{{padding:12px 24px;border-top:1px solid {_O};font-size:11px;color:{_M};text-align:center}}
+body{{background:var(--md-sys-color-surface);color:var(--md-sys-color-on-surface);font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:40px 20px}}
+.card{{width:420px;background:var(--md-sys-color-surface-container);border-radius:28px;padding:24px}}
+.title{{font-size:1.5rem;font-weight:700;margin-bottom:8px}}
+.subtitle{{font-size:0.85rem;color:#938f99;margin-bottom:24px}}
+.options{{display:flex;flex-direction:column;gap:12px}}
+.opt{{padding:20px;border-radius:16px;background:var(--md-sys-color-surface);border:1px solid var(--md-sys-color-outline-variant);cursor:pointer;transition:all 0.2s ease}}
+.opt:hover{{background:#36343b;border-color:var(--md-sys-color-primary-container)}}
+.opt-title{{font-size:1rem;font-weight:700;margin-bottom:4px}}
+.opt-sub{{font-size:0.8rem;color:#938f99}}
+.footer{{margin-top:24px;text-align:center;font-size:0.75rem;color:#938f99}}
 </style></head><body>
 <div class="card">
-  <div class="header">
     <div class="title">找队友</div>
     <div class="subtitle">选择你要玩的模式</div>
-  </div>
-  <div class="body">
-    <div class="desc">使用 <b>/lfg 排位</b> 或 <b>/lfg 娱乐</b> 注册</div>
     <div class="options">
-      <div class="opt">排位<div class="sub">Ranked · /lfg 排位</div></div>
-      <div class="opt">娱乐<div class="sub">Pubs · /lfg 娱乐</div></div>
+        <div class="opt">
+            <div class="opt-title">排位赛</div>
+            <div class="opt-sub">/lfg 排位</div>
+        </div>
+        <div class="opt">
+            <div class="opt-title">娱乐匹配</div>
+            <div class="opt-sub">/lfg 娱乐</div>
+        </div>
     </div>
-  </div>
-  <div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
+    <div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
 </div>
 </body></html>"""
 
 
 def _build_lfg_html(entries: list[dict]) -> str:
-    _C = "#171A22"
-    _T = "#E4EAF5"
-    _M = "#8B95AD"
-    _O = "#2A3148"
-    _G = "#4CE5B1"
+    rank_colors = {
+        "Predator": "#ffb4ab", "Master": "#d0bcff", "Diamond": "#bac3ff",
+        "Platinum": "#99f1ff", "Gold": "#ffd966", "Silver": "#c0c0c0",
+        "Bronze": "#cd7f32", "Unranked": "#938f99",
+    }
 
     rows = ""
     for e in entries:
         mode = e.get("mode", "ranked")
-        mode_label = "排位" if mode == "ranked" else "娱乐"
-        mode_color = "#FF6B6B" if mode == "ranked" else "#4CE5B1"
         rank_name = e.get("rank_name", "Unranked")
         rank_score = e.get("rank_score", 0)
         rank_img = e.get("rank_img", "")
         level = e.get("level", 0)
         kills = e.get("kills", 0)
         apex_name = e.get("apex_name", "Unknown")
-        top_pct = e.get("rank_top_pct_global", 0)
+        platform = e.get("platform", "PC")
         ladder_pos = e.get("rank_ladder_pos", 0)
 
+        rank_type = rank_name.lower().split(" ")[0] if rank_name else "unranked"
+        text_color = rank_colors.get(rank_name, "#938f99")
         rank_display = _rank_zh(rank_name)
         if ladder_pos and rank_name in ("Predator", "Master"):
             rank_display += f" #{ladder_pos}"
 
+        chip_class = "chip-highlight" if mode == "ranked" else ""
+        chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
+        mode_label = "排位赛" if mode == "ranked" else "娱乐匹配"
+
         rows += f"""
-  <div class="row">
-    <div class="row-left">
-      <img class="rank-icon" src="{rank_img}" onerror="this.remove()">
-      <div class="row-info">
-        <div class="row-name">{apex_name}</div>
-        <div class="row-rank">{rank_display} · {rank_score:,} RP</div>
-      </div>
-    </div>
-    <div class="row-right">
-      <div class="mode-tag" style="color:{mode_color}">{mode_label}</div>
-      <div class="row-stats">Lv.{level} · {kills:,} 击杀</div>
-    </div>
-  </div>"""
+        <div class="player-row">
+            <div class="col-player">
+                <div class="avatar">
+                    <span class="material-symbols-rounded">person</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700;">{apex_name}</div>
+                    <div class="status-tag"><span class="material-symbols-rounded dot-online" style="font-variation-settings: 'FILL' 1;font-size:8px">circle</span> 在线 · {platform}</div>
+                </div>
+            </div>
+            <div class="col-rank">
+                <div class="rank-badge-bg">
+                    <img class="rank-icon" src="{rank_img}" alt="{rank_name}">
+                </div>
+                <div class="rank-text">
+                    <span class="rank-score text-{rank_type}">{rank_score:,}</span>
+                    <span class="rank-label">{rank_display}</span>
+                </div>
+            </div>
+            <div class="col-wants">
+                <div class="md3-chip {chip_class}">{chip_icon} {mode_label}</div>
+            </div>
+            <div class="col-data">{level}</div>
+            <div class="col-data">{kills:,}</div>
+        </div>"""
+
+    if not rows:
+        rows = '<div style="text-align:center;padding:40px;color:#938f99;">目前没有玩家在线发起组队</div>'
 
     return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<style>
+:root {{
+    --md-sys-color-surface: #1c1b1f;
+    --md-sys-color-on-surface: #e6e1e5;
+    --md-sys-color-surface-container: #2b2930;
+    --md-sys-color-primary-container: #4f378b;
+    --md-sys-color-on-primary-container: #eaddff;
+    --md-sys-color-secondary-container: #333537;
+    --md-sys-color-on-secondary-container: #e3e2e6;
+    --md-sys-color-outline-variant: #49454f;
+    --md-sys-color-tertiary-container: #633b48;
+    --md-sys-color-on-tertiary-container: #ffd8e4;
+}}
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:#0F1218;color:{_T};display:flex;justify-content:center;padding:24px}}
-.card{{width:680px;background:{_C};border-radius:24px;overflow:hidden;border:1px solid {_O}}}
-.header{{padding:20px 24px;border-bottom:1px solid {_O}}}
-.title{{font-size:20px;font-weight:800;color:{_T}}}
-.subtitle{{font-size:12px;color:{_M};margin-top:4px}}
-.row{{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid {_O}}}
-.row:last-child{{border-bottom:none}}
-.row-left{{display:flex;align-items:center;gap:12px}}
-.rank-icon{{width:40px;height:40px;border-radius:10px}}
-.row-name{{font-size:14px;font-weight:700;color:{_T}}}
-.row-rank{{font-size:12px;color:{_M};margin-top:2px}}
-.row-right{{display:flex;flex-direction:column;align-items:flex-end;gap:4px}}
-.mode-tag{{font-size:12px;font-weight:700}}
-.row-stats{{font-size:11px;color:{_M}}}
-.footer{{padding:12px 24px;border-top:1px solid {_O};font-size:11px;color:{_M};display:flex;justify-content:space-between}}
+body{{background:var(--md-sys-color-surface);color:var(--md-sys-color-on-surface);font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:24px}}
+.lfg-list{{width:100%;max-width:1000px;display:flex;flex-direction:column;gap:8px}}
+.list-header{{display:grid;grid-template-columns:2fr 2fr 3fr 1fr 1fr;padding:0 24px 12px 24px;font-size:0.85rem;font-weight:500;color:#938f99}}
+.player-row{{display:grid;grid-template-columns:2fr 2fr 3fr 1fr 1fr;align-items:center;background:var(--md-sys-color-surface-container);padding:16px 24px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent}}
+.player-row:hover{{background:#36343b;transform:translateY(-2px);border-color:var(--md-sys-color-outline-variant)}}
+.col-player{{display:flex;align-items:center;gap:16px}}
+.avatar{{width:44px;height:44px;border-radius:12px;background:var(--md-sys-color-primary-container);display:flex;justify-content:center;align-items:center;color:var(--md-sys-color-on-primary-container)}}
+.col-rank{{display:flex;align-items:center;gap:12px}}
+.rank-badge-bg{{background:rgba(0,0,0,0.2);padding:6px;border-radius:12px;display:flex}}
+.rank-icon{{width:34px;height:34px}}
+.rank-text{{display:flex;flex-direction:column}}
+.rank-score{{font-weight:700;font-size:1.05rem}}
+.rank-label{{font-size:0.75rem;color:#938f99}}
+.col-wants{{display:flex;gap:8px;flex-wrap:wrap}}
+.md3-chip{{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px}}
+.chip-highlight{{background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)}}
+.col-data{{font-weight:700;font-size:1.1rem}}
+.text-predator{{color:#ffb4ab}} .text-master{{color:#d0bcff}} .text-diamond{{color:#bac3ff}}
+.text-platinum{{color:#99f1ff}} .text-gold{{color:#ffd966}} .text-silver{{color:#c0c0c0}}
+.text-bronze{{color:#cd7f32}} .text-unranked{{color:#938f99}}
+.status-tag{{font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px}}
+.dot-online{{color:#b7f397;font-size:8px}}
+.footer{{padding:12px 24px;font-size:11px;color:#938f99;display:flex;justify-content:space-between;border-top:1px solid var(--md-sys-color-outline-variant);margin-top:8px}}
 </style></head><body>
-<div class="card">
-  <div class="header">
-    <div class="title">找队友</div>
-    <div class="subtitle">{len(entries)} 位玩家在线</div>
-  </div>
-  {rows}
-  <div class="footer">
-    <span>Data: apexlegendsstatus.com</span>
-    <span>auth.赤羽真白 · Apex Chiyuchan</span>
-  </div>
+<div class="lfg-list card">
+    <div class="list-header">
+        <div>玩家</div><div>段位 / 分数</div><div>寻找队友</div><div>等级</div><div>击杀数</div>
+    </div>
+    {rows}
+    <div class="footer">
+        <span>Data: apexlegendsstatus.com</span>
+        <span>auth.赤羽真白 · Apex Chiyuchan</span>
+    </div>
 </div>
 </body></html>"""
 
