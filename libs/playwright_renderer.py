@@ -285,7 +285,7 @@ def _build_stats_html(**d) -> str:
     online_map = {"online": "在线", "offline": "离线", "in_game": "游戏中"}
     state_text = online_map.get(online, online)
     state_dot = "#4CE5B1" if online in ("online", "in_game") else "#555"
-    prestige_str = f"P{prestige}" if prestige else ""
+    prestige_str = ""  # level is now total level, no need to show prestige prefix
     rank_c = _rank_color(rank_name)
     top_global = f"{rank_top_pct_global}%"
     rp_delta_html = ""

@@ -328,6 +328,8 @@ class XiaoChiyu(Star):
 
         # ── 构建渲染数据 ──
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+        _lv = badges.get("level") or stats.level
+        _pr = badges.get("prestige") or stats.prestige
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
@@ -335,9 +337,9 @@ class XiaoChiyu(Star):
             "avatar_url": qq_avatar,
             "platform": platform,
             "online": stats.state,
-            "level": badges.get("level") or stats.level,
+            "level": _pr * 500 + _lv if _pr else _lv,
             "level_pct": stats.to_next_level_pct,
-            "prestige": badges.get("prestige") or stats.prestige,
+            "prestige": _pr,
             "rank_name": stats.rank_name,
             "rank_div": stats.rank_div,
             "rank_score": stats.rank_score,
@@ -373,8 +375,8 @@ class XiaoChiyu(Star):
             "rank_score": stats.rank_score,
             "rank_img": stats.rank_img,
             "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
-            "level": badges.get("level") or stats.level,
-            "prestige": badges.get("prestige") or stats.prestige,
+            "level": _pr * 500 + _lv if _pr else _lv,
+            "prestige": _pr,
             "kills": badges.get("kills", 0) or stats.kills,
             "avatar_url": qq_avatar,
         }
@@ -417,6 +419,9 @@ class XiaoChiyu(Star):
                 badges = await fetch_badges(u["uid"], u["platform"])
                 rank_dist = await self.apex.get_rank_distribution()
                 global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+                level_raw = badges.get("level") or stats.level
+                prestige_raw = badges.get("prestige") or stats.prestige
+                total_level = prestige_raw * 500 + level_raw if prestige_raw else level_raw
                 entries.append({
                     "qq_id": u["qq_id"],
                     "qq_name": u.get("qq_name", ""),
@@ -429,7 +434,7 @@ class XiaoChiyu(Star):
                     "rank_img": stats.rank_img,
                     "rank_top_pct_global": global_pct,
                     "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
-                    "level": badges.get("level") or stats.level,
+                    "level": total_level,
                     "kills": badges.get("kills", 0) or stats.kills,
                 })
 
@@ -923,6 +928,8 @@ class XiaoChiyu(Star):
         global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
 
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+        _lv2 = badges.get("level") or stats.level
+        _pr2 = badges.get("prestige") or stats.prestige
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
@@ -930,9 +937,9 @@ class XiaoChiyu(Star):
             "avatar_url": qq_avatar,
             "platform": platform,
             "online": stats.state,
-            "level": badges.get("level") or stats.level,
+            "level": _pr2 * 500 + _lv2 if _pr2 else _lv2,
             "level_pct": stats.to_next_level_pct,
-            "prestige": badges.get("prestige") or stats.prestige,
+            "prestige": _pr2,
             "rank_name": stats.rank_name,
             "rank_div": stats.rank_div,
             "rank_score": stats.rank_score,

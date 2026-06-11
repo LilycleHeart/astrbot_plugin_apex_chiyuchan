@@ -1284,8 +1284,6 @@ def _draw_profile_sync(
     uid = data.get("uid", "")
 
     lvl_text = f"Lv.{level}"
-    if prestige:
-        lvl_text += f"  P{prestige}"
 
     lvl_tw, _ = _text_bbox(draw, lvl_text, FONT_SUBTITLE)
     draw.text((cx, cy), lvl_text, font=FONT_SUBTITLE, fill=ON_SURFACE)
@@ -1538,11 +1536,7 @@ async def draw_player_list_card(
         rank_img = r.get("rank_img", "")
         rank_name = _parse_rank_name(rank_img)
 
-        lvl_str = ""
-        if prestige:
-            lvl_str = f"P{prestige} "
-        if level:
-            lvl_str += f"Lv.{level}"
+        lvl_str = f"Lv.{level}" if level else ""
         lvl_html = f'<span class="level">{lvl_str}</span>' if lvl_str else ""
 
         rank_html = ""
@@ -1731,11 +1725,7 @@ def _draw_player_list_sync(players: list[dict], hint: str) -> bytes:
         name_x = badge_x + badge_size + 14
         name_y = item_top + 12
 
-        lvl_label = ""
-        if prestige:
-            lvl_label = f"P{prestige} "
-        if level:
-            lvl_label += f"Lv.{level}"
+        lvl_label = f"Lv.{level}" if level else ""
         lvl_w, _ = _text_bbox(draw, lvl_label, FONT_CAPTION) if lvl_label else (0, 0)
 
         name_max_w = pill_x - name_x - 12 - lvl_w - 8
