@@ -500,6 +500,11 @@ class XiaoChiyu(Star):
             return
 
         cached = self._profile_cache.get(qq_id)
+        if cached:
+            # 验证 cache 里的 uid 是自己绑定的，防止 /stats @别人 后误注册
+            user = await self.db.get_user(qq_id)
+            if user and str(user["uid"]) != str(cached["uid"]):
+                cached = None
         if not cached:
             user = await self.db.get_user(qq_id)
             if user:
@@ -507,7 +512,7 @@ class XiaoChiyu(Star):
                 if stats:
                     qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
                     cached = {
-                        "uid": stats.uid,
+                        "uid": user["uid"],
                         "name": stats.name,
                         "platform": user["platform"],
                         "rank_name": stats.rank_name,
