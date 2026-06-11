@@ -59,6 +59,13 @@ class XiaoChiyu(Star):
         from .libs.config import preload_fonts
         preload_fonts()
 
+        if config.get("use_local_fonts", False):
+            try:
+                from .libs.playwright_renderer import set_use_local_fonts
+                set_use_local_fonts(True)
+            except Exception:
+                pass
+
         self._fire_and_forget(self._on_init(), "DB初始化")
 
     def _fire_and_forget(self, coro, name: str = ""):

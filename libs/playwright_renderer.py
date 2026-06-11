@@ -23,6 +23,12 @@ _C_DIAMOND = "#5D9FF0"
 _C_MASTER = "#C58BFF"
 _C_PRED = "#DA292A"
 
+_USE_LOCAL_FONTS = False
+
+def set_use_local_fonts(val: bool):
+    global _USE_LOCAL_FONTS
+    _USE_LOCAL_FONTS = val
+
 def _escape_html(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
@@ -1004,12 +1010,14 @@ async def draw_predator_card(predator) -> bytes:
 
 
 def _build_lfg_mode_card() -> str:
+    ff = "sans-serif" if _USE_LOCAL_FONTS else "'Noto Sans SC','Roboto',sans-serif"
+    fl = "" if _USE_LOCAL_FONTS else '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+{fl}
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{background:#1c1b1f;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:40px 20px}}
+body{{background:#1c1b1f;color:#e6e1e5;font-family:{ff};display:flex;justify-content:center;padding:40px 20px}}
 .card{{width:420px;background:#2b2930;border-radius:28px;padding:24px}}
 .title{{font-size:1.5rem;font-weight:700;margin-bottom:8px}}
 .subtitle{{font-size:0.85rem;color:#938f99;margin-bottom:24px}}
@@ -1065,12 +1073,20 @@ def _build_lfg_html(entries: list[dict]) -> str:
             rank_display += f" #{ladder_pos}"
 
         chip_class = "chip-highlight" if mode == "ranked" else ""
-        chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
+        if _USE_LOCAL_FONTS:
+            chip_icon = '<span style="font-size:16px">&#9733;</span>' if mode == "ranked" else ""
+        else:
+            chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
         mode_label = "排位赛" if mode == "ranked" else "娱乐匹配"
 
         state_map = {"online": "在线", "in_game": "游戏中", "offline": "离线"}
         state_text = state_map.get(state, "在线")
         dot_color = "#4CE5B1" if state in ("online", "in_game") else "#555"
+
+        if _USE_LOCAL_FONTS:
+            dot_icon = f'<span style="color:{dot_color};font-size:8px">&#9679;</span>'
+        else:
+            dot_icon = f'<span class="material-symbols-rounded" style="font-variation-settings:\'FILL\' 1;font-size:8px;color:{dot_color}">circle</span>'
 
         display_name = e.get("qq_name") or apex_name
         qq_avatar = e.get("qq_avatar", "")
@@ -1081,7 +1097,7 @@ def _build_lfg_html(entries: list[dict]) -> str:
                 <img class="avatar" src="{qq_avatar}" alt="">
                 <div class="player-info">
                     <div class="player-name" title="{display_name}">{display_name}</div>
-                    <div class="status-tag"><span class="material-symbols-rounded" style="font-variation-settings:'FILL' 1;font-size:8px;color:{dot_color}">circle</span> {state_text} · {platform}</div>
+                    <div class="status-tag">{dot_icon} {state_text} · {platform}</div>
                 </div>
             </div>
             <div class="col-rank">
@@ -1101,12 +1117,15 @@ def _build_lfg_html(entries: list[dict]) -> str:
     if not rows:
         rows = '<div style="text-align:center;padding:40px;color:#938f99;">目前没有玩家在线发起组队</div>'
 
+    font_family = "'Noto Sans SC','Roboto',sans-serif" if not _USE_LOCAL_FONTS else "sans-serif"
+    fonts_link = "" if _USE_LOCAL_FONTS else '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
+
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+{fonts_link}
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{background:#1e1e2e;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:32px 24px}}
+body{{background:#1e1e2e;color:#e6e1e5;font-family:{font_family};display:flex;justify-content:center;padding:32px 24px}}
 .lfg-list{{width:100%;max-width:1280px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
 .list-header{{display:grid;grid-template-columns:1.8fr 1fr 0.9fr 0.5fr 0.5fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:12px}}
 .list-header>div{{text-align:center}}
