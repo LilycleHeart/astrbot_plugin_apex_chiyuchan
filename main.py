@@ -413,6 +413,8 @@ class XiaoChiyu(Star):
                 stats = await self.apex.get_stats(u["uid"], u["platform"])
                 if not stats:
                     continue
+                from .libs.als_scraper import fetch_badges
+                badges = await fetch_badges(u["uid"], u["platform"])
                 rank_dist = await self.apex.get_rank_distribution()
                 global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
                 entries.append({
@@ -426,8 +428,9 @@ class XiaoChiyu(Star):
                     "rank_score": stats.rank_score,
                     "rank_img": stats.rank_img,
                     "rank_top_pct_global": global_pct,
-                    "level": stats.level,
-                    "kills": stats.kills,
+                    "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
+                    "level": badges.get("level") or stats.level,
+                    "kills": badges.get("kills", 0) or stats.kills,
                 })
 
             if not entries:

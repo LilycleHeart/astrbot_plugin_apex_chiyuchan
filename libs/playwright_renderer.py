@@ -1102,9 +1102,11 @@ def _build_lfg_html(entries: list[dict]) -> str:
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#1e1e2e;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:32px 24px}}
-.lfg-list{{width:100%;max-width:1080px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
-.list-header{{display:grid;grid-template-columns:2.5fr 2fr 2.5fr 1fr 1fr;padding:0 28px 16px 28px;font-size:0.85rem;font-weight:500;color:#938f99}}
-.player-row{{display:grid;grid-template-columns:2.5fr 2fr 2.5fr 1fr 1fr;align-items:center;background:#282838;padding:20px 28px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent}}
+.lfg-list{{width:100%;max-width:1200px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
+.list-header{{display:grid;grid-template-columns:2.5fr 2fr 2.5fr 1fr 1fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center}}
+.list-header>div{{text-align:center}}
+.list-header>div:first-child{{text-align:left}}
+.player-row{{display:grid;grid-template-columns:2.5fr 2fr 2.5fr 1fr 1fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent}}
 .player-row:hover{{background:#303042;transform:translateY(-2px);border-color:#49454f}}
 .col-player{{display:flex;align-items:center;gap:18px}}
 .avatar{{width:52px;height:52px;border-radius:14px;object-fit:cover}}
@@ -1120,11 +1122,11 @@ body{{background:#1e1e2e;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-
 .col-wants{{display:flex;gap:8px;flex-wrap:wrap}}
 .md3-chip{{background:#333537;color:#e3e2e6;padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px}}
 .chip-highlight{{background:#633b48;color:#ffd8e4}}
-.col-data{{font-weight:700;font-size:1.1rem;text-align:right}}
+.col-data{{font-weight:700;font-size:1.1rem;text-align:center}}
 .text-predator{{color:#ffb4ab}} .text-master{{color:#d0bcff}} .text-diamond{{color:#bac3ff}}
 .text-platinum{{color:#99f1ff}} .text-gold{{color:#ffd966}} .text-silver{{color:#c0c0c0}}
 .text-bronze{{color:#cd7f32}} .text-unranked{{color:#938f99}}
-.footer{{padding:16px 28px 0 28px;font-size:11px;color:#555;display:flex;justify-content:space-between;border-top:1px solid #383850;margin-top:8px}}
+.footer{{padding:16px 32px 0 32px;font-size:11px;color:#555;display:flex;justify-content:space-between;border-top:1px solid #383850;margin-top:8px}}
 </style></head><body>
 <div class="lfg-list">
     <div class="list-header">
