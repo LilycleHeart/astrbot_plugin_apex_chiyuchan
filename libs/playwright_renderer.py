@@ -616,7 +616,7 @@ async def _embed_images(html: str) -> str:
 async def _render_card_sync(html: str, width: int) -> bytes:
     html = await _embed_images(html)
     async with run_with_page(viewport={"width": width, "height": 100}, device_scale_factor=2) as page:
-        await page.set_content(html, wait_until="networkidle", timeout=30000)
+        await page.set_content(html, wait_until="load", timeout=15000)
         await page.wait_for_selector(".card, .lfg-list", timeout=10000)
         card_height = await page.evaluate(
             "() => (document.querySelector('.card') || document.querySelector('.lfg-list'))?.offsetHeight || 600"
@@ -1108,10 +1108,12 @@ def _build_lfg_html(entries: list[dict]) -> str:
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#1e1e2e;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:32px 24px}}
 .lfg-list{{width:100%;max-width:1280px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
-.list-header{{display:grid;grid-template-columns:1fr 1.2fr 1fr 0.6fr 0.6fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:20px}}
+.list-header{{display:grid;grid-template-columns:1.8fr 1fr 0.9fr 0.5fr 0.5fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:12px}}
 .list-header>div{{text-align:center}}
 .list-header>div:first-child{{text-align:left}}
-.player-row{{display:grid;grid-template-columns:1fr 1.2fr 1fr 0.6fr 0.6fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent;gap:20px}}
+.list-header>div:nth-child(2){{text-align:left}}
+.list-header>div:nth-child(3){{text-align:left}}
+.player-row{{display:grid;grid-template-columns:1.8fr 1fr 0.9fr 0.5fr 0.5fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent;gap:12px}}
 .player-row:hover{{background:#303042;transform:translateY(-2px);border-color:#49454f}}
 .col-player{{display:flex;align-items:center;gap:18px}}
 .avatar{{width:52px;height:52px;border-radius:14px;object-fit:cover;flex-shrink:0}}
