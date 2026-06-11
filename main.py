@@ -412,6 +412,16 @@ class XiaoChiyu(Star):
 
             entries = []
             for u in lfg_users:
+                # cw: look up QQ name via OneBot API, cache in db
+                qq_name = u.get("qq_name", "") or ""
+                if not qq_name:
+                    try:
+                        info = await event.bot.call_action("get_stranger_info", user_id=int(u["qq_id"]), no_cache=False)
+                        qq_name = info.get("nickname", "") or info.get("nick", "")
+                        if qq_name:
+                            await self.db.upsert_lfg_user(u["qq_id"], u["uid"], u["name"], u["platform"], u["mode"], qq_name=qq_name)
+                    except Exception:
+                        pass
                 stats = await self.apex.get_stats(u["uid"], u["platform"])
                 if not stats:
                     continue
