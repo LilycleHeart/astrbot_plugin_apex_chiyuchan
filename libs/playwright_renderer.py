@@ -1143,7 +1143,7 @@ body{{background:#1e1e2e;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-
 
 async def draw_lfg_card(entries: list[dict]) -> bytes:
     html = _build_lfg_html(entries)
-    return await _render_card_sync(html, 720)
+    return await _render_card_sync(html, 1328)
 
 
 async def draw_lfg_mode_card() -> bytes:
