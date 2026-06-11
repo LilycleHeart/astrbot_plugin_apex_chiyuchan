@@ -320,7 +320,7 @@ async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
         await page.goto(f"https://apexlegendsstatus.com/profile/{platform}/{name_or_uid}",
                         wait_until="domcontentloaded", timeout=15000)
         try:
-            await page.wait_for_selector(".player-name", timeout=3000)
+            await page.wait_for_selector(".player-name", timeout=5000)
         except Exception:
             pass
         return await page.evaluate("""() => {
