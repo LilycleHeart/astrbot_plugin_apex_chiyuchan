@@ -418,12 +418,13 @@ class XiaoChiyu(Star):
     async def cmd_lfg(self, event: AstrMessageEvent):
         """找队友 — /lfg [注册|排位|娱乐|列表|退出]"""
         qq_id = event.get_sender_id()
+        group_id = event.unified_msg_origin
         msg = event.get_message_str().strip()
         parts = msg.split(maxsplit=1)
         arg = parts[1].strip().lower() if len(parts) > 1 else ""
 
         if arg in ("list", "列表"):
-            lfg_users = await self.db.list_lfg_users()
+            lfg_users = await self.db.list_lfg_users(group_id)
             if not lfg_users:
                 img = await renderer.draw_text_card("LFG", "当前没有人在找队友", is_error=True)
                 async for r in self._send_card(event, img):
@@ -440,7 +441,7 @@ class XiaoChiyu(Star):
                         info = await event.bot.call_action("get_stranger_info", user_id=int(u["qq_id"]), no_cache=False)
                         qq_name = info.get("nickname", "") or info.get("nick", "")
                         if qq_name:
-                            await self.db.upsert_lfg_user(u["qq_id"], u["uid"], u["name"], u["platform"], u["mode"], qq_name=qq_name)
+                            await self.db.upsert_lfg_user(u["qq_id"], group_id, u["uid"], u["name"], u["platform"], u["mode"], qq_name=qq_name)
                     except Exception:
                         pass
                 stats = await self.apex.get_stats(u["uid"], u["platform"])
@@ -483,9 +484,9 @@ class XiaoChiyu(Star):
             return
 
         if arg in ("leave", "退出", "取消"):
-            existing = await self.db.get_lfg_user(qq_id)
+            existing = await self.db.get_lfg_user(qq_id, group_id)
             if existing:
-                await self.db.remove_lfg_user(qq_id)
+                await self.db.remove_lfg_user(qq_id, group_id)
                 yield event.plain_result("已退出找队友列表")
             else:
                 yield event.plain_result("你不在找队友列表中")
@@ -546,7 +547,7 @@ class XiaoChiyu(Star):
             return
 
         await self.db.upsert_lfg_user(
-            qq_id, cached["uid"], cached["name"], cached["platform"], mode, qq_name=event.get_sender_name() or ""
+            qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode, qq_name=event.get_sender_name() or ""
         )
 
         yield event.plain_result(f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})，使用 /lfg 列表 查看")
@@ -1285,12 +1286,13 @@ class XiaoChiyu(Star):
         from mcp.types import CallToolResult, TextContent, ImageContent
 
         qq_id = event.get_sender_id()
+        group_id = event.unified_msg_origin
         action = action.strip().lower()
 
         if action in ("leave", "退出", "取消"):
-            existing = await self.db.get_lfg_user(qq_id)
+            existing = await self.db.get_lfg_user(qq_id, group_id)
             if existing:
-                await self.db.remove_lfg_user(qq_id)
+                await self.db.remove_lfg_user(qq_id, group_id)
                 return CallToolResult(
                     content=[TextContent(type="text", text="已退出找队友列表")]
                 )
@@ -1326,7 +1328,7 @@ class XiaoChiyu(Star):
                     content=[TextContent(type="text", text="请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友")]
                 )
             await self.db.upsert_lfg_user(
-                qq_id, cached["uid"], cached["name"], cached["platform"], mode,
+                qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode,
                 qq_name=event.get_sender_name() or ""
             )
             return CallToolResult(
@@ -1334,7 +1336,7 @@ class XiaoChiyu(Star):
             )
 
         # list
-        lfg_users = await self.db.list_lfg_users()
+        lfg_users = await self.db.list_lfg_users(group_id)
         if not lfg_users:
             return CallToolResult(
                 content=[TextContent(type="text", text="当前没有人在找队友")]
@@ -1349,7 +1351,7 @@ class XiaoChiyu(Star):
                     info = await event.bot.call_action("get_stranger_info", user_id=int(u["qq_id"]), no_cache=False)
                     qq_name = info.get("nickname", "") or info.get("nick", "")
                     if qq_name:
-                        await self.db.upsert_lfg_user(u["qq_id"], u["uid"], u["name"], u["platform"], u["mode"], qq_name=qq_name)
+                        await self.db.upsert_lfg_user(u["qq_id"], group_id, u["uid"], u["name"], u["platform"], u["mode"], qq_name=qq_name)
                 except Exception:
                     pass
             stats = await self.apex.get_stats(u["uid"], u["platform"])

@@ -84,20 +84,47 @@ class Database:
             );
 
             CREATE TABLE IF NOT EXISTS lfg_users (
-                qq_id       TEXT PRIMARY KEY,
+                qq_id       TEXT NOT NULL,
+                group_id    TEXT NOT NULL DEFAULT 'global',
                 uid         TEXT NOT NULL,
                 name        TEXT NOT NULL,
                 qq_name     TEXT DEFAULT '',
                 platform    TEXT DEFAULT 'PC',
                 mode        TEXT DEFAULT 'ranked',
-                registered_at TEXT DEFAULT (datetime('now','localtime'))
+                registered_at TEXT DEFAULT (datetime('now','localtime')),
+                PRIMARY KEY (group_id, qq_id)
             );
         """)
-        # migrate: add qq_name column if missing
+        # migrate: add qq_name / group_id columns; recreate PK if old schema
         try:
             await conn.execute("ALTER TABLE lfg_users ADD COLUMN qq_name TEXT DEFAULT ''")
         except Exception:
             pass
+        try:
+            await conn.execute("ALTER TABLE lfg_users ADD COLUMN group_id TEXT NOT NULL DEFAULT 'global'")
+        except Exception:
+            pass
+        # check if old schema (single PK on qq_id) — recreate with composite PK
+        cursor = await conn.execute("PRAGMA table_info(lfg_users)")
+        cols = {row[1]: row for row in await cursor.fetchall()}
+        pk_cols = [name for name, info in cols.items() if info[5] == 1]
+        if pk_cols == ["qq_id"]:  # old single-column PK
+            await conn.execute("""
+                CREATE TABLE lfg_users_new (
+                    qq_id TEXT NOT NULL, group_id TEXT NOT NULL DEFAULT 'global',
+                    uid TEXT NOT NULL, name TEXT NOT NULL, qq_name TEXT DEFAULT '',
+                    platform TEXT DEFAULT 'PC', mode TEXT DEFAULT 'ranked',
+                    registered_at TEXT DEFAULT (datetime('now','localtime')),
+                    PRIMARY KEY (group_id, qq_id)
+                )
+            """)
+            await conn.execute("""
+                INSERT OR IGNORE INTO lfg_users_new
+                SELECT qq_id, COALESCE(group_id,'global'), uid, name, COALESCE(qq_name,''),
+                       platform, mode, registered_at FROM lfg_users
+            """)
+            await conn.execute("DROP TABLE lfg_users")
+            await conn.execute("ALTER TABLE lfg_users_new RENAME TO lfg_users")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_teams_expires ON teams(expires_at)")
         await conn.commit()
@@ -380,33 +407,37 @@ class Database:
         )
         await conn.commit()
 
-    async def upsert_lfg_user(self, qq_id: str, uid: str, name: str, platform: str, mode: str = "ranked", qq_name: str = ""):
+    async def upsert_lfg_user(self, qq_id: str, group_id: str, uid: str, name: str, platform: str, mode: str = "ranked", qq_name: str = ""):
         conn = await self._get_conn()
         await conn.execute(
-            "INSERT OR REPLACE INTO lfg_users (qq_id, uid, name, qq_name, platform, mode, registered_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
-            (qq_id, uid, name, qq_name, platform, mode),
+            "INSERT OR REPLACE INTO lfg_users (qq_id, group_id, uid, name, qq_name, platform, mode, registered_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
+            (qq_id, group_id, uid, name, qq_name, platform, mode),
         )
         await conn.commit()
 
-    async def remove_lfg_user(self, qq_id: str):
+    async def remove_lfg_user(self, qq_id: str, group_id: str):
         conn = await self._get_conn()
-        await conn.execute("DELETE FROM lfg_users WHERE qq_id = ?", (qq_id,))
+        await conn.execute("DELETE FROM lfg_users WHERE qq_id = ? AND group_id = ?", (qq_id, group_id))
         await conn.commit()
 
-    async def get_lfg_user(self, qq_id: str) -> dict | None:
+    async def get_lfg_user(self, qq_id: str, group_id: str) -> dict | None:
         conn = await self._get_conn()
-        async with conn.execute("SELECT * FROM lfg_users WHERE qq_id = ?", (qq_id,)) as cursor:
+        async with conn.execute("SELECT * FROM lfg_users WHERE qq_id = ? AND group_id = ?", (qq_id, group_id)) as cursor:
             row = await cursor.fetchone()
         return dict(row) if row else None
 
-    async def list_lfg_users(self) -> list[dict]:
+    async def list_lfg_users(self, group_id: str = "") -> list[dict]:
         conn = await self._get_conn()
-        async with conn.execute("SELECT * FROM lfg_users ORDER BY registered_at DESC") as cursor:
-            rows = await cursor.fetchall()
+        if group_id:
+            async with conn.execute("SELECT * FROM lfg_users WHERE group_id = ? ORDER BY registered_at DESC", (group_id,)) as cursor:
+                rows = await cursor.fetchall()
+        else:
+            async with conn.execute("SELECT * FROM lfg_users ORDER BY registered_at DESC") as cursor:
+                rows = await cursor.fetchall()
         return [dict(r) for r in rows]
 
     async def get_all_lfg_uids(self) -> list[dict]:
         conn = await self._get_conn()
-        async with conn.execute("SELECT qq_id, uid, platform FROM lfg_users") as cursor:
+        async with conn.execute("SELECT qq_id, group_id, uid, platform FROM lfg_users") as cursor:
             rows = await cursor.fetchall()
         return [dict(r) for r in rows]
