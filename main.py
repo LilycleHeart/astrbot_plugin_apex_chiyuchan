@@ -414,7 +414,7 @@ class XiaoChiyu(Star):
     #  LFG 找队友
     # ═══════════════════════════════════════════════
 
-    @filter.command("lfg", alias={"找队友", "组队", "lfg"})
+    @filter.command("lfg", alias={"找队友", "lfg"})
     async def cmd_lfg(self, event: AstrMessageEvent):
         """找队友 — /lfg [注册|排位|娱乐|列表|退出]"""
         qq_id = event.get_sender_id()
@@ -1278,7 +1278,7 @@ class XiaoChiyu(Star):
 
     @filter.llm_tool(name="apex_lfg")
     async def llm_lfg(self, event: AstrMessageEvent, action: str = "list"):
-        """找队友功能。列出找队友列表、注册（排位/娱乐）或退出。当用户表示想找队友、想组队、想打排位/匹配时可调用。
+        """找队友功能。列出找队友列表、注册排位/娱乐、退出。当用户说"找队友"、"想打排位"、"想打匹配"时调用，不要因为"组队"触发。不要因为组队系统相关请求调用此工具。
         Args:
             action(string): 操作类型: list/ranked/casual/leave
         """
