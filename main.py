@@ -453,6 +453,89 @@ class XiaoChiyu(Star):
     #  LFG 找队友
     # ═══════════════════════════════════════════════
 
+    async def _refresh_lfg_entry(self, u: dict, group_id: str, rank_dist, bot) -> dict | None:
+        """获取或刷新 LFG 列表条目。若 DB 中 stats 在 5min 内，直接使用；否则重爬并更新 DB。"""
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        stats_updated = u.get("stats_updated_at")
+        fresh = False
+        if stats_updated:
+            try:
+                updated = datetime.strptime(stats_updated, "%Y-%m-%d %H:%M:%S")
+                if (now - updated) < timedelta(minutes=5):
+                    fresh = True
+            except ValueError:
+                pass
+
+        # QQ 名字
+        qq_name = u.get("qq_name", "") or ""
+        if not qq_name:
+            try:
+                info = await bot.call_action("get_stranger_info", user_id=int(u["qq_id"]), no_cache=False)
+                qq_name = info.get("nickname", "") or info.get("nick", "")
+                if qq_name:
+                    await self.db.update_lfg_qq_name(u["qq_id"], group_id, qq_name)
+            except Exception:
+                pass
+
+        if fresh:
+            stats = await self.apex.get_stats(u["uid"], u["platform"])
+            state = stats.state if stats else u.get("state", "offline")
+            rank_img = u.get("rank_img", "") or (stats.rank_img if stats else "")
+            lvl_raw = u.get("level", 0) or 0
+            pr_raw = u.get("prestige", 0) or 0
+            total_lvl = pr_raw * 500 + lvl_raw if pr_raw else lvl_raw
+            gpct = self._calc_global_pct(
+                u.get("rank_name", ""), 0, rank_dist
+            ) or (stats.rank_top_pct if stats else 0)
+            return {
+                "qq_id": u["qq_id"], "qq_name": qq_name or "",
+                "qq_avatar": f"https://q1.qlogo.cn/g?b=qq&nk={u['qq_id']}&s=640",
+                "mode": u["mode"], "apex_name": u["name"],
+                "platform": u["platform"],
+                "rank_name": u.get("rank_name", ""),
+                "rank_score": u.get("rank_score", 0),
+                "rank_img": rank_img,
+                "rank_top_pct_global": gpct,
+                "rank_ladder_pos": u.get("rank_pos", 0),
+                "level": total_lvl, "kills": u.get("kills", 0),
+                "state": state,
+            }
+
+        # stale — 重新爬取
+        stats = await self.apex.get_stats(u["uid"], u["platform"])
+        if not stats:
+            return None
+        bind_user = await self.db.get_user(u["qq_id"])
+        als_lookup = bind_user["uid"] if bind_user else u["uid"]
+        badges = await fetch_lfg_stats(als_lookup, u["platform"])
+        gpct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        lvl_raw = badges.get("level") or stats.level
+        pr_raw = badges.get("prestige") or stats.prestige
+        total_lvl = pr_raw * 500 + lvl_raw if pr_raw else lvl_raw
+        await self.db.upsert_lfg_user(
+            u["qq_id"], group_id, u["uid"], stats.name, u["platform"], u["mode"],
+            qq_name=qq_name or "",
+            kills=badges.get("kills", 0) or stats.kills,
+            level=lvl_raw, prestige=pr_raw,
+            rank_pos=badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            rank_name=stats.rank_name, rank_score=stats.rank_score,
+            rank_img=stats.rank_img, state=stats.state,
+        )
+        return {
+            "qq_id": u["qq_id"], "qq_name": qq_name or "",
+            "qq_avatar": f"https://q1.qlogo.cn/g?b=qq&nk={u['qq_id']}&s=640",
+            "mode": u["mode"], "apex_name": stats.name,
+            "platform": u["platform"],
+            "rank_name": stats.rank_name, "rank_score": stats.rank_score,
+            "rank_img": stats.rank_img,
+            "rank_top_pct_global": gpct,
+            "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            "level": total_lvl, "kills": badges.get("kills", 0) or stats.kills,
+            "state": stats.state,
+        }
+
     @filter.command("lfg", alias={"组队", "lfg"})
     async def cmd_lfg(self, event: AstrMessageEvent):
         """找队友 — /lfg [排位|娱乐|列表|退出] [@目标 仅管理员]"""
@@ -482,43 +565,9 @@ class XiaoChiyu(Star):
             entries = []
             rank_dist = await self.apex.get_rank_distribution()
             for u in lfg_users:
-                # cw: look up QQ name via OneBot API, cache in db
-                qq_name = u.get("qq_name", "") or ""
-                if not qq_name:
-                    try:
-                        info = await event.bot.call_action("get_stranger_info", user_id=int(u["qq_id"]), no_cache=False)
-                        qq_name = info.get("nickname", "") or info.get("nick", "")
-                        if qq_name:
-                            await self.db.upsert_lfg_user(u["qq_id"], group_id, u["uid"], u["name"], u["platform"], u["mode"], qq_name=qq_name)
-                    except Exception:
-                        pass
-                stats = await self.apex.get_stats(u["uid"], u["platform"])
-                if not stats:
-                    continue
-                # 用 users 表绑定的 ALS UID 查询爬虫，避免重名消歧问题
-                bind_user = await self.db.get_user(u["qq_id"])
-                als_lookup = bind_user["uid"] if bind_user else u["uid"]
-                badges = await fetch_lfg_stats(als_lookup, u["platform"])
-                global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
-                level_raw = badges.get("level") or stats.level
-                prestige_raw = badges.get("prestige") or stats.prestige
-                total_level = prestige_raw * 500 + level_raw if prestige_raw else level_raw
-                entries.append({
-                    "qq_id": u["qq_id"],
-                    "qq_name": u.get("qq_name", ""),
-                    "qq_avatar": f"https://q1.qlogo.cn/g?b=qq&nk={u['qq_id']}&s=640",
-                    "mode": u["mode"],
-                    "apex_name": stats.name,
-                    "platform": u["platform"],
-                    "rank_name": stats.rank_name,
-                    "rank_score": stats.rank_score,
-                    "rank_img": stats.rank_img,
-                    "rank_top_pct_global": global_pct,
-                    "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
-                    "level": total_level,
-                    "kills": badges.get("kills", 0) or stats.kills,
-                    "state": stats.state,
-                })
+                entry = await self._refresh_lfg_entry(u, group_id, rank_dist, event.bot)
+                if entry:
+                    entries.append(entry)
 
             if not entries:
                 img = await renderer.draw_text_card("LFG", "没有有效的战绩数据", is_error=True)
@@ -594,6 +643,22 @@ class XiaoChiyu(Star):
                 yield r
             return
 
+        # 注册时一并爬取 ALS 数据存入 DB
+        bind_user = await self.db.get_user(qq_id)
+        als_lookup = bind_user["uid"] if bind_user else cached["uid"]
+        badges, stats_lfg = await asyncio.gather(
+            fetch_lfg_stats(als_lookup, cached["platform"]),
+            self.apex.get_stats(cached["uid"], cached["platform"]),
+        )
+        lvl_raw = badges.get("level") or (stats_lfg.level if stats_lfg else cached.get("level", 0))
+        pr_raw = badges.get("prestige") or (stats_lfg.prestige if stats_lfg else cached.get("prestige", 0))
+        kills = badges.get("kills", 0) or (stats_lfg.kills if stats_lfg else cached.get("kills", 0))
+        rp = stats_lfg.rank_score if stats_lfg else cached.get("rank_score", 0)
+        rn = stats_lfg.rank_name if stats_lfg else cached.get("rank_name", "")
+        ri = stats_lfg.rank_img if stats_lfg else cached.get("rank_img", "")
+        st = stats_lfg.state if stats_lfg else "offline"
+        rp_pos = badges.get("rankPos", 0) or (stats_lfg.rank_ladder_pos if stats_lfg else 0)
+
         qq_name = event.get_sender_name() or ""
         if qq_id != event.get_sender_id():
             try:
@@ -602,7 +667,10 @@ class XiaoChiyu(Star):
             except Exception:
                 qq_name = ""
         await self.db.upsert_lfg_user(
-            qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode, qq_name=qq_name
+            qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode,
+            qq_name=qq_name,
+            kills=kills, level=lvl_raw, prestige=pr_raw,
+            rank_pos=rp_pos, rank_name=rn, rank_score=rp, rank_img=ri, state=st,
         )
 
         yield event.plain_result(f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})，使用 /lfg 列表 查看")
@@ -1301,6 +1369,21 @@ class XiaoChiyu(Star):
                 return CallToolResult(
                     content=[TextContent(type="text", text="请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友")]
                 )
+            # 注册时一并爬取 ALS 数据存入 DB
+            bind_user = await self.db.get_user(qq_id)
+            als_lookup = bind_user["uid"] if bind_user else cached["uid"]
+            badges, stats_lfg = await asyncio.gather(
+                fetch_lfg_stats(als_lookup, cached["platform"]),
+                self.apex.get_stats(cached["uid"], cached["platform"]),
+            )
+            lvl_raw = badges.get("level") or (stats_lfg.level if stats_lfg else cached.get("level", 0))
+            pr_raw = badges.get("prestige") or (stats_lfg.prestige if stats_lfg else cached.get("prestige", 0))
+            kills = badges.get("kills", 0) or (stats_lfg.kills if stats_lfg else cached.get("kills", 0))
+            rp = stats_lfg.rank_score if stats_lfg else cached.get("rank_score", 0)
+            rn = stats_lfg.rank_name if stats_lfg else cached.get("rank_name", "")
+            ri = stats_lfg.rank_img if stats_lfg else cached.get("rank_img", "")
+            st = stats_lfg.state if stats_lfg else "offline"
+            rp_pos = badges.get("rankPos", 0) or (stats_lfg.rank_ladder_pos if stats_lfg else 0)
             qq_name = event.get_sender_name() or ""
             if qq_id != event.get_sender_id():
                 try:
@@ -1310,7 +1393,9 @@ class XiaoChiyu(Star):
                     qq_name = ""
             await self.db.upsert_lfg_user(
                 qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode,
-                qq_name=qq_name
+                qq_name=qq_name,
+                kills=kills, level=lvl_raw, prestige=pr_raw,
+                rank_pos=rp_pos, rank_name=rn, rank_score=rp, rank_img=ri, state=st,
             )
             return CallToolResult(
                 content=[TextContent(type="text", text=f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})")]
@@ -1326,41 +1411,9 @@ class XiaoChiyu(Star):
         entries = []
         rank_dist = await self.apex.get_rank_distribution()
         for u in lfg_users:
-            qq_name = u.get("qq_name", "") or ""
-            if not qq_name:
-                try:
-                    info = await event.bot.call_action("get_stranger_info", user_id=int(u["qq_id"]), no_cache=False)
-                    qq_name = info.get("nickname", "") or info.get("nick", "")
-                    if qq_name:
-                        await self.db.upsert_lfg_user(u["qq_id"], group_id, u["uid"], u["name"], u["platform"], u["mode"], qq_name=qq_name)
-                except Exception:
-                    pass
-            stats = await self.apex.get_stats(u["uid"], u["platform"])
-            if not stats:
-                continue
-            bind_user = await self.db.get_user(u["qq_id"])
-            als_lookup = bind_user["uid"] if bind_user else u["uid"]
-            badges = await fetch_lfg_stats(als_lookup, u["platform"])
-            global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
-            level_raw = badges.get("level") or stats.level
-            prestige_raw = badges.get("prestige") or stats.prestige
-            total_level = prestige_raw * 500 + level_raw if prestige_raw else level_raw
-            entries.append({
-                "qq_id": u["qq_id"],
-                "qq_name": u.get("qq_name", ""),
-                "qq_avatar": f"https://q1.qlogo.cn/g?b=qq&nk={u['qq_id']}&s=640",
-                "mode": u["mode"],
-                "apex_name": stats.name,
-                "platform": u["platform"],
-                "rank_name": stats.rank_name,
-                "rank_score": stats.rank_score,
-                "rank_img": stats.rank_img,
-                "rank_top_pct_global": global_pct,
-                "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
-                "level": total_level,
-                "kills": badges.get("kills", 0) or stats.kills,
-                "state": stats.state,
-            })
+            entry = await self._refresh_lfg_entry(u, group_id, rank_dist, event.bot)
+            if entry:
+                entries.append(entry)
 
         if not entries:
             return CallToolResult(

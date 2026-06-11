@@ -99,16 +99,36 @@ class Database:
                     uid TEXT NOT NULL, name TEXT NOT NULL, qq_name TEXT DEFAULT '',
                     platform TEXT DEFAULT 'PC', mode TEXT DEFAULT 'ranked',
                     registered_at TEXT DEFAULT (datetime('now','localtime')),
+                    kills INTEGER DEFAULT 0, level INTEGER DEFAULT 0,
+                    prestige INTEGER DEFAULT 0, rank_pos INTEGER DEFAULT 0,
+                    rank_name TEXT DEFAULT '', rank_score INTEGER DEFAULT 0,
+                    rank_img TEXT DEFAULT '', state TEXT DEFAULT 'offline', stats_updated_at TEXT,
                     PRIMARY KEY (group_id, qq_id)
                 )
             """)
             await conn.execute("""
                 INSERT OR IGNORE INTO lfg_users_new
                 SELECT qq_id, COALESCE(group_id,'global'), uid, name, COALESCE(qq_name,''),
-                       platform, mode, registered_at FROM lfg_users
+                       platform, mode, registered_at,
+                       0,0,0,0,'',0,'','offline',NULL FROM lfg_users
             """)
             await conn.execute("DROP TABLE lfg_users")
             await conn.execute("ALTER TABLE lfg_users_new RENAME TO lfg_users")
+        else:
+            # add stats columns if missing
+            for col_def in (
+                "kills INTEGER DEFAULT 0", "level INTEGER DEFAULT 0",
+                "prestige INTEGER DEFAULT 0", "rank_pos INTEGER DEFAULT 0",
+                "rank_score INTEGER DEFAULT 0", "state TEXT DEFAULT 'offline'",
+                "rank_name TEXT DEFAULT ''", "rank_img TEXT DEFAULT ''",
+                "stats_updated_at TEXT",
+            ):
+                col_name = col_def.split()[0]
+                if col_name not in cols:
+                    try:
+                        await conn.execute(f"ALTER TABLE lfg_users ADD COLUMN {col_def}")
+                    except Exception:
+                        pass
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform)")
         await conn.commit()
         logger.info("[Database] SQLite tables ready (WAL mode)")
@@ -137,11 +157,6 @@ class Database:
         await conn.commit()
 
     # ── RP 操作 ──
-        await conn.execute(
-            f"DELETE FROM teams WHERE id IN ({placeholders})", expired_ids
-        )
-        await conn.commit()
-        return expired
 
     async def get_rp_delta(
         self, uid: str, platform: str, current_score: int
@@ -203,11 +218,12 @@ class Database:
         )
         await conn.commit()
 
-    async def upsert_lfg_user(self, qq_id: str, group_id: str, uid: str, name: str, platform: str, mode: str = "ranked", qq_name: str = ""):
+    async def upsert_lfg_user(self, qq_id: str, group_id: str, uid: str, name: str, platform: str, mode: str = "ranked", qq_name: str = "", kills: int = 0, level: int = 0, prestige: int = 0, rank_pos: int = 0, rank_name: str = "", rank_score: int = 0, rank_img: str = "", state: str = "offline"):
         conn = await self._get_conn()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         await conn.execute(
-            "INSERT OR REPLACE INTO lfg_users (qq_id, group_id, uid, name, qq_name, platform, mode, registered_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
-            (qq_id, group_id, uid, name, qq_name, platform, mode),
+            "INSERT OR REPLACE INTO lfg_users (qq_id, group_id, uid, name, qq_name, platform, mode, registered_at, kills, level, prestige, rank_pos, rank_name, rank_score, rank_img, state, stats_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'), ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (qq_id, group_id, uid, name, qq_name, platform, mode, kills, level, prestige, rank_pos, rank_name, rank_score, rank_img, state, now),
         )
         await conn.commit()
 
@@ -231,6 +247,14 @@ class Database:
             async with conn.execute("SELECT * FROM lfg_users ORDER BY registered_at DESC") as cursor:
                 rows = await cursor.fetchall()
         return [dict(r) for r in rows]
+
+    async def update_lfg_qq_name(self, qq_id: str, group_id: str, qq_name: str):
+        conn = await self._get_conn()
+        await conn.execute(
+            "UPDATE lfg_users SET qq_name = ? WHERE qq_id = ? AND group_id = ?",
+            (qq_name, qq_id, group_id),
+        )
+        await conn.commit()
 
     async def get_all_lfg_uids(self) -> list[dict]:
         conn = await self._get_conn()
