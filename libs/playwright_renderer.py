@@ -1055,7 +1055,7 @@ def _build_lfg_html(entries: list[dict]) -> str:
         kills = e.get("kills", 0)
         apex_name = e.get("apex_name", "Unknown")
         platform = e.get("platform", "PC")
-        ladder_pos = e.get("rank_ladder_pos", 0)
+        ladder_pos = e.get("rank_ladder_pos", 0) or 0
 
         rank_type = rank_name.lower().split(" ")[0] if rank_name else "unranked"
         text_color = rank_colors.get(rank_name, "#938f99")
@@ -1075,7 +1075,7 @@ def _build_lfg_html(entries: list[dict]) -> str:
             <div class="col-player">
                 <img class="avatar" src="{qq_avatar}" alt="">
                 <div class="player-info">
-                    <div class="player-name">{display_name}</div>
+                    <div class="player-name" title="{display_name}">{display_name}</div>
                     <div class="status-tag"><span class="material-symbols-rounded dot-online" style="font-variation-settings: 'FILL' 1;font-size:8px">circle</span> 在线 · {platform}</div>
                 </div>
             </div>
@@ -1102,27 +1102,27 @@ def _build_lfg_html(entries: list[dict]) -> str:
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#1e1e2e;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-serif;display:flex;justify-content:center;padding:32px 24px}}
-.lfg-list{{width:100%;max-width:1200px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
-.list-header{{display:grid;grid-template-columns:2.5fr 2fr 2.5fr 1fr 1fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center}}
+.lfg-list{{width:100%;max-width:1280px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
+.list-header{{display:grid;grid-template-columns:1fr 1.2fr 1fr 0.6fr 0.6fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:20px}}
 .list-header>div{{text-align:center}}
 .list-header>div:first-child{{text-align:left}}
-.player-row{{display:grid;grid-template-columns:2.5fr 2fr 2.5fr 1fr 1fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent}}
+.player-row{{display:grid;grid-template-columns:1fr 1.2fr 1fr 0.6fr 0.6fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent;gap:20px}}
 .player-row:hover{{background:#303042;transform:translateY(-2px);border-color:#49454f}}
 .col-player{{display:flex;align-items:center;gap:18px}}
-.avatar{{width:52px;height:52px;border-radius:14px;object-fit:cover}}
+.avatar{{width:52px;height:52px;border-radius:14px;object-fit:cover;flex-shrink:0}}
 .player-info{{display:flex;flex-direction:column;gap:4px}}
 .player-name{{font-weight:700;font-size:1rem}}
 .status-tag{{font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px}}
 .dot-online{{color:#b7f397;font-size:8px}}
 .col-rank{{display:flex;align-items:center;gap:14px}}
-.rank-icon{{width:44px;height:44px}}
-.rank-text{{display:flex;flex-direction:column;gap:2px}}
+.rank-icon{{width:44px;height:44px;flex-shrink:0}}
+.rank-text{{display:flex;flex-direction:column;gap:2px;white-space:nowrap}}
 .rank-score{{font-weight:700;font-size:1.15rem}}
 .rank-label{{font-size:0.78rem;color:#938f99}}
 .col-wants{{display:flex;gap:8px;flex-wrap:wrap}}
-.md3-chip{{background:#333537;color:#e3e2e6;padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px}}
+.md3-chip{{background:#333537;color:#e3e2e6;padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap}}
 .chip-highlight{{background:#633b48;color:#ffd8e4}}
-.col-data{{font-weight:700;font-size:1.1rem;text-align:center}}
+.col-data{{font-weight:700;font-size:1.1rem;text-align:center;white-space:nowrap}}
 .text-predator{{color:#ffb4ab}} .text-master{{color:#d0bcff}} .text-diamond{{color:#bac3ff}}
 .text-platinum{{color:#99f1ff}} .text-gold{{color:#ffd966}} .text-silver{{color:#c0c0c0}}
 .text-bronze{{color:#cd7f32}} .text-unranked{{color:#938f99}}

@@ -93,6 +93,11 @@ class Database:
                 registered_at TEXT DEFAULT (datetime('now','localtime'))
             );
         """)
+        # migrate: add qq_name column if missing
+        try:
+            await conn.execute("ALTER TABLE lfg_users ADD COLUMN qq_name TEXT DEFAULT ''")
+        except Exception:
+            pass
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_teams_expires ON teams(expires_at)")
         await conn.commit()
