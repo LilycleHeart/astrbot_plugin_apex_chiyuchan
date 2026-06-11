@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from pathlib import Path
 
@@ -262,7 +263,19 @@ class XiaoChiyu(Star):
         name = msg.split(maxsplit=1)[1] if " " in msg else ""
 
         if name:
-            if name.strip().isdigit():
+            # 处理 @提及：查对方绑定
+            at_match = re.search(r'\[CQ:at,qq=(\d+)\]', name) or re.search(r'@(\d+)', name)
+            if at_match:
+                target_qq = at_match.group(1)
+                target_user = await self.db.get_user(target_qq)
+                if not target_user:
+                    img = await renderer.draw_text_card("查询失败", "对方未绑定 Apex 账号", is_error=True)
+                    async for r in self._send_card(event, img):
+                        yield r
+                    return
+                uid = target_user["uid"]
+                platform = target_user.get("platform", "PC")
+            elif name.strip().isdigit():
                 idx = int(name.strip())
                 cached = self._last_search.get(qq_id, [])
                 if 1 <= idx <= len(cached):
