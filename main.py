@@ -155,6 +155,21 @@ class XiaoChiyu(Star):
             return None, cleaned, "只有管理员才能为他人操作"
         return target_qq or event.get_sender_id(), cleaned, None
 
+    async def _get_badges_cached(self, uid: str, platform: str) -> dict:
+        """从 DB 或 ALS 获取徽章数据，DB 缓存 24h。"""
+        from datetime import datetime, timedelta
+        cached = await self.db.get_badge_cache(uid, platform)
+        if cached:
+            try:
+                updated = datetime.strptime(cached["updated_at"], "%Y-%m-%d %H:%M:%S")
+                if (datetime.now() - updated) < timedelta(hours=24):
+                    return cached["data"]
+            except ValueError:
+                pass
+        badges = await fetch_badges(uid, platform)
+        await self.db.set_badge_cache(uid, platform, badges)
+        return badges
+
     async def _send_card(
         self, event: AstrMessageEvent, img_bytes: bytes, suffix: str = ".png", **kwargs
     ):
@@ -365,7 +380,7 @@ class XiaoChiyu(Star):
 
         # ── API 获取基础数据 + 网站抓取徽章 + 段位分布（并行）──
         stats_task = self.apex.get_stats(uid, platform)
-        badges_task = fetch_badges(uid, platform)
+        badges_task = self._get_badges_cached(uid, platform)
         rankdist_task = self.apex.get_rank_distribution()
         stats, badges, rank_dist = await asyncio.gather(
             stats_task, badges_task, rankdist_task
@@ -973,7 +988,7 @@ class XiaoChiyu(Star):
             uid, platform = user["uid"], user["platform"]
 
         stats_task = self.apex.get_stats(uid, platform)
-        badges_task = fetch_badges(uid, platform)
+        badges_task = self._get_badges_cached(uid, platform)
         rankdist_task = self.apex.get_rank_distribution()
         stats, badges, rank_dist = await asyncio.gather(
             stats_task, badges_task, rankdist_task

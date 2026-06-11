@@ -78,6 +78,14 @@ class Database:
                 registered_at TEXT DEFAULT (datetime('now','localtime')),
                 PRIMARY KEY (group_id, qq_id)
             );
+
+            CREATE TABLE IF NOT EXISTS badge_cache (
+                uid         TEXT NOT NULL,
+                platform    TEXT NOT NULL DEFAULT 'PC',
+                data        TEXT NOT NULL,
+                updated_at  TEXT DEFAULT (datetime('now','localtime')),
+                PRIMARY KEY (uid, platform)
+            );
         """)
         # migrate: add qq_name / group_id columns; recreate PK if old schema
         try:
@@ -261,3 +269,26 @@ class Database:
         async with conn.execute("SELECT qq_id, group_id, uid, platform FROM lfg_users") as cursor:
             rows = await cursor.fetchall()
         return [dict(r) for r in rows]
+
+    # ── 徽章缓存 ──
+
+    async def get_badge_cache(self, uid: str, platform: str = "PC") -> dict | None:
+        conn = await self._get_conn()
+        async with conn.execute(
+            "SELECT data, updated_at FROM badge_cache WHERE uid = ? AND platform = ?",
+            (uid, platform),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if row:
+            import json
+            return {"data": json.loads(row["data"]), "updated_at": row["updated_at"]}
+        return None
+
+    async def set_badge_cache(self, uid: str, platform: str, data: dict):
+        import json
+        conn = await self._get_conn()
+        await conn.execute(
+            "INSERT OR REPLACE INTO badge_cache (uid, platform, data, updated_at) VALUES (?, ?, ?, datetime('now','localtime'))",
+            (uid, platform, json.dumps(data)),
+        )
+        await conn.commit()
