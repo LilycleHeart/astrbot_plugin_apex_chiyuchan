@@ -434,7 +434,10 @@ class XiaoChiyu(Star):
                 stats = await self.apex.get_stats(u["uid"], u["platform"])
                 if not stats:
                     continue
-                badges = await fetch_lfg_stats(u["uid"], u["platform"])
+                # 用 users 表绑定的 ALS UID 查询爬虫，避免重名消歧问题
+                bind_user = await self.db.get_user(u["qq_id"])
+                als_lookup = bind_user["uid"] if bind_user else u["uid"]
+                badges = await fetch_lfg_stats(als_lookup, u["platform"])
                 debug_lines.append(f"{u['name']}: scraper={badges}, api_kills={stats.kills}, api_level={stats.level}, api_prestige={getattr(stats,'prestige',0)}, api_ladder={stats.rank_ladder_pos}")
                 global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
                 level_raw = badges.get("level") or stats.level
