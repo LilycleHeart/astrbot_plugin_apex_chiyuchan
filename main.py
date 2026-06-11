@@ -414,7 +414,7 @@ class XiaoChiyu(Star):
     #  LFG 找队友
     # ═══════════════════════════════════════════════
 
-    @filter.command("lfg", alias={"找队友", "lfg"})
+    @filter.command("lfg", alias={"组队", "lfg"})
     async def cmd_lfg(self, event: AstrMessageEvent):
         """找队友 — /lfg [注册|排位|娱乐|列表|退出]"""
         qq_id = event.get_sender_id()
@@ -741,119 +741,13 @@ class XiaoChiyu(Star):
     #  队伍系统
     # ═══════════════════════════════════════════════
 
-    @filter.command_group("team")
-    def team(self):
-        pass
-
-    @team.command("create", alias={"创建"})
-    async def team_create(self, event: AstrMessageEvent, name: str):
-        """创建队伍 — /team create <队伍名>"""
-        qq_id = event.get_sender_id()
-        team_id = await self.db.create_team(name, qq_id)
-        if team_id is None:
-            img = await renderer.draw_text_card(
-                "创建失败", "你已在队伍中，请先退出当前队伍", is_error=True
-            )
-        else:
-            img = await renderer.draw_text_card(
-                "队伍创建成功",
-                f"'{name}' 已创建\n默认 12 小时后自动解散\n使用 /team ttl <小时> 修改时限",
-            )
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("join", alias={"加入"})
-    async def team_join(self, event: AstrMessageEvent, name: str):
-        """加入队伍 — /team join <队伍名>"""
-        qq_id = event.get_sender_id()
-        err = await self.db.join_team(name, qq_id)
-        if err:
-            img = await renderer.draw_text_card("加入失败", err, is_error=True)
-        else:
-            img = await renderer.draw_text_card("加入成功", f"你已加入队伍 '{name}'")
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("leave", alias={"离开"})
-    async def team_leave(self, event: AstrMessageEvent):
-        """离开当前队伍"""
-        qq_id = event.get_sender_id()
-        err = await self.db.leave_team(qq_id)
-        if err:
-            img = await renderer.draw_text_card("操作失败", err, is_error=True)
-        else:
-            img = await renderer.draw_text_card("已离开", "你已退出队伍")
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("info", alias={"信息"})
-    async def team_info(self, event: AstrMessageEvent):
-        """查看当前队伍信息"""
-        qq_id = event.get_sender_id()
-        team = await self.db.get_team_by_member(qq_id)
-        if not team:
-            img = await renderer.draw_text_card(
-                "队伍信息", "你不在任何队伍中", is_error=True
-            )
-        else:
-            team["members"] = await self.db.get_team_members(team["id"])
-            team["member_count"] = len(team["members"])
-            img = await renderer.draw_team_card(team)
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("list", alias={"列表"})
-    async def team_list(self, event: AstrMessageEvent):
-        """查看所有活跃队伍"""
-        teams = await self.db.get_all_teams()
-        img = await renderer.draw_team_list_card(teams)
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("disband", alias={"解散"})
-    async def team_disband(self, event: AstrMessageEvent):
-        """解散队伍 (仅队长)"""
-        qq_id = event.get_sender_id()
-        err = await self.db.disband_team(qq_id)
-        if err:
-            img = await renderer.draw_text_card("解散失败", err, is_error=True)
-        else:
-            img = await renderer.draw_text_card("已解散", "队伍已解散")
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("ttl", alias={"时限", "时效"})
-    async def team_ttl(self, event: AstrMessageEvent, hours: int):
-        """修改队伍存活时限 — /team ttl <小时> (1~48 仅队长)"""
-        qq_id = event.get_sender_id()
-        err = await self.db.set_team_ttl(qq_id, hours)
-        if err:
-            img = await renderer.draw_text_card("修改失败", err, is_error=True)
-        else:
-            img = await renderer.draw_text_card(
-                "修改成功", f"队伍将在 {hours} 小时后自动解散"
-            )
-        async for r in self._send_card(event, img):
-            yield r
-
     # ═══════════════════════════════════════════════
     #  后台自动清理过期队伍
     # ═══════════════════════════════════════════════
 
     @filter.on_astrbot_loaded()
     async def start_cleaner(self):
-        self._fire_and_forget(self._auto_clean_expired_teams(), "清理过期队伍")
         self._fire_and_forget(self._auto_clean_temp_files(), "清理临时文件")
-
-    async def _auto_clean_expired_teams(self):
-        while True:
-            await asyncio.sleep(60)
-            try:
-                expired = await self.db.expire_teams()
-                for team in expired:
-                    logger.info(f"[小赤羽] 队伍 '{team['name']}' 已过期，自动解散")
-            except Exception as e:
-                logger.error(f"[小赤羽] 清理过期队伍失败: {e}")
 
     async def _auto_clean_temp_files(self):
         """每5分钟清理超过30分钟的临时PNG文件"""
@@ -1278,7 +1172,7 @@ class XiaoChiyu(Star):
 
     @filter.llm_tool(name="apex_lfg")
     async def llm_lfg(self, event: AstrMessageEvent, action: str = "list"):
-        """找队友功能。列出找队友列表、注册排位/娱乐、退出。当用户说"找队友"、"想打排位"、"想打匹配"时调用，不要因为"组队"触发。不要因为组队系统相关请求调用此工具。
+        """找队友功能。列出组队列表、注册排位/娱乐、退出。当用户说"组队"、"找队友"、"想打排位"、"想打匹配"时调用。
         Args:
             action(string): 操作类型: list/ranked/casual/leave
         """
