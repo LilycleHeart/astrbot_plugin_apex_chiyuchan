@@ -454,7 +454,7 @@ class XiaoChiyu(Star):
     # ═══════════════════════════════════════════════
 
     async def _refresh_lfg_entry(self, u: dict, group_id: str, rank_dist, bot) -> dict | None:
-        """获取或刷新 LFG 列表条目。若 DB 中 stats 在 5min 内，直接使用；否则重爬并更新 DB。"""
+        """获取或刷新 LFG 列表条目。DB 中 kills/level 等静态数据在 30min 内直接使用，否则重爬 ALS（在线状态始终实时）。"""
         from datetime import datetime, timedelta
 
         now = datetime.now()
@@ -463,7 +463,7 @@ class XiaoChiyu(Star):
         if stats_updated:
             try:
                 updated = datetime.strptime(stats_updated, "%Y-%m-%d %H:%M:%S")
-                if (now - updated) < timedelta(minutes=5):
+                if (now - updated) < timedelta(minutes=30):
                     fresh = True
             except ValueError:
                 pass
