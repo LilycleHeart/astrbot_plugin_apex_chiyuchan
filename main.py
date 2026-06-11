@@ -52,6 +52,8 @@ class XiaoChiyu(Star):
         self._temp_dir.mkdir(parents=True, exist_ok=True)
 
         self._last_search: dict[str, list[dict]] = {}
+        self._profile_cache: dict[str, dict] = {}
+        self._lfg_entries: dict[str, dict] = {}
         self._monitor_task: asyncio.Task | None = None
 
         from .libs.config import preload_fonts
@@ -362,12 +364,137 @@ class XiaoChiyu(Star):
             "rank_dist_entries": rank_dist.entries if rank_dist else None,
         }
 
+        self._profile_cache[qq_id] = {
+            "uid": stats.uid,
+            "name": stats.name,
+            "platform": platform,
+            "rank_name": stats.rank_name,
+            "rank_div": stats.rank_div,
+            "rank_score": stats.rank_score,
+            "rank_img": stats.rank_img,
+            "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            "level": badges.get("level") or stats.level,
+            "prestige": badges.get("prestige") or stats.prestige,
+            "kills": badges.get("kills", 0) or stats.kills,
+            "avatar_url": qq_avatar,
+        }
+
         logger.info(
             f"[DEBUG] rank_name={profile_data.get('rank_name')} "
             f"rank_div={profile_data.get('rank_div')} "
             f"rank_img={profile_data.get('rank_img')[:60] if profile_data.get('rank_img') else 'EMPTY'}"
         )
         img = await renderer.draw_profile_card(profile_data)
+        async for r in self._send_card(event, img):
+            yield r
+
+    # ═══════════════════════════════════════════════
+    #  LFG 找队友
+    # ═══════════════════════════════════════════════
+
+    @filter.command("lfg", alias={"找队友", "组队", "lfg"})
+    async def cmd_lfg(self, event: AstrMessageEvent):
+        """找队友 — /lfg [注册|排位|娱乐|列表|退出]"""
+        qq_id = event.get_sender_id()
+        msg = event.get_message_str().strip()
+        parts = msg.split(maxsplit=1)
+        arg = parts[1].strip().lower() if len(parts) > 1 else ""
+
+        if arg in ("list", "列表"):
+            lfg_users = await self.db.list_lfg_users()
+            if not lfg_users:
+                img = await renderer.draw_text_card("LFG", "当前没有人在找队友", is_error=True)
+                async for r in self._send_card(event, img):
+                    yield r
+                return
+
+            entries = []
+            for u in lfg_users:
+                stats = await self.apex.get_stats(u["uid"], u["platform"])
+                if not stats:
+                    continue
+                rank_dist = await self.apex.get_rank_distribution()
+                global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+                entries.append({
+                    "qq_id": u["qq_id"],
+                    "mode": u["mode"],
+                    "apex_name": stats.name,
+                    "platform": u["platform"],
+                    "rank_name": stats.rank_name,
+                    "rank_score": stats.rank_score,
+                    "rank_img": stats.rank_img,
+                    "rank_top_pct_global": global_pct,
+                    "level": stats.level,
+                    "kills": stats.kills,
+                })
+
+            if not entries:
+                img = await renderer.draw_text_card("LFG", "没有有效的战绩数据", is_error=True)
+                async for r in self._send_card(event, img):
+                    yield r
+                return
+
+            img = await renderer.draw_lfg_card(entries)
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        if arg in ("leave", "退出", "取消"):
+            existing = await self.db.get_lfg_user(qq_id)
+            if existing:
+                await self.db.remove_lfg_user(qq_id)
+                img = await renderer.draw_text_card("LFG", "已退出找队友列表")
+            else:
+                img = await renderer.draw_text_card("LFG", "你不在找队友列表中", is_error=True)
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        mode = None
+        if arg in ("rank", "ranked", "排位", "rp"):
+            mode = "ranked"
+        elif arg in ("casual", "娱乐", "匹配", "pub", "pubs"):
+            mode = "casual"
+        elif arg in ("register", "注册"):
+            mode = None
+        elif arg:
+            img = await renderer.draw_text_card(
+                "LFG", "用法: /lfg [注册|排位|娱乐|列表|退出]", is_error=True
+            )
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        if not mode:
+            cached = self._profile_cache.get(qq_id)
+            if not cached:
+                img = await renderer.draw_text_card(
+                    "LFG", "请先使用 /stats 查询战绩后再找队友", is_error=True
+                )
+                async for r in self._send_card(event, img):
+                    yield r
+                return
+            img = await renderer.draw_lfg_mode_card()
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        cached = self._profile_cache.get(qq_id)
+        if not cached:
+            img = await renderer.draw_text_card(
+                "LFG", "请先使用 /stats 查询战绩后再找队友", is_error=True
+            )
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        await self.db.upsert_lfg_user(
+            qq_id, cached["uid"], cached["name"], cached["platform"], mode
+        )
+
+        img = await renderer.draw_text_card(
+            "LFG", f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})，使用 /lfg 列表 查看"
+        )
         async for r in self._send_card(event, img):
             yield r
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import asyncio
+import httpx
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageDraw, ImageFont, ImageSequence
@@ -971,11 +972,15 @@ try:
         draw_server_status_card as _draw_server_status_card_pw,
     )
     from .playwright_renderer import draw_predator_card as _draw_predator_card_pw
+    from .playwright_renderer import draw_lfg_card as _draw_lfg_card_pw
+    from .playwright_renderer import draw_lfg_mode_card as _draw_lfg_mode_card_pw
 except Exception:
     _draw_profile_card_pw = None
     _draw_map_rotation_card_pw = None
     _draw_server_status_card_pw = None
     _draw_predator_card_pw = None
+    _draw_lfg_card_pw = None
+    _draw_lfg_mode_card_pw = None
 
 
 async def draw_profile_card(data: dict) -> bytes:
@@ -1808,6 +1813,113 @@ def _draw_text_sync(title: str, message: str, is_error: bool = False) -> bytes:
         cy += line_h
 
     _draw_centered_text(draw, "auth.赤羽真白 · Apex Chiyuchan", card_x, card_y + card_h - FONT_SIZES["caption"] - 8, card_w, FONT_CAPTION, fill=MUTED)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+async def draw_lfg_mode_card() -> bytes:
+    """LFG 模式选择卡片 (优先 playwright，回退 Pillow)"""
+    if _draw_lfg_mode_card_pw is not None:
+        try:
+            return await _draw_lfg_mode_card_pw()
+        except Exception:
+            pass
+    return await asyncio.get_event_loop().run_in_executor(
+        None, _draw_lfg_mode_sync
+    )
+
+
+def _draw_lfg_mode_sync() -> bytes:
+    card_w, card_h = 420, 320
+    PADDING = 16
+    img = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    _draw_rounded_rect(draw, 0, 0, card_w, card_h, 24, SURFACE)
+    _draw_rounded_rect(draw, 0, 0, card_w, card_h, 24, DIVIDER, width=1)
+
+    cy = PADDING + 12
+    draw.text((PADDING + 8, cy), "找队友", font=FONT_TITLE, fill=PRIMARY)
+    cy += FONT_SIZES["title"] + 4
+    draw.text((PADDING + 8, cy), "选择你要玩的模式", font=FONT_CAPTION, fill=MUTED)
+    cy += FONT_SIZES["caption"] + 16
+
+    _draw_centered_text(draw, "/lfg 排位", PADDING, cy, card_w - PADDING * 2, FONT_BODY, fill=ON_SURFACE)
+    cy += FONT_SIZES["body"] + 12
+    _draw_centered_text(draw, "/lfg 娱乐", PADDING, cy, card_w - PADDING * 2, FONT_BODY, fill=ON_SURFACE)
+    cy += FONT_SIZES["body"] + 12
+
+    _draw_centered_text(draw, "auth.赤羽真白 · Apex Chiyuchan", 0, card_h - FONT_SIZES["caption"] - 8, card_w, FONT_CAPTION, fill=MUTED)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+async def draw_lfg_card(entries: list[dict]) -> bytes:
+    """LFG 找队友卡片 (优先 playwright，回退 Pillow)"""
+    if _draw_lfg_card_pw is not None:
+        try:
+            return await _draw_lfg_card_pw(entries)
+        except Exception:
+            pass
+    return await asyncio.get_event_loop().run_in_executor(
+        None, _draw_lfg_sync, entries
+    )
+
+
+def _draw_lfg_sync(entries: list[dict]) -> bytes:
+    card_w = 680
+    row_h = 72
+    card_h = 80 + len(entries) * row_h + 40
+    PADDING = 16
+    img = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    _draw_rounded_rect(draw, 0, 0, card_w, card_h, 24, SURFACE)
+    _draw_rounded_rect(draw, 0, 0, card_w, card_h, 24, DIVIDER, width=1)
+
+    cy = PADDING + 12
+    draw.text((PADDING + 8, cy), "找队友", font=FONT_TITLE, fill=PRIMARY)
+    cy += FONT_SIZES["title"] + 4
+    draw.text((PADDING + 8, cy), f"{len(entries)} 位玩家在线", font=FONT_CAPTION, fill=MUTED)
+    cy += FONT_SIZES["caption"] + 16
+
+    for e in entries:
+        mode = e.get("mode", "ranked")
+        mode_label = "排位" if mode == "ranked" else "娱乐"
+        mode_color = PRIMARY if mode == "ranked" else ACCENT_GREEN
+        rank_name = e.get("rank_name", "Unranked")
+        rank_score = e.get("rank_score", 0)
+        apex_name = e.get("apex_name", "Unknown")
+        level = e.get("level", 0)
+        kills = e.get("kills", 0)
+        rank_img = e.get("rank_img", "")
+
+        rank_display = _rank_zh(rank_name)
+        ladder_pos = e.get("rank_ladder_pos", 0)
+        if ladder_pos and rank_name in ("Predator", "Master"):
+            rank_display += f" #{ladder_pos}"
+
+        if rank_img:
+            try:
+                ri = Image.open(io.BytesIO(httpx.get(rank_img, timeout=8).content)).resize((40, 40), Image.LANCZOS)
+                img.paste(ri, (PADDING + 8, cy + 16), ri)
+            except Exception:
+                pass
+
+        draw.text((PADDING + 56, cy + 12), apex_name, font=FONT_BODY, fill=ON_SURFACE)
+        draw.text((PADDING + 56, cy + 32), f"{rank_display} · {rank_score:,} RP", font=FONT_CAPTION, fill=MUTED)
+
+        draw.text((card_w - PADDING - 80, cy + 12), mode_label, font=FONT_BODY, fill=mode_color)
+        draw.text((card_w - PADDING - 80, cy + 32), f"Lv.{level} · {kills:,} 击杀", font=FONT_CAPTION, fill=MUTED)
+
+        draw.line((PADDING, cy + row_h), (card_w - PADDING, cy + row_h), fill=DIVIDER, width=1)
+        cy += row_h
+
+    _draw_centered_text(draw, "auth.赤羽真白 · Apex Chiyuchan", 0, card_h - FONT_SIZES["caption"] - 8, card_w, FONT_CAPTION, fill=MUTED)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")

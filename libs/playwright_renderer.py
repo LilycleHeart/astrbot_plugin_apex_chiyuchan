@@ -1001,3 +1001,125 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 async def draw_predator_card(predator) -> bytes:
     html = _build_predator_html(predator)
     return await _render_card_sync(html, 720)
+
+
+def _build_lfg_mode_card() -> str:
+    _C = "#171A22"
+    _T = "#E4EAF5"
+    _M = "#8B95AD"
+    _O = "#2A3148"
+    _A = "#6DA8FF"
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:#0F1218;color:{_T};display:flex;justify-content:center;padding:24px}}
+.card{{width:420px;background:{_C};border-radius:24px;overflow:hidden;border:1px solid {_O}}}
+.header{{padding:20px 24px;border-bottom:1px solid {_O}}}
+.title{{font-size:20px;font-weight:800;color:{_T}}}
+.subtitle{{font-size:12px;color:{_M};margin-top:4px}}
+.body{{padding:20px 24px}}
+.desc{{font-size:13px;color:{_M};line-height:1.6;margin-bottom:16px}}
+.options{{display:flex;flex-direction:column;gap:10px}}
+.opt{{padding:14px 16px;background:#1D222C;border-radius:12px;border:1px solid {_O};cursor:pointer;font-size:14px;font-weight:600;color:{_T};text-align:center}}
+.opt .sub{{font-size:11px;color:{_M};font-weight:400;margin-top:4px}}
+.footer{{padding:12px 24px;border-top:1px solid {_O};font-size:11px;color:{_M};text-align:center}}
+</style></head><body>
+<div class="card">
+  <div class="header">
+    <div class="title">找队友</div>
+    <div class="subtitle">选择你要玩的模式</div>
+  </div>
+  <div class="body">
+    <div class="desc">使用 <b>/lfg 排位</b> 或 <b>/lfg 娱乐</b> 注册</div>
+    <div class="options">
+      <div class="opt">排位<div class="sub">Ranked · /lfg 排位</div></div>
+      <div class="opt">娱乐<div class="sub">Pubs · /lfg 娱乐</div></div>
+    </div>
+  </div>
+  <div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
+</div>
+</body></html>"""
+
+
+def _build_lfg_html(entries: list[dict]) -> str:
+    _C = "#171A22"
+    _T = "#E4EAF5"
+    _M = "#8B95AD"
+    _O = "#2A3148"
+    _G = "#4CE5B1"
+
+    rows = ""
+    for e in entries:
+        mode = e.get("mode", "ranked")
+        mode_label = "排位" if mode == "ranked" else "娱乐"
+        mode_color = "#FF6B6B" if mode == "ranked" else "#4CE5B1"
+        rank_name = e.get("rank_name", "Unranked")
+        rank_score = e.get("rank_score", 0)
+        rank_img = e.get("rank_img", "")
+        level = e.get("level", 0)
+        kills = e.get("kills", 0)
+        apex_name = e.get("apex_name", "Unknown")
+        top_pct = e.get("rank_top_pct_global", 0)
+        ladder_pos = e.get("rank_ladder_pos", 0)
+
+        rank_display = _rank_zh(rank_name)
+        if ladder_pos and rank_name in ("Predator", "Master"):
+            rank_display += f" #{ladder_pos}"
+
+        rows += f"""
+  <div class="row">
+    <div class="row-left">
+      <img class="rank-icon" src="{rank_img}" onerror="this.remove()">
+      <div class="row-info">
+        <div class="row-name">{apex_name}</div>
+        <div class="row-rank">{rank_display} · {rank_score:,} RP</div>
+      </div>
+    </div>
+    <div class="row-right">
+      <div class="mode-tag" style="color:{mode_color}">{mode_label}</div>
+      <div class="row-stats">Lv.{level} · {kills:,} 击杀</div>
+    </div>
+  </div>"""
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:#0F1218;color:{_T};display:flex;justify-content:center;padding:24px}}
+.card{{width:680px;background:{_C};border-radius:24px;overflow:hidden;border:1px solid {_O}}}
+.header{{padding:20px 24px;border-bottom:1px solid {_O}}}
+.title{{font-size:20px;font-weight:800;color:{_T}}}
+.subtitle{{font-size:12px;color:{_M};margin-top:4px}}
+.row{{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid {_O}}}
+.row:last-child{{border-bottom:none}}
+.row-left{{display:flex;align-items:center;gap:12px}}
+.rank-icon{{width:40px;height:40px;border-radius:10px}}
+.row-name{{font-size:14px;font-weight:700;color:{_T}}}
+.row-rank{{font-size:12px;color:{_M};margin-top:2px}}
+.row-right{{display:flex;flex-direction:column;align-items:flex-end;gap:4px}}
+.mode-tag{{font-size:12px;font-weight:700}}
+.row-stats{{font-size:11px;color:{_M}}}
+.footer{{padding:12px 24px;border-top:1px solid {_O};font-size:11px;color:{_M};display:flex;justify-content:space-between}}
+</style></head><body>
+<div class="card">
+  <div class="header">
+    <div class="title">找队友</div>
+    <div class="subtitle">{len(entries)} 位玩家在线</div>
+  </div>
+  {rows}
+  <div class="footer">
+    <span>Data: apexlegendsstatus.com</span>
+    <span>auth.赤羽真白 · Apex Chiyuchan</span>
+  </div>
+</div>
+</body></html>"""
+
+
+async def draw_lfg_card(entries: list[dict]) -> bytes:
+    html = _build_lfg_html(entries)
+    return await _render_card_sync(html, 720)
+
+
+async def draw_lfg_mode_card() -> bytes:
+    html = _build_lfg_mode_card()
+    return await _render_card_sync(html, 420)

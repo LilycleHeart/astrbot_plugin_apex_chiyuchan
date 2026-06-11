@@ -82,6 +82,15 @@ class Database:
                 enabled       INTEGER DEFAULT 1,
                 last_state    TEXT DEFAULT ''
             );
+
+            CREATE TABLE IF NOT EXISTS lfg_users (
+                qq_id       TEXT PRIMARY KEY,
+                uid         TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                platform    TEXT DEFAULT 'PC',
+                mode        TEXT DEFAULT 'ranked',
+                registered_at TEXT DEFAULT (datetime('now','localtime'))
+            );
         """)
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_teams_expires ON teams(expires_at)")
@@ -364,3 +373,34 @@ class Database:
             (last_state, session_id),
         )
         await conn.commit()
+
+    async def upsert_lfg_user(self, qq_id: str, uid: str, name: str, platform: str, mode: str = "ranked"):
+        conn = await self._get_conn()
+        await conn.execute(
+            "INSERT OR REPLACE INTO lfg_users (qq_id, uid, name, platform, mode, registered_at) VALUES (?, ?, ?, ?, ?, datetime('now','localtime'))",
+            (qq_id, uid, name, platform, mode),
+        )
+        await conn.commit()
+
+    async def remove_lfg_user(self, qq_id: str):
+        conn = await self._get_conn()
+        await conn.execute("DELETE FROM lfg_users WHERE qq_id = ?", (qq_id,))
+        await conn.commit()
+
+    async def get_lfg_user(self, qq_id: str) -> dict | None:
+        conn = await self._get_conn()
+        async with conn.execute("SELECT * FROM lfg_users WHERE qq_id = ?", (qq_id,)) as cursor:
+            row = await cursor.fetchone()
+        return dict(row) if row else None
+
+    async def list_lfg_users(self) -> list[dict]:
+        conn = await self._get_conn()
+        async with conn.execute("SELECT * FROM lfg_users ORDER BY registered_at DESC") as cursor:
+            rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    async def get_all_lfg_uids(self) -> list[dict]:
+        conn = await self._get_conn()
+        async with conn.execute("SELECT qq_id, uid, platform FROM lfg_users") as cursor:
+            rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
