@@ -622,8 +622,12 @@ async def _embed_images(html: str) -> str:
 async def _render_card_sync(html: str, width: int) -> bytes:
     html = await _embed_images(html)
     async with run_with_page(viewport={"width": width, "height": 100}, device_scale_factor=2) as page:
-        await page.set_content(html, wait_until="load", timeout=15000)
+        await page.set_content(html, wait_until="load", timeout=20000)
         await page.wait_for_selector(".card, .lfg-list", timeout=10000)
+        try:
+            await page.wait_for_function("() => document.fonts.ready", timeout=8000)
+        except Exception:
+            pass
         card_height = await page.evaluate(
             "() => (document.querySelector('.card') || document.querySelector('.lfg-list'))?.offsetHeight || 600"
         )
@@ -1012,9 +1016,13 @@ async def draw_predator_card(predator) -> bytes:
 def _build_lfg_mode_card() -> str:
     ff = "sans-serif" if _USE_LOCAL_FONTS else "'Noto Sans SC','Roboto',sans-serif"
     fl = "" if _USE_LOCAL_FONTS else '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
+    ml = ""
+    if _USE_LOCAL_FONTS:
+        ml = '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 {fl}
+{ml}
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#1c1b1f;color:#e6e1e5;font-family:{ff};display:flex;justify-content:center;padding:40px 20px}}
@@ -1073,20 +1081,14 @@ def _build_lfg_html(entries: list[dict]) -> str:
             rank_display += f" #{ladder_pos}"
 
         chip_class = "chip-highlight" if mode == "ranked" else ""
-        if _USE_LOCAL_FONTS:
-            chip_icon = '<span style="font-size:16px">&#9733;</span>' if mode == "ranked" else ""
-        else:
-            chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
+        chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
         mode_label = "排位赛" if mode == "ranked" else "娱乐匹配"
 
         state_map = {"online": "在线", "in_game": "游戏中", "offline": "离线"}
         state_text = state_map.get(state, "在线")
         dot_color = "#4CE5B1" if state in ("online", "in_game") else "#555"
 
-        if _USE_LOCAL_FONTS:
-            dot_icon = f'<span style="color:{dot_color};font-size:8px">&#9679;</span>'
-        else:
-            dot_icon = f'<span class="material-symbols-rounded" style="font-variation-settings:\'FILL\' 1;font-size:8px;color:{dot_color}">circle</span>'
+        dot_icon = f'<span class="material-symbols-rounded" style="font-variation-settings:\'FILL\' 1;font-size:8px;color:{dot_color}">circle</span>'
 
         display_name = e.get("qq_name") or apex_name
         qq_avatar = e.get("qq_avatar", "")
@@ -1119,20 +1121,24 @@ def _build_lfg_html(entries: list[dict]) -> str:
 
     font_family = "'Noto Sans SC','Roboto',sans-serif" if not _USE_LOCAL_FONTS else "sans-serif"
     fonts_link = "" if _USE_LOCAL_FONTS else '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
+    ms_link = "" if _USE_LOCAL_FONTS else ""
+    if _USE_LOCAL_FONTS:
+        ms_link = '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 {fonts_link}
+{ms_link}
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#1e1e2e;color:#e6e1e5;font-family:{font_family};display:flex;justify-content:center;padding:32px 24px}}
 .lfg-list{{width:100%;max-width:1280px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
-.list-header{{display:grid;grid-template-columns:1.8fr 1fr 0.9fr 0.5fr 0.5fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:12px}}
+.list-header{{display:grid;grid-template-columns:1.5fr 1fr 0.8fr 0.5fr 0.5fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:16px}}
 .list-header>div{{text-align:center}}
 .list-header>div:first-child{{text-align:left}}
 .list-header>div:nth-child(2){{text-align:left}}
 .list-header>div:nth-child(3){{text-align:left}}
-.player-row{{display:grid;grid-template-columns:1.8fr 1fr 0.9fr 0.5fr 0.5fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent;gap:12px}}
+.player-row{{display:grid;grid-template-columns:1.5fr 1fr 0.8fr 0.5fr 0.5fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent;gap:16px}}
 .player-row:hover{{background:#303042;transform:translateY(-2px);border-color:#49454f}}
 .col-player{{display:flex;align-items:center;gap:18px}}
 .avatar{{width:52px;height:52px;border-radius:14px;object-fit:cover;flex-shrink:0}}
