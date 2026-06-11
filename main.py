@@ -464,11 +464,9 @@ class XiaoChiyu(Star):
             existing = await self.db.get_lfg_user(qq_id)
             if existing:
                 await self.db.remove_lfg_user(qq_id)
-                img = await renderer.draw_text_card("LFG", "已退出找队友列表")
+                yield event.plain_result("已退出找队友列表")
             else:
-                img = await renderer.draw_text_card("LFG", "你不在找队友列表中", is_error=True)
-            async for r in self._send_card(event, img):
-                yield r
+                yield event.plain_result("你不在找队友列表中")
             return
 
         mode = None
@@ -524,11 +522,7 @@ class XiaoChiyu(Star):
             qq_id, cached["uid"], cached["name"], cached["platform"], mode, qq_name=event.get_sender_name() or ""
         )
 
-        img = await renderer.draw_text_card(
-            "LFG", f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})，使用 /lfg 列表 查看"
-        )
-        async for r in self._send_card(event, img):
-            yield r
+        yield event.plain_result(f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})，使用 /lfg 列表 查看")
 
     # ═══════════════════════════════════════════════
     #  地图轮换
