@@ -1056,6 +1056,7 @@ def _build_lfg_html(entries: list[dict]) -> str:
         apex_name = e.get("apex_name", "Unknown")
         platform = e.get("platform", "PC")
         ladder_pos = e.get("rank_ladder_pos", 0) or 0
+        state = e.get("state", "offline")
 
         rank_type = rank_name.lower().split(" ")[0] if rank_name else "unranked"
         text_color = rank_colors.get(rank_name, "#938f99")
@@ -1067,6 +1068,10 @@ def _build_lfg_html(entries: list[dict]) -> str:
         chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
         mode_label = "排位赛" if mode == "ranked" else "娱乐匹配"
 
+        state_map = {"online": "在线", "in_game": "游戏中", "offline": "离线"}
+        state_text = state_map.get(state, "在线")
+        dot_color = "#4CE5B1" if state in ("online", "in_game") else "#555"
+
         display_name = e.get("qq_name") or apex_name
         qq_avatar = e.get("qq_avatar", "")
 
@@ -1076,7 +1081,7 @@ def _build_lfg_html(entries: list[dict]) -> str:
                 <img class="avatar" src="{qq_avatar}" alt="">
                 <div class="player-info">
                     <div class="player-name" title="{display_name}">{display_name}</div>
-                    <div class="status-tag"><span class="material-symbols-rounded dot-online" style="font-variation-settings: 'FILL' 1;font-size:8px">circle</span> 在线 · {platform}</div>
+                    <div class="status-tag"><span class="material-symbols-rounded" style="font-variation-settings:'FILL' 1;font-size:8px;color:{dot_color}">circle</span> {state_text} · {platform}</div>
                 </div>
             </div>
             <div class="col-rank">
@@ -1113,7 +1118,6 @@ body{{background:#1e1e2e;color:#e6e1e5;font-family:'Noto Sans SC','Roboto',sans-
 .player-info{{display:flex;flex-direction:column;gap:4px}}
 .player-name{{font-weight:700;font-size:1rem}}
 .status-tag{{font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px}}
-.dot-online{{color:#b7f397;font-size:8px}}
 .col-rank{{display:flex;align-items:center;gap:14px}}
 .rank-icon{{width:44px;height:44px;flex-shrink:0}}
 .rank-text{{display:flex;flex-direction:column;gap:2px;white-space:nowrap}}

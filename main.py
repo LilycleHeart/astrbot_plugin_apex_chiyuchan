@@ -446,6 +446,7 @@ class XiaoChiyu(Star):
                     "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
                     "level": total_level,
                     "kills": badges.get("kills", 0) or stats.kills,
+                    "state": stats.state,
                 })
 
             if not entries:
