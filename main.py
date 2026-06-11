@@ -530,6 +530,19 @@ class XiaoChiyu(Star):
 
         yield event.plain_result(f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})，使用 /lfg 列表 查看")
 
+    @filter.command("lfgdebug", alias={"lfg-debug", "lfg爬虫"})
+    async def cmd_lfg_debug(self, event: AstrMessageEvent):
+        """调试：查看 LFG 爬虫返回的原始数据"""
+        parts = event.get_message_str().strip().split(maxsplit=1)
+        if len(parts) < 2:
+            yield event.plain_result("用法: /lfgdebug <玩家名> [PC|PS|XBOX|SWITCH]")
+            return
+        args = parts[1].split()
+        name = args[0]
+        platform = args[1].upper() if len(args) > 1 else "PC"
+        raw = await fetch_lfg_stats(name, platform)
+        yield event.plain_result(f"fetch_lfg_stats({name}, {platform}) = {raw}")
+
     # ═══════════════════════════════════════════════
     #  地图轮换
     # ═══════════════════════════════════════════════
