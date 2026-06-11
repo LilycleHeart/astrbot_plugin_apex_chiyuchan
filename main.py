@@ -455,25 +455,17 @@ class XiaoChiyu(Star):
             mode = "ranked"
         elif arg in ("casual", "娱乐", "匹配", "pub", "pubs"):
             mode = "casual"
-        elif arg in ("register", "注册"):
+        elif arg in ("register", "注册", "登记"):
             mode = None
-        elif arg:
+        elif arg and arg not in ("list", "列表", "leave", "退出", "取消"):
             img = await renderer.draw_text_card(
-                "LFG", "用法: /lfg [注册|排位|娱乐|列表|退出]", is_error=True
+                "LFG", "用法: /lfg [排位|娱乐|列表|退出]", is_error=True
             )
             async for r in self._send_card(event, img):
                 yield r
             return
 
         if not mode:
-            cached = self._profile_cache.get(qq_id)
-            if not cached:
-                img = await renderer.draw_text_card(
-                    "LFG", "请先使用 /stats 查询战绩后再找队友", is_error=True
-                )
-                async for r in self._send_card(event, img):
-                    yield r
-                return
             img = await renderer.draw_lfg_mode_card()
             async for r in self._send_card(event, img):
                 yield r
@@ -481,8 +473,27 @@ class XiaoChiyu(Star):
 
         cached = self._profile_cache.get(qq_id)
         if not cached:
+            user = await self.db.get_user(qq_id)
+            if user:
+                stats = await self.apex.get_stats(user["uid"], user["platform"])
+                if stats:
+                    qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+                    cached = {
+                        "uid": stats.uid,
+                        "name": stats.name,
+                        "platform": user["platform"],
+                        "rank_name": stats.rank_name,
+                        "rank_score": stats.rank_score,
+                        "rank_img": stats.rank_img,
+                        "level": stats.level,
+                        "kills": stats.kills,
+                        "avatar_url": qq_avatar,
+                    }
+                    self._profile_cache[qq_id] = cached
+
+        if not cached:
             img = await renderer.draw_text_card(
-                "LFG", "请先使用 /stats 查询战绩后再找队友", is_error=True
+                "LFG", "请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友", is_error=True
             )
             async for r in self._send_card(event, img):
                 yield r
