@@ -129,6 +129,32 @@ class XiaoChiyu(Star):
         above += tier_count * (3 - div) / 4
         return round(above / total * 100, 2)
 
+    def _extract_at_target(self, args: str) -> tuple[str | None, str]:
+        """从参数字符串中提取 @QQ，返回 (target_qq, cleaned_args)。"""
+        m = re.search(r'\[CQ:at,qq=(\d+)\]', args)
+        if m:
+            target = m.group(1)
+            cleaned = args.replace(m.group(0), "").strip()
+            return target, cleaned
+        m = re.search(r'@(\d+)', args)
+        if m:
+            target = m.group(1)
+            cleaned = args.replace(m.group(0), "").strip()
+            return target, cleaned
+        return None, args
+
+    async def _resolve_admin_target(
+        self, event: AstrMessageEvent, args: str
+    ) -> tuple[str | None, str, str | None]:
+        """解析命令中的 @目标。管理员可为他人操作。
+        Returns (target_qq, cleaned_args, error_msg).
+        若 non-admin 使用 @目标，返回 (None, cleaned_args, 错误消息)。
+        """
+        target_qq, cleaned = self._extract_at_target(args)
+        if target_qq and not event.is_admin():
+            return None, cleaned, "只有管理员才能为他人操作"
+        return target_qq or event.get_sender_id(), cleaned, None
+
     async def _send_card(
         self, event: AstrMessageEvent, img_bytes: bytes, suffix: str = ".png", **kwargs
     ):
@@ -142,9 +168,13 @@ class XiaoChiyu(Star):
 
     @filter.command("bind", alias={"绑定"})
     async def cmd_bind(self, event: AstrMessageEvent):
-        """绑定 Apex 账号 — /bind <玩家名> [平台]"""
+        """绑定 Apex 账号 — /bind <玩家名> [平台] (@目标 仅管理员)"""
         msg = event.get_message_str().strip()
         rest = msg.split(maxsplit=1)[1] if " " in msg else ""
+        qq_id, rest, err = await self._resolve_admin_target(event, rest)
+        if err:
+            yield event.plain_result(err)
+            return
         parts = rest.split()
         platform = "PC"
         if parts and parts[-1].upper() in ("PC", "PS4", "X1"):
@@ -153,7 +183,6 @@ class XiaoChiyu(Star):
         if not name:
             yield event.plain_result("请提供玩家名，例如 /bind Liliumcordis")
             return
-        qq_id = event.get_sender_id()
 
         if name.strip().isdigit():
             idx = int(name.strip())
@@ -223,12 +252,17 @@ class XiaoChiyu(Star):
 
     @filter.command("bind_uid", alias={"绑定UID"})
     async def cmd_bind_uid(self, event: AstrMessageEvent, uid: str, platform: str = "PC"):
-        """直接通过 UID 绑定 — /bind_uid <UID> [平台]"""
+        """直接通过 UID 绑定 — /bind_uid <UID> [平台] [@目标 仅管理员]"""
         if platform.upper() not in ("PC", "PS4", "X1"):
             yield event.plain_result("平台仅支持 PC / PS4 / X1")
             return
         platform = platform.upper()
-        qq_id = event.get_sender_id()
+        msg = event.get_message_str().strip()
+        _, rest, err = await self._resolve_admin_target(event, msg)
+        if err:
+            yield event.plain_result(err)
+            return
+        qq_id, _, _ = await self._resolve_admin_target(event, msg)
         stats = await self.apex.get_stats(uid, platform)
         if not stats:
             yield event.plain_result(f"找不到 UID '{uid}'")
@@ -240,8 +274,13 @@ class XiaoChiyu(Star):
 
     @filter.command("unbind", alias={"解绑"})
     async def cmd_unbind(self, event: AstrMessageEvent):
-        """解绑 Apex 账号"""
-        qq_id = event.get_sender_id()
+        """解绑 Apex 账号 — /unbind [@目标 仅管理员]"""
+        msg = event.get_message_str().strip()
+        rest = msg.split(maxsplit=1)[1] if " " in msg else ""
+        qq_id, _, err = await self._resolve_admin_target(event, rest)
+        if err:
+            yield event.plain_result(err)
+            return
         user = await self.db.get_user(qq_id)
         if not user:
             yield event.plain_result("你还没有绑定 Apex 账号")
@@ -416,12 +455,21 @@ class XiaoChiyu(Star):
 
     @filter.command("lfg", alias={"组队", "lfg"})
     async def cmd_lfg(self, event: AstrMessageEvent):
-        """找队友 — /lfg [注册|排位|娱乐|列表|退出]"""
+        """找队友 — /lfg [排位|娱乐|列表|退出] [@目标 仅管理员]"""
         qq_id = event.get_sender_id()
         group_id = event.unified_msg_origin
         msg = event.get_message_str().strip()
         parts = msg.split(maxsplit=1)
         arg = parts[1].strip().lower() if len(parts) > 1 else ""
+
+        # 提取 @目标（仅 leave / register 模式支持）
+        target_qq, arg_cleaned, err = await self._resolve_admin_target(event, arg)
+        if err:
+            yield event.plain_result(err)
+            return
+        if target_qq != qq_id:
+            qq_id = target_qq
+            arg = arg_cleaned
 
         if arg in ("list", "列表"):
             lfg_users = await self.db.list_lfg_users(group_id)
@@ -546,8 +594,15 @@ class XiaoChiyu(Star):
                 yield r
             return
 
+        qq_name = event.get_sender_name() or ""
+        if qq_id != event.get_sender_id():
+            try:
+                info = await event.bot.call_action("get_stranger_info", user_id=int(qq_id), no_cache=False)
+                qq_name = info.get("nickname", "") or info.get("nick", "")
+            except Exception:
+                qq_name = ""
         await self.db.upsert_lfg_user(
-            qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode, qq_name=event.get_sender_name() or ""
+            qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode, qq_name=qq_name
         )
 
         yield event.plain_result(f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})，使用 /lfg 列表 查看")
@@ -955,12 +1010,13 @@ class XiaoChiyu(Star):
 
     @filter.llm_tool(name="apex_bind")
     async def llm_bind(
-        self, event: AstrMessageEvent, player_name: str, platform: str = "PC"
+        self, event: AstrMessageEvent, player_name: str, platform: str = "PC", target_qq: str = ""
     ):
-        """绑定 Apex 账号到当前 QQ。
+        """绑定 Apex 账号到当前 QQ（管理员可绑定到其他人的 QQ）。
         Args:
             player_name(string): 要绑定的玩家名或数字序号
             platform(string): 平台，PC/PS4/X1，默认PC
+            target_qq(string): 要绑定到的QQ号，不填则绑定给自己（仅管理员可用）
         """
         import base64
         from mcp.types import CallToolResult, TextContent, ImageContent
@@ -975,6 +1031,14 @@ class XiaoChiyu(Star):
             )
         platform = platform.upper()
         qq_id = event.get_sender_id()
+
+        # admin 可为他人绑定
+        if target_qq:
+            if not event.is_admin():
+                return CallToolResult(
+                    content=[TextContent(type="text", text="只有管理员才能为他人绑定账号")]
+                )
+            qq_id = target_qq
 
         if player_name.strip().isdigit():
             idx = int(player_name.strip())
@@ -1054,11 +1118,20 @@ class XiaoChiyu(Star):
         )
 
     @filter.llm_tool(name="apex_unbind")
-    async def llm_unbind(self, event: AstrMessageEvent):
-        """解绑当前 QQ 的 Apex 账号。"""
+    async def llm_unbind(self, event: AstrMessageEvent, target_qq: str = ""):
+        """解绑 QQ 的 Apex 账号（管理员可解绑其他人的 QQ）。
+        Args:
+            target_qq(string): 要解绑的QQ号，不填则解绑自己（仅管理员可用）
+        """
         from mcp.types import CallToolResult, TextContent
 
         qq_id = event.get_sender_id()
+        if target_qq:
+            if not event.is_admin():
+                return CallToolResult(
+                    content=[TextContent(type="text", text="只有管理员才能解绑他人的账号")]
+                )
+            qq_id = target_qq
         user = await self.db.get_user(qq_id)
         if not user:
             return CallToolResult(
@@ -1171,15 +1244,22 @@ class XiaoChiyu(Star):
         )
 
     @filter.llm_tool(name="apex_lfg")
-    async def llm_lfg(self, event: AstrMessageEvent, action: str = "list"):
-        """找队友功能。列出组队列表、注册排位/娱乐、退出。当用户说"组队"、"找队友"、"想打排位"、"想打匹配"时调用。
+    async def llm_lfg(self, event: AstrMessageEvent, action: str = "list", target_qq: str = ""):
+        """找队友功能。列出组队列表、注册排位/娱乐、退出。当用户说"组队"、"找队友"、"想打排位"、"想打匹配"时调用，不要因为"组队"随意触发。
         Args:
             action(string): 操作类型: list/ranked/casual/leave
+            target_qq(string): 要操作的QQ号，不填则操作自己（仅管理员可用）
         """
         import base64
         from mcp.types import CallToolResult, TextContent, ImageContent
 
         qq_id = event.get_sender_id()
+        if target_qq:
+            if not event.is_admin():
+                return CallToolResult(
+                    content=[TextContent(type="text", text="只有管理员才能为他人操作")]
+                )
+            qq_id = target_qq
         group_id = event.unified_msg_origin
         action = action.strip().lower()
 
@@ -1221,9 +1301,16 @@ class XiaoChiyu(Star):
                 return CallToolResult(
                     content=[TextContent(type="text", text="请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友")]
                 )
+            qq_name = event.get_sender_name() or ""
+            if qq_id != event.get_sender_id():
+                try:
+                    info = await event.bot.call_action("get_stranger_info", user_id=int(qq_id), no_cache=False)
+                    qq_name = info.get("nickname", "") or info.get("nick", "")
+                except Exception:
+                    qq_name = ""
             await self.db.upsert_lfg_user(
                 qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode,
-                qq_name=event.get_sender_name() or ""
+                qq_name=qq_name
             )
             return CallToolResult(
                 content=[TextContent(type="text", text=f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})")]
