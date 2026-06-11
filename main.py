@@ -16,7 +16,7 @@ from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 from .libs.apex_client import ApexClient
 from .libs.database import Database
 from .libs import image_renderer as renderer
-from .libs.als_scraper import fetch_badges, search_players
+from .libs.als_scraper import fetch_badges, fetch_lfg_stats, search_players
 
 
 async def _send_status_card(context, sid: str, text: str, wrapper):
@@ -432,8 +432,7 @@ class XiaoChiyu(Star):
                 stats = await self.apex.get_stats(u["uid"], u["platform"])
                 if not stats:
                     continue
-                from .libs.als_scraper import fetch_badges
-                badges = await fetch_badges(u["uid"], u["platform"])
+                badges = await fetch_lfg_stats(u["uid"], u["platform"])
                 rank_dist = await self.apex.get_rank_distribution()
                 global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
                 level_raw = badges.get("level") or stats.level

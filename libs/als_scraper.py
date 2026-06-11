@@ -310,3 +310,33 @@ async def search_players(name: str, platform: str = "PC") -> list[dict]:
         except Exception as e:
             logger.error(f"[SearchPlayers] Error: {e}")
             return []
+
+
+async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
+    """轻量版 Playwright 爬虫，只取 LFG 所需数据 (kills/level/prestige/rankPos)，跳过徽章"""
+    from .playwright_manager import run_with_page
+    async def _run(page):
+        await _block_noise(page)
+        await page.goto(f"https://apexlegendsstatus.com/profile/{platform}/{name_or_uid}",
+                        wait_until="domcontentloaded", timeout=15000)
+        try:
+            await page.wait_for_selector(".player-name", timeout=3000)
+        except Exception:
+            pass
+        return await page.evaluate("""() => {
+            const text = document.body.innerText;
+            let kills = 0, level = 0, prestige = 0, rankPos = 0;
+            const gIdx = text.indexOf('\\nGlobal\\n');
+            if (gIdx >= 0) {
+                const gSection = text.substring(gIdx, gIdx + 500);
+                const ck = gSection.match(/Career Kills\\s*\\n([\\d,]+)\\n/);
+                if (ck) kills = parseInt(ck[1].replace(/,/g,''));
+            }
+            const lv = text.match(/LEVEL\\s*\\n(\\d+)\\s*\\nPRESTIGE\\s*(\\d+)/);
+            if (lv) { level = parseInt(lv[1]); prestige = parseInt(lv[2]); }
+            const br = text.match(/BR Rank[\\s\\S]*?#([\\d,]{1,12})\\b/);
+            if (br) rankPos = parseInt(br[1].replace(/,/g,''));
+            return {kills, level, prestige, rankPos};
+        }""")
+    async with run_with_page() as page:
+        return await _run(page)
