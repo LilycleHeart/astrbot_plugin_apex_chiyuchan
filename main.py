@@ -398,7 +398,7 @@ class XiaoChiyu(Star):
         _lv = badges.get("level") or stats.level
         _pr = badges.get("prestige") or stats.prestige
         global_pct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
-        rank_ladder_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
+        rank_ladder_pos = stats.rank_ladder_pos or badges.get("rankPcPos") or badges.get("rankPos", 0)
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
@@ -443,7 +443,7 @@ class XiaoChiyu(Star):
             "rank_div": stats.rank_div,
             "rank_score": stats.rank_score,
             "rank_img": stats.rank_img,
-            "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            "rank_ladder_pos": rank_ladder_pos,
             "level": _pr * 500 + _lv if _pr else _lv,
             "prestige": _pr,
             "kills": badges.get("kills", 0) or stats.kills,
@@ -524,7 +524,7 @@ class XiaoChiyu(Star):
         lvl_raw = badges.get("level") or stats.level
         pr_raw = badges.get("prestige") or stats.prestige
         total_lvl = pr_raw * 500 + lvl_raw if pr_raw else lvl_raw
-        rp_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
+        rp_pos = stats.rank_ladder_pos or badges.get("rankPcPos") or badges.get("rankPos", 0)
         await self.db.upsert_lfg_user(
             u["qq_id"], group_id, u["uid"], stats.name, u["platform"], u["mode"],
             qq_name=qq_name or "",
@@ -1001,7 +1001,7 @@ class XiaoChiyu(Star):
         _lv2 = badges.get("level") or stats.level
         _pr2 = badges.get("prestige") or stats.prestige
         global_pct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
-        rank_ladder_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
+        rank_ladder_pos = stats.rank_ladder_pos or badges.get("rankPcPos") or badges.get("rankPos", 0)
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
@@ -1394,7 +1394,7 @@ class XiaoChiyu(Star):
             rn = stats_lfg.rank_name if stats_lfg else cached.get("rank_name", "")
             ri = stats_lfg.rank_img if stats_lfg else cached.get("rank_img", "")
             st = stats_lfg.state if stats_lfg else "offline"
-            rp_pos = badges.get("rankPos", 0) or (stats_lfg.rank_ladder_pos if stats_lfg else 0)
+        rp_pos = (stats_lfg.rank_ladder_pos if stats_lfg else 0) or badges.get("rankPos", 0)
             qq_name = event.get_sender_name() or ""
             if qq_id != event.get_sender_id():
                 try:
