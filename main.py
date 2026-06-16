@@ -156,10 +156,16 @@ class XiaoChiyu(Star):
         return target_qq or event.get_sender_id(), cleaned, None
 
     async def _get_badges_cached(self, uid: str, platform: str) -> dict:
-        """从 DB 获取徽章数据（永久缓存），不存在时爬 ALS 并存入。空结果不缓存，下次重试。"""
+        """从 DB 或 ALS 获取徽章数据。DB 缓存 1 小时，超时或被调用方要求刷新时重爬。"""
+        from datetime import datetime, timedelta
         cached = await self.db.get_badge_cache(uid, platform)
         if cached:
-            return cached["data"]
+            try:
+                updated = datetime.strptime(cached["updated_at"], "%Y-%m-%d %H:%M:%S")
+                if (datetime.now() - updated) < timedelta(hours=1):
+                    return cached["data"]
+            except ValueError:
+                pass
         badges = await fetch_badges(uid, platform)
         if badges.get("seasons") or badges.get("special"):
             await self.db.set_badge_cache(uid, platform, badges)
