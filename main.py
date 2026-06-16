@@ -1399,7 +1399,7 @@ class XiaoChiyu(Star):
             rn = stats_lfg.rank_name if stats_lfg else cached.get("rank_name", "")
             ri = stats_lfg.rank_img if stats_lfg else cached.get("rank_img", "")
             st = stats_lfg.state if stats_lfg else "offline"
-        rp_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or (stats_lfg.rank_ladder_pos if stats_lfg else 0)
+            rp_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or (stats_lfg.rank_ladder_pos if stats_lfg else 0)
             qq_name = event.get_sender_name() or ""
             if qq_id != event.get_sender_id():
                 try:
