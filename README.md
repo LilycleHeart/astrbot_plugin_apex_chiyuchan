@@ -1,7 +1,7 @@
 <h1 align="center">⚡ 小赤羽 / AstrBot Apex 数据查询插件</h1>
 
 <p align="center">
-  <b>一个专注于 Apex 英雄数据查询 · 状态追踪 的 AstrBot 多功能插件</b>
+  <b>一个专注于 Apex 英雄数据查询 · 组队 · 状态追踪 的 AstrBot 多功能插件</b>
 </p>
 
 <p align="center">
@@ -34,6 +34,12 @@
   <tr>
     <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" width="360" /></td>
     <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="360" /></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><b>找队友 (LFG)</b></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/lfg.png" width="720" /></td>
   </tr>
 </table>
 
@@ -80,7 +86,14 @@
 
 ---
 
+### 👥 找队友系统 (LFG)
 
+- 按群隔离的找队友列表
+- 排位 / 娱乐两种模式
+- 实时在线状态 + 30min 缓存战绩数据
+- 管理员可代为注册/退出
+
+---
 
 ### 🤖 LLM 自然语言支持
 
@@ -108,6 +121,7 @@
 | `/map` | 地图轮换 |
 | `/server` | 服务器状态 |
 | `/master` | 猎杀 / 大师数据 |
+| `/lfg <排位|娱乐|列表|退出>` | 找队友 |
 
 ---
 

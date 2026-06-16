@@ -4,3 +4,7 @@ __pycache__/
 *.rar
 debug_card.html
 assets/moe_digits/
+
+data/
+__pycache__/
+*.egg-info/

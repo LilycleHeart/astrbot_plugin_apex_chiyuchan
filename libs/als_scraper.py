@@ -215,7 +215,18 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
         if (brRank) rankPos = parseInt(brRank[1].replace(/,/g,''));
         const brScore = text.match(/BR Rank[\\s\\S]*?([\\d,]+)\\s*RP/);
         if (brScore) rankScore = parseInt(brScore[1].replace(/,/g,''));
-        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore};
+        let rankTopPct = 0, rankPcPos = 0;
+        const rp = document.querySelector('.v2-sb-stat__pill--rank');
+        if (rp) {
+            const sp = rp.querySelector('span');
+            if (sp) rankTopPct = parseFloat(sp.textContent.trim().replace('%',''));
+        }
+        const tp = document.querySelector('.v2-sb-stat__pill--top');
+        if (tp) {
+            const m2 = tp.textContent.trim().match(/#([\\d,]+)/);
+            if (m2) rankPcPos = parseInt(m2[1].replace(/,/g,''));
+        }
+        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore, rankTopPct, rankPcPos};
     }""")
 
 
@@ -312,3 +323,74 @@ async def search_players(name: str, platform: str = "PC") -> list[dict]:
         except Exception as e:
             logger.error(f"[SearchPlayers] Error: {e}")
             return []
+
+
+async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
+    """轻量版 Playwright 爬虫，只取 LFG 所需数据 (kills/level/prestige/rankPos)，跳过徽章
+
+    先试 `/profile/{platform}/{name_or_uid}`；如果找不到 `.player-name`（如消歧页面），
+    再试 `/profile/uid/{platform}/{name_or_uid}`（ALS 数字 UID 路径）。TTL 缓存 5 分钟。
+    """
+    from .playwright_manager import run_with_page
+    from .ttl_cache import get as cache_get, set as cache_set
+
+    cache_key = f"lfg_stats:{platform}:{name_or_uid}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    async def _scrape(page):
+        try:
+            await page.wait_for_selector(".player-name", timeout=5000)
+        except Exception:
+            pass
+        if not await page.query_selector(".player-name"):
+            return {}
+        text = await page.evaluate("document.body.innerText")
+        kills = 0; level = 0; prestige = 0; rankPos = 0; rankTopPct = 0; rankPcPos = 0
+        gIdx = text.find("\nGlobal\n")
+        if gIdx >= 0:
+            sec = text[gIdx:gIdx + 500]
+            import re
+            ck = re.search(r"Career Kills\s*\n([\d,]+)\n", sec)
+            if ck: kills = int(ck.group(1).replace(",", ""))
+        lv = __import__("re").search(r"LEVEL\s*\n(\d+)\s*\nPRESTIGE\s*(\d+)", text)
+        if lv: level = int(lv.group(1)); prestige = int(lv.group(2))
+        br = __import__("re").search(r"BR Rank[\s\S]*?#([\d,]{1,12})\b", text)
+        if br: rankPos = int(br.group(1).replace(",", ""))
+        # DOM 方式提取排名百分比和位置
+        rp_el = await page.query_selector('.v2-sb-stat__pill--rank span')
+        if rp_el:
+            try: rankTopPct = float((await rp_el.text_content()).strip().replace('%',''))
+            except: pass
+        tp_el = await page.query_selector('.v2-sb-stat__pill--top')
+        if tp_el:
+            import re
+            m = re.search(r'#([\d,]+)', await tp_el.text_content())
+            if m: rankPcPos = int(m.group(1).replace(',',''))
+        return {"kills": kills, "level": level, "prestige": prestige, "rankPos": rankPos, "rankTopPct": rankTopPct, "rankPcPos": rankPcPos}
+
+    async with run_with_page() as page:
+        await _block_noise(page)
+        is_uid = name_or_uid.isdigit()
+        urls = [
+            f"https://apexlegendsstatus.com/profile/uid/{platform}/{name_or_uid}" if is_uid
+            else f"https://apexlegendsstatus.com/profile/{platform}/{name_or_uid}",
+        ]
+        # name 时再备一个 uid 路径
+        if not is_uid:
+            urls.append(f"https://apexlegendsstatus.com/profile/uid/{platform}/{name_or_uid}")
+        result = {"kills": 0, "level": 0, "prestige": 0, "rankPos": 0}
+        for url in urls:
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            except Exception:
+                continue
+            r = await _scrape(page)
+            if r and (r.get("kills") or r.get("level") or r.get("rankPos")):
+                result = r
+                break
+
+        if result.get("kills") or result.get("level") or result.get("prestige"):
+            await cache_set(cache_key, result, 300)
+        return result

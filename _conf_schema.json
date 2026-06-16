@@ -10,5 +10,11 @@
     "type": "int",
     "default": 900,
     "hint": "建议 300~3600"
+  },
+  "use_local_fonts": {
+    "description": "使用系统字体代替 Google Fonts（避免外链加载）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后 LFG 卡片使用 Microsoft YaHei 等系统字体"
   }
 }

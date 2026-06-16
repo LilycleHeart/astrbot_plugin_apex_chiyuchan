@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 from .libs.apex_client import ApexClient
 from .libs.database import Database
 from .libs import image_renderer as renderer
-from .libs.als_scraper import fetch_badges, search_players
+from .libs.als_scraper import fetch_badges, fetch_lfg_stats, search_players
 
 
 async def _send_status_card(context, sid: str, text: str, wrapper):
@@ -52,10 +53,19 @@ class XiaoChiyu(Star):
         self._temp_dir.mkdir(parents=True, exist_ok=True)
 
         self._last_search: dict[str, list[dict]] = {}
+        self._profile_cache: dict[str, dict] = {}
+        self._lfg_entries: dict[str, dict] = {}
         self._monitor_task: asyncio.Task | None = None
 
         from .libs.config import preload_fonts
         preload_fonts()
+
+        if config.get("use_local_fonts", False):
+            try:
+                from .libs.playwright_renderer import set_use_local_fonts
+                set_use_local_fonts(True)
+            except Exception:
+                pass
 
         self._fire_and_forget(self._on_init(), "DB初始化")
 
@@ -159,6 +169,7 @@ class XiaoChiyu(Star):
         if media:
             badges.update(media)
         return badges
+
     async def _send_card(
         self, event: AstrMessageEvent, img_bytes: bytes, suffix: str = ".png", **kwargs
     ):
@@ -172,9 +183,13 @@ class XiaoChiyu(Star):
 
     @filter.command("bind", alias={"绑定"})
     async def cmd_bind(self, event: AstrMessageEvent):
-        """绑定 Apex 账号 — /bind <玩家名> [平台]"""
+        """绑定 Apex 账号 — /bind <玩家名> [平台] (@目标 仅管理员)"""
         msg = event.get_message_str().strip()
         rest = msg.split(maxsplit=1)[1] if " " in msg else ""
+        qq_id, rest, err = await self._resolve_admin_target(event, rest)
+        if err:
+            yield event.plain_result(err)
+            return
         parts = rest.split()
         platform = "PC"
         if parts and parts[-1].upper() in ("PC", "PS4", "X1"):
@@ -183,7 +198,6 @@ class XiaoChiyu(Star):
         if not name:
             yield event.plain_result("请提供玩家名，例如 /bind Liliumcordis")
             return
-        qq_id = event.get_sender_id()
 
         if name.strip().isdigit():
             idx = int(name.strip())
@@ -253,12 +267,17 @@ class XiaoChiyu(Star):
 
     @filter.command("bind_uid", alias={"绑定UID"})
     async def cmd_bind_uid(self, event: AstrMessageEvent, uid: str, platform: str = "PC"):
-        """直接通过 UID 绑定 — /bind_uid <UID> [平台]"""
+        """直接通过 UID 绑定 — /bind_uid <UID> [平台] [@目标 仅管理员]"""
         if platform.upper() not in ("PC", "PS4", "X1"):
             yield event.plain_result("平台仅支持 PC / PS4 / X1")
             return
         platform = platform.upper()
-        qq_id = event.get_sender_id()
+        msg = event.get_message_str().strip()
+        _, rest, err = await self._resolve_admin_target(event, msg)
+        if err:
+            yield event.plain_result(err)
+            return
+        qq_id, _, _ = await self._resolve_admin_target(event, msg)
         stats = await self.apex.get_stats(uid, platform)
         if not stats:
             yield event.plain_result(f"找不到 UID '{uid}'")
@@ -270,8 +289,13 @@ class XiaoChiyu(Star):
 
     @filter.command("unbind", alias={"解绑"})
     async def cmd_unbind(self, event: AstrMessageEvent):
-        """解绑 Apex 账号"""
-        qq_id = event.get_sender_id()
+        """解绑 Apex 账号 — /unbind [@目标 仅管理员]"""
+        msg = event.get_message_str().strip()
+        rest = msg.split(maxsplit=1)[1] if " " in msg else ""
+        qq_id, _, err = await self._resolve_admin_target(event, rest)
+        if err:
+            yield event.plain_result(err)
+            return
         user = await self.db.get_user(qq_id)
         if not user:
             yield event.plain_result("你还没有绑定 Apex 账号")
@@ -293,7 +317,19 @@ class XiaoChiyu(Star):
         name = msg.split(maxsplit=1)[1] if " " in msg else ""
 
         if name:
-            if name.strip().isdigit():
+            # 处理 @提及：查对方绑定
+            at_match = re.search(r'\[CQ:at,qq=(\d+)\]', name) or re.search(r'@(\d+)', name)
+            if at_match:
+                target_qq = at_match.group(1)
+                target_user = await self.db.get_user(target_qq)
+                if not target_user:
+                    img = await renderer.draw_text_card("查询失败", "对方未绑定 Apex 账号", is_error=True)
+                    async for r in self._send_card(event, img):
+                        yield r
+                    return
+                uid = target_user["uid"]
+                platform = target_user.get("platform", "PC")
+            elif name.strip().isdigit():
                 idx = int(name.strip())
                 cached = self._last_search.get(qq_id, [])
                 if 1 <= idx <= len(cached):
@@ -344,7 +380,7 @@ class XiaoChiyu(Star):
 
         # ── API 获取基础数据 + 网站抓取徽章 + 段位分布（并行）──
         stats_task = self.apex.get_stats(uid, platform)
-        badges_task = fetch_badges(uid, platform)
+        badges_task = self._get_badges_cached(uid, platform)
         rankdist_task = self.apex.get_rank_distribution()
         stats, badges, rank_dist = await asyncio.gather(
             stats_task, badges_task, rankdist_task
@@ -362,10 +398,12 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
-        global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
-
         # ── 构建渲染数据 ──
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+        _lv = badges.get("level") or stats.level
+        _pr = badges.get("prestige") or stats.prestige
+        global_pct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        rank_ladder_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
@@ -373,16 +411,16 @@ class XiaoChiyu(Star):
             "avatar_url": qq_avatar,
             "platform": platform,
             "online": stats.state,
-            "level": badges.get("level") or stats.level,
+            "level": _pr * 500 + _lv if _pr else _lv,
             "level_pct": stats.to_next_level_pct,
-            "prestige": badges.get("prestige") or stats.prestige,
+            "prestige": _pr,
             "rank_name": stats.rank_name,
             "rank_div": stats.rank_div,
             "rank_score": stats.rank_score,
             "rank_img": stats.rank_img,
             "rank_top_pct": stats.rank_top_pct,
             "rank_top_pct_global": global_pct,
-            "rank_ladder_pos": badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            "rank_ladder_pos": rank_ladder_pos,
             "rp_delta": rp_delta,
             "kills": badges.get("kills", 0) or stats.kills,
             "damage": stats.damage,
@@ -402,6 +440,21 @@ class XiaoChiyu(Star):
             "rank_dist_entries": rank_dist.entries if rank_dist else None,
         }
 
+        self._profile_cache[qq_id] = {
+            "uid": stats.uid,
+            "name": stats.name,
+            "platform": platform,
+            "rank_name": stats.rank_name,
+            "rank_div": stats.rank_div,
+            "rank_score": stats.rank_score,
+            "rank_img": stats.rank_img,
+            "rank_ladder_pos": rank_ladder_pos,
+            "level": _pr * 500 + _lv if _pr else _lv,
+            "prestige": _pr,
+            "kills": badges.get("kills", 0) or stats.kills,
+            "avatar_url": qq_avatar,
+        }
+
         logger.info(
             f"[DEBUG] rank_name={profile_data.get('rank_name')} "
             f"rank_div={profile_data.get('rank_div')} "
@@ -410,6 +463,233 @@ class XiaoChiyu(Star):
         img = await renderer.draw_profile_card(profile_data)
         async for r in self._send_card(event, img):
             yield r
+
+    # ═══════════════════════════════════════════════
+    #  LFG 找队友
+    # ═══════════════════════════════════════════════
+
+    async def _refresh_lfg_entry(self, u: dict, group_id: str, rank_dist, bot) -> dict | None:
+        """获取或刷新 LFG 列表条目。DB 中 kills/level 等静态数据在 30min 内直接使用，否则重爬 ALS（在线状态始终实时）。"""
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        stats_updated = u.get("stats_updated_at")
+        fresh = False
+        if stats_updated:
+            try:
+                updated = datetime.strptime(stats_updated, "%Y-%m-%d %H:%M:%S")
+                if (now - updated) < timedelta(minutes=30):
+                    fresh = True
+            except ValueError:
+                pass
+
+        # QQ 名字
+        qq_name = u.get("qq_name", "") or ""
+        if not qq_name:
+            try:
+                info = await bot.call_action("get_stranger_info", user_id=int(u["qq_id"]), no_cache=False)
+                qq_name = info.get("nickname", "") or info.get("nick", "")
+                if qq_name:
+                    await self.db.update_lfg_qq_name(u["qq_id"], group_id, qq_name)
+            except Exception:
+                pass
+
+        if fresh:
+            stats = await self.apex.get_stats(u["uid"], u["platform"])
+            state = stats.state if stats else u.get("state", "offline")
+            rank_img = u.get("rank_img", "") or (stats.rank_img if stats else "")
+            lvl_raw = u.get("level", 0) or 0
+            pr_raw = u.get("prestige", 0) or 0
+            total_lvl = pr_raw * 500 + lvl_raw if pr_raw else lvl_raw
+            gpct = self._calc_global_pct(
+                u.get("rank_name", ""), 0, rank_dist
+            ) or (stats.rank_top_pct if stats else 0)
+            return {
+                "qq_id": u["qq_id"], "qq_name": qq_name or "",
+                "qq_avatar": f"https://q1.qlogo.cn/g?b=qq&nk={u['qq_id']}&s=640",
+                "mode": u["mode"], "apex_name": u["name"],
+                "platform": u["platform"],
+                "rank_name": u.get("rank_name", ""),
+                "rank_score": u.get("rank_score", 0),
+                "rank_img": rank_img,
+                "rank_top_pct_global": gpct,
+                "rank_ladder_pos": u.get("rank_pos", 0),
+                "level": total_lvl, "kills": u.get("kills", 0),
+                "state": state,
+            }
+
+        # stale — 重新爬取
+        stats = await self.apex.get_stats(u["uid"], u["platform"])
+        if not stats:
+            return None
+        bind_user = await self.db.get_user(u["qq_id"])
+        als_lookup = bind_user["uid"] if bind_user else u["uid"]
+        badges = await fetch_lfg_stats(als_lookup, u["platform"])
+        gpct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        lvl_raw = badges.get("level") or stats.level
+        pr_raw = badges.get("prestige") or stats.prestige
+        total_lvl = pr_raw * 500 + lvl_raw if pr_raw else lvl_raw
+        rp_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
+        await self.db.upsert_lfg_user(
+            u["qq_id"], group_id, u["uid"], stats.name, u["platform"], u["mode"],
+            qq_name=qq_name or "",
+            kills=badges.get("kills", 0) or stats.kills,
+            level=lvl_raw, prestige=pr_raw,
+            rank_pos=rp_pos,
+            rank_name=stats.rank_name, rank_score=stats.rank_score,
+            rank_img=stats.rank_img, state=stats.state,
+        )
+        return {
+            "qq_id": u["qq_id"], "qq_name": qq_name or "",
+            "qq_avatar": f"https://q1.qlogo.cn/g?b=qq&nk={u['qq_id']}&s=640",
+            "mode": u["mode"], "apex_name": stats.name,
+            "platform": u["platform"],
+            "rank_name": stats.rank_name, "rank_score": stats.rank_score,
+            "rank_img": stats.rank_img,
+            "rank_top_pct_global": gpct,
+            "rank_ladder_pos": rp_pos,
+            "level": total_lvl, "kills": badges.get("kills", 0) or stats.kills,
+            "state": stats.state,
+        }
+
+    @filter.command("lfg", alias={"组队", "lfg"})
+    async def cmd_lfg(self, event: AstrMessageEvent):
+        """找队友 — /lfg [排位|娱乐|列表|退出] [@目标 仅管理员]"""
+        qq_id = event.get_sender_id()
+        group_id = event.unified_msg_origin
+        msg = event.get_message_str().strip()
+        parts = msg.split(maxsplit=1)
+        arg = parts[1].strip().lower() if len(parts) > 1 else ""
+
+        # 提取 @目标（仅 leave / register 模式支持）
+        target_qq, arg_cleaned, err = await self._resolve_admin_target(event, arg)
+        if err:
+            yield event.plain_result(err)
+            return
+        if target_qq != qq_id:
+            qq_id = target_qq
+            arg = arg_cleaned
+
+        if arg in ("list", "列表"):
+            lfg_users = await self.db.list_lfg_users(group_id)
+            if not lfg_users:
+                img = await renderer.draw_text_card("LFG", "当前没有人在找队友", is_error=True)
+                async for r in self._send_card(event, img):
+                    yield r
+                return
+
+            entries = []
+            rank_dist = await self.apex.get_rank_distribution()
+            for u in lfg_users:
+                entry = await self._refresh_lfg_entry(u, group_id, rank_dist, event.bot)
+                if entry:
+                    entries.append(entry)
+
+            if not entries:
+                img = await renderer.draw_text_card("LFG", "没有有效的战绩数据", is_error=True)
+                async for r in self._send_card(event, img):
+                    yield r
+                return
+
+            img = await renderer.draw_lfg_card(entries)
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        if arg in ("leave", "退出", "取消"):
+            existing = await self.db.get_lfg_user(qq_id, group_id)
+            if existing:
+                await self.db.remove_lfg_user(qq_id, group_id)
+                yield event.plain_result("已退出找队友列表")
+            else:
+                yield event.plain_result("你不在找队友列表中")
+            return
+
+        mode = None
+        if arg in ("rank", "ranked", "排位", "rp"):
+            mode = "ranked"
+        elif arg in ("casual", "娱乐", "匹配", "pub", "pubs"):
+            mode = "casual"
+        elif arg in ("register", "注册", "登记"):
+            mode = None
+        elif arg and arg not in ("list", "列表", "leave", "退出", "取消"):
+            img = await renderer.draw_text_card(
+                "LFG", "用法: /lfg [排位|娱乐|列表|退出]", is_error=True
+            )
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        if not mode:
+            img = await renderer.draw_lfg_mode_card()
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        cached = self._profile_cache.get(qq_id)
+        if cached:
+            # 验证 cache 里的 uid 是自己绑定的，防止 /stats @别人 后误注册
+            user = await self.db.get_user(qq_id)
+            if user and str(user["uid"]) != str(cached["uid"]):
+                cached = None
+        if not cached:
+            user = await self.db.get_user(qq_id)
+            if user:
+                stats = await self.apex.get_stats(user["uid"], user["platform"])
+                if stats:
+                    qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+                    cached = {
+                        "uid": user["uid"],
+                        "name": stats.name,
+                        "platform": user["platform"],
+                        "rank_name": stats.rank_name,
+                        "rank_score": stats.rank_score,
+                        "rank_img": stats.rank_img,
+                        "level": stats.level,
+                        "kills": stats.kills,
+                        "avatar_url": qq_avatar,
+                    }
+                    self._profile_cache[qq_id] = cached
+
+        if not cached:
+            img = await renderer.draw_text_card(
+                "LFG", "请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友", is_error=True
+            )
+            async for r in self._send_card(event, img):
+                yield r
+            return
+
+        # 注册时一并爬取 ALS 数据存入 DB
+        bind_user = await self.db.get_user(qq_id)
+        als_lookup = bind_user["uid"] if bind_user else cached["uid"]
+        badges, stats_lfg = await asyncio.gather(
+            fetch_lfg_stats(als_lookup, cached["platform"]),
+            self.apex.get_stats(cached["uid"], cached["platform"]),
+        )
+        lvl_raw = badges.get("level") or (stats_lfg.level if stats_lfg else cached.get("level", 0))
+        pr_raw = badges.get("prestige") or (stats_lfg.prestige if stats_lfg else cached.get("prestige", 0))
+        kills = badges.get("kills", 0) or (stats_lfg.kills if stats_lfg else cached.get("kills", 0))
+        rp = stats_lfg.rank_score if stats_lfg else cached.get("rank_score", 0)
+        rn = stats_lfg.rank_name if stats_lfg else cached.get("rank_name", "")
+        ri = stats_lfg.rank_img if stats_lfg else cached.get("rank_img", "")
+        st = stats_lfg.state if stats_lfg else "offline"
+        rp_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or (stats_lfg.rank_ladder_pos if stats_lfg else 0)
+
+        qq_name = event.get_sender_name() or ""
+        if qq_id != event.get_sender_id():
+            try:
+                info = await event.bot.call_action("get_stranger_info", user_id=int(qq_id), no_cache=False)
+                qq_name = info.get("nickname", "") or info.get("nick", "")
+            except Exception:
+                qq_name = ""
+        await self.db.upsert_lfg_user(
+            qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode,
+            qq_name=qq_name,
+            kills=kills, level=lvl_raw, prestige=pr_raw,
+            rank_pos=rp_pos, rank_name=rn, rank_score=rp, rank_img=ri, state=st,
+        )
+
+        yield event.plain_result(f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})，使用 /lfg 列表 查看")
 
     # ═══════════════════════════════════════════════
     #  地图轮换
@@ -600,119 +880,13 @@ class XiaoChiyu(Star):
     #  队伍系统
     # ═══════════════════════════════════════════════
 
-    @filter.command_group("team")
-    def team(self):
-        pass
-
-    @team.command("create", alias={"创建"})
-    async def team_create(self, event: AstrMessageEvent, name: str):
-        """创建队伍 — /team create <队伍名>"""
-        qq_id = event.get_sender_id()
-        team_id = await self.db.create_team(name, qq_id)
-        if team_id is None:
-            img = await renderer.draw_text_card(
-                "创建失败", "你已在队伍中，请先退出当前队伍", is_error=True
-            )
-        else:
-            img = await renderer.draw_text_card(
-                "队伍创建成功",
-                f"'{name}' 已创建\n默认 12 小时后自动解散\n使用 /team ttl <小时> 修改时限",
-            )
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("join", alias={"加入"})
-    async def team_join(self, event: AstrMessageEvent, name: str):
-        """加入队伍 — /team join <队伍名>"""
-        qq_id = event.get_sender_id()
-        err = await self.db.join_team(name, qq_id)
-        if err:
-            img = await renderer.draw_text_card("加入失败", err, is_error=True)
-        else:
-            img = await renderer.draw_text_card("加入成功", f"你已加入队伍 '{name}'")
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("leave", alias={"离开"})
-    async def team_leave(self, event: AstrMessageEvent):
-        """离开当前队伍"""
-        qq_id = event.get_sender_id()
-        err = await self.db.leave_team(qq_id)
-        if err:
-            img = await renderer.draw_text_card("操作失败", err, is_error=True)
-        else:
-            img = await renderer.draw_text_card("已离开", "你已退出队伍")
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("info", alias={"信息"})
-    async def team_info(self, event: AstrMessageEvent):
-        """查看当前队伍信息"""
-        qq_id = event.get_sender_id()
-        team = await self.db.get_team_by_member(qq_id)
-        if not team:
-            img = await renderer.draw_text_card(
-                "队伍信息", "你不在任何队伍中", is_error=True
-            )
-        else:
-            team["members"] = await self.db.get_team_members(team["id"])
-            team["member_count"] = len(team["members"])
-            img = await renderer.draw_team_card(team)
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("list", alias={"列表"})
-    async def team_list(self, event: AstrMessageEvent):
-        """查看所有活跃队伍"""
-        teams = await self.db.get_all_teams()
-        img = await renderer.draw_team_list_card(teams)
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("disband", alias={"解散"})
-    async def team_disband(self, event: AstrMessageEvent):
-        """解散队伍 (仅队长)"""
-        qq_id = event.get_sender_id()
-        err = await self.db.disband_team(qq_id)
-        if err:
-            img = await renderer.draw_text_card("解散失败", err, is_error=True)
-        else:
-            img = await renderer.draw_text_card("已解散", "队伍已解散")
-        async for r in self._send_card(event, img):
-            yield r
-
-    @team.command("ttl", alias={"时限", "时效"})
-    async def team_ttl(self, event: AstrMessageEvent, hours: int):
-        """修改队伍存活时限 — /team ttl <小时> (1~48 仅队长)"""
-        qq_id = event.get_sender_id()
-        err = await self.db.set_team_ttl(qq_id, hours)
-        if err:
-            img = await renderer.draw_text_card("修改失败", err, is_error=True)
-        else:
-            img = await renderer.draw_text_card(
-                "修改成功", f"队伍将在 {hours} 小时后自动解散"
-            )
-        async for r in self._send_card(event, img):
-            yield r
-
     # ═══════════════════════════════════════════════
     #  后台自动清理过期队伍
     # ═══════════════════════════════════════════════
 
     @filter.on_astrbot_loaded()
     async def start_cleaner(self):
-        self._fire_and_forget(self._auto_clean_expired_teams(), "清理过期队伍")
         self._fire_and_forget(self._auto_clean_temp_files(), "清理临时文件")
-
-    async def _auto_clean_expired_teams(self):
-        while True:
-            await asyncio.sleep(60)
-            try:
-                expired = await self.db.expire_teams()
-                for team in expired:
-                    logger.info(f"[小赤羽] 队伍 '{team['name']}' 已过期，自动解散")
-            except Exception as e:
-                logger.error(f"[小赤羽] 清理过期队伍失败: {e}")
 
     async def _auto_clean_temp_files(self):
         """每5分钟清理超过30分钟的临时PNG文件"""
@@ -744,7 +918,18 @@ class XiaoChiyu(Star):
 
         qq_id = event.get_sender_id()
         if player_name:
-            if player_name.strip().isdigit():
+            # 处理 @提及：查对方绑定
+            at_match = re.search(r'\[CQ:at,qq=(\d+)\]', player_name) or re.search(r'@(\d+)', player_name)
+            if at_match:
+                target_qq = at_match.group(1)
+                target_user = await self.db.get_user(target_qq)
+                if not target_user:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"对方 (QQ {target_qq}) 未绑定 Apex 账号")]
+                    )
+                uid = target_user["uid"]
+                platform = target_user.get("platform", "PC")
+            elif player_name.strip().isdigit():
                 idx = int(player_name.strip())
                 cached = self._last_search.get(qq_id, [])
                 if 1 <= idx <= len(cached):
@@ -804,7 +989,7 @@ class XiaoChiyu(Star):
             uid, platform = user["uid"], user["platform"]
 
         stats_task = self.apex.get_stats(uid, platform)
-        badges_task = fetch_badges(uid, platform)
+        badges_task = self._get_badges_cached(uid, platform)
         rankdist_task = self.apex.get_rank_distribution()
         stats, badges, rank_dist = await asyncio.gather(
             stats_task, badges_task, rankdist_task
@@ -817,9 +1002,11 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
-        global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
-
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+        _lv2 = badges.get("level") or stats.level
+        _pr2 = badges.get("prestige") or stats.prestige
+        global_pct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        rank_ladder_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
@@ -827,16 +1014,16 @@ class XiaoChiyu(Star):
             "avatar_url": qq_avatar,
             "platform": platform,
             "online": stats.state,
-            "level": badges.get("level") or stats.level,
+            "level": _pr2 * 500 + _lv2 if _pr2 else _lv2,
             "level_pct": stats.to_next_level_pct,
-            "prestige": badges.get("prestige") or stats.prestige,
+            "prestige": _pr2,
             "rank_name": stats.rank_name,
             "rank_div": stats.rank_div,
             "rank_score": stats.rank_score,
             "rank_img": stats.rank_img,
             "rank_top_pct": stats.rank_top_pct,
             "rank_top_pct_global": global_pct,
-            "rank_ladder_pos": badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            "rank_ladder_pos": rank_ladder_pos,
             "rp_delta": rp_delta,
             "kills": badges.get("kills", 0) or stats.kills,
             "damage": stats.damage,
@@ -907,12 +1094,13 @@ class XiaoChiyu(Star):
 
     @filter.llm_tool(name="apex_bind")
     async def llm_bind(
-        self, event: AstrMessageEvent, player_name: str, platform: str = "PC"
+        self, event: AstrMessageEvent, player_name: str, platform: str = "PC", target_qq: str = ""
     ):
-        """绑定 Apex 账号到当前 QQ。
+        """绑定 Apex 账号到当前 QQ（管理员可绑定到其他人的 QQ）。
         Args:
             player_name(string): 要绑定的玩家名或数字序号
             platform(string): 平台，PC/PS4/X1，默认PC
+            target_qq(string): 要绑定到的QQ号，不填则绑定给自己（仅管理员可用）
         """
         import base64
         from mcp.types import CallToolResult, TextContent, ImageContent
@@ -927,6 +1115,14 @@ class XiaoChiyu(Star):
             )
         platform = platform.upper()
         qq_id = event.get_sender_id()
+
+        # admin 可为他人绑定
+        if target_qq:
+            if not event.is_admin():
+                return CallToolResult(
+                    content=[TextContent(type="text", text="只有管理员才能为他人绑定账号")]
+                )
+            qq_id = target_qq
 
         if player_name.strip().isdigit():
             idx = int(player_name.strip())
@@ -1006,11 +1202,20 @@ class XiaoChiyu(Star):
         )
 
     @filter.llm_tool(name="apex_unbind")
-    async def llm_unbind(self, event: AstrMessageEvent):
-        """解绑当前 QQ 的 Apex 账号。"""
+    async def llm_unbind(self, event: AstrMessageEvent, target_qq: str = ""):
+        """解绑 QQ 的 Apex 账号（管理员可解绑其他人的 QQ）。
+        Args:
+            target_qq(string): 要解绑的QQ号，不填则解绑自己（仅管理员可用）
+        """
         from mcp.types import CallToolResult, TextContent
 
         qq_id = event.get_sender_id()
+        if target_qq:
+            if not event.is_admin():
+                return CallToolResult(
+                    content=[TextContent(type="text", text="只有管理员才能解绑他人的账号")]
+                )
+            qq_id = target_qq
         user = await self.db.get_user(qq_id)
         if not user:
             return CallToolResult(
@@ -1118,6 +1323,128 @@ class XiaoChiyu(Star):
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
+                ImageContent(type="image", data=img_b64, mimeType="image/png"),
+            ]
+        )
+
+    @filter.llm_tool(name="apex_lfg")
+    async def llm_lfg(self, event: AstrMessageEvent, action: str = "list", target_qq: str = ""):
+        """找队友功能。列出组队列表、注册排位/娱乐、退出。当用户说"组队"、"找队友"、"想打排位"、"想打匹配"时调用，不要因为"组队"随意触发。
+        Args:
+            action(string): 操作类型: list/ranked/casual/leave
+            target_qq(string): 要操作的QQ号，不填则操作自己（仅管理员可用）
+        """
+        import base64
+        from mcp.types import CallToolResult, TextContent, ImageContent
+
+        qq_id = event.get_sender_id()
+        if target_qq:
+            if not event.is_admin():
+                return CallToolResult(
+                    content=[TextContent(type="text", text="只有管理员才能为他人操作")]
+                )
+            qq_id = target_qq
+        group_id = event.unified_msg_origin
+        action = action.strip().lower()
+
+        if action in ("leave", "退出", "取消"):
+            existing = await self.db.get_lfg_user(qq_id, group_id)
+            if existing:
+                await self.db.remove_lfg_user(qq_id, group_id)
+                return CallToolResult(
+                    content=[TextContent(type="text", text="已退出找队友列表")]
+                )
+            return CallToolResult(
+                content=[TextContent(type="text", text="你不在找队友列表中")]
+            )
+
+        if action in ("ranked", "排位", "casual", "娱乐"):
+            mode = "ranked" if action in ("ranked", "排位") else "casual"
+            cached = self._profile_cache.get(qq_id)
+            if cached:
+                user = await self.db.get_user(qq_id)
+                if user and str(user["uid"]) != str(cached["uid"]):
+                    cached = None
+            if not cached:
+                user = await self.db.get_user(qq_id)
+                if user:
+                    stats = await self.apex.get_stats(user["uid"], user["platform"])
+                    if stats:
+                        cached = {
+                            "uid": user["uid"],
+                            "name": stats.name,
+                            "platform": user["platform"],
+                            "rank_name": stats.rank_name,
+                            "rank_score": stats.rank_score,
+                            "rank_img": stats.rank_img,
+                            "level": stats.level,
+                            "kills": stats.kills,
+                        }
+                        self._profile_cache[qq_id] = cached
+            if not cached:
+                return CallToolResult(
+                    content=[TextContent(type="text", text="请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友")]
+                )
+            # 注册时一并爬取 ALS 数据存入 DB
+            bind_user = await self.db.get_user(qq_id)
+            als_lookup = bind_user["uid"] if bind_user else cached["uid"]
+            badges, stats_lfg = await asyncio.gather(
+                fetch_lfg_stats(als_lookup, cached["platform"]),
+                self.apex.get_stats(cached["uid"], cached["platform"]),
+            )
+            lvl_raw = badges.get("level") or (stats_lfg.level if stats_lfg else cached.get("level", 0))
+            pr_raw = badges.get("prestige") or (stats_lfg.prestige if stats_lfg else cached.get("prestige", 0))
+            kills = badges.get("kills", 0) or (stats_lfg.kills if stats_lfg else cached.get("kills", 0))
+            rp = stats_lfg.rank_score if stats_lfg else cached.get("rank_score", 0)
+            rn = stats_lfg.rank_name if stats_lfg else cached.get("rank_name", "")
+            ri = stats_lfg.rank_img if stats_lfg else cached.get("rank_img", "")
+            st = stats_lfg.state if stats_lfg else "offline"
+            rp_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or (stats_lfg.rank_ladder_pos if stats_lfg else 0)
+            qq_name = event.get_sender_name() or ""
+            if qq_id != event.get_sender_id():
+                try:
+                    info = await event.bot.call_action("get_stranger_info", user_id=int(qq_id), no_cache=False)
+                    qq_name = info.get("nickname", "") or info.get("nick", "")
+                except Exception:
+                    qq_name = ""
+            await self.db.upsert_lfg_user(
+                qq_id, group_id, cached["uid"], cached["name"], cached["platform"], mode,
+                qq_name=qq_name,
+                kills=kills, level=lvl_raw, prestige=pr_raw,
+                rank_pos=rp_pos, rank_name=rn, rank_score=rp, rank_img=ri, state=st,
+            )
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})")]
+            )
+
+        # list
+        lfg_users = await self.db.list_lfg_users(group_id)
+        if not lfg_users:
+            return CallToolResult(
+                content=[TextContent(type="text", text="当前没有人在找队友")]
+            )
+
+        entries = []
+        rank_dist = await self.apex.get_rank_distribution()
+        for u in lfg_users:
+            entry = await self._refresh_lfg_entry(u, group_id, rank_dist, event.bot)
+            if entry:
+                entries.append(entry)
+
+        if not entries:
+            return CallToolResult(
+                content=[TextContent(type="text", text="没有有效的战绩数据")]
+            )
+
+        text_lines = [f"当前找队友列表 ({len(entries)} 人):"]
+        for e in entries:
+            txt = f"{e['qq_name'] or e['apex_name']} | {e['rank_name']} {e['rank_score']}RP | Lv{e['level']} | {e['kills']}杀 | {e['state']} | {'排位' if e['mode']=='ranked' else '娱乐'}"
+            text_lines.append(txt)
+        img_bytes = await renderer.draw_lfg_card(entries)
+        img_b64 = base64.b64encode(img_bytes).decode()
+        return CallToolResult(
+            content=[
+                TextContent(type="text", text="\n".join(text_lines)),
                 ImageContent(type="image", data=img_b64, mimeType="image/png"),
             ]
         )

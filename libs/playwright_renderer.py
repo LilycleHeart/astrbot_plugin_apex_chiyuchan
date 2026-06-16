@@ -23,6 +23,12 @@ _C_DIAMOND = "#5D9FF0"
 _C_MASTER = "#C58BFF"
 _C_PRED = "#DA292A"
 
+_USE_LOCAL_FONTS = False
+
+def set_use_local_fonts(val: bool):
+    global _USE_LOCAL_FONTS
+    _USE_LOCAL_FONTS = val
+
 def _escape_html(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
@@ -281,13 +287,16 @@ def _build_stats_html(**d) -> str:
     selected_legend = d.get("selected_legend")
     rank_dist_entries = d.get("rank_dist_entries", None)
 
+    _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
+    top_pct_label = "全平台" if rank_name.startswith(("Predator", "Master")) else _p
+
     display_name = f"{name} [{tag}]" if tag else name
     _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
     top_pct_label = "全平台" if rank_name.startswith(("Predator", "Master")) else _p
     online_map = {"online": "在线", "offline": "离线", "in_game": "游戏中"}
     state_text = online_map.get(online, online)
     state_dot = "#4CE5B1" if online in ("online", "in_game") else "#555"
-    prestige_str = f"P{prestige}" if prestige else ""
+    prestige_str = ""  # level is now total level, no need to show prestige prefix
     rank_c = _rank_color(rank_name)
     top_global = f"{rank_top_pct_global}%"
     rp_delta_html = ""
@@ -618,10 +627,14 @@ async def _embed_images(html: str) -> str:
 async def _render_card_sync(html: str, width: int) -> bytes:
     html = await _embed_images(html)
     async with run_with_page(viewport={"width": width, "height": 100}, device_scale_factor=2) as page:
-        await page.set_content(html, wait_until="domcontentloaded", timeout=15000)
-        await page.wait_for_selector(".card", timeout=10000)
+        await page.set_content(html, wait_until="load", timeout=20000)
+        await page.wait_for_selector(".card, .lfg-list", timeout=10000)
+        try:
+            await page.wait_for_function("() => document.fonts.ready", timeout=8000)
+        except Exception:
+            pass
         card_height = await page.evaluate(
-            "() => document.querySelector('.card')?.offsetHeight || 600"
+            "() => (document.querySelector('.card') || document.querySelector('.lfg-list'))?.offsetHeight || 600"
         )
         await page.set_viewport_size({"width": width, "height": card_height + 48})
         return await page.screenshot(full_page=False, type="png")
@@ -1003,3 +1016,172 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SUR
 async def draw_predator_card(predator) -> bytes:
     html = _build_predator_html(predator)
     return await _render_card_sync(html, 720)
+
+
+def _build_lfg_mode_card() -> str:
+    ff = "sans-serif" if _USE_LOCAL_FONTS else "'Noto Sans SC','Roboto',sans-serif"
+    fl = "" if _USE_LOCAL_FONTS else '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
+    ml = ""
+    if _USE_LOCAL_FONTS:
+        ml = '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+{fl}
+{ml}
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#1c1b1f;color:#e6e1e5;font-family:{ff};display:flex;justify-content:center;padding:40px 20px}}
+.card{{width:420px;background:#2b2930;border-radius:28px;padding:24px}}
+.title{{font-size:1.5rem;font-weight:700;margin-bottom:8px}}
+.subtitle{{font-size:0.85rem;color:#938f99;margin-bottom:24px}}
+.options{{display:flex;flex-direction:column;gap:12px}}
+.opt{{padding:20px;border-radius:16px;background:#1c1b1f;border:1px solid #49454f;cursor:pointer;transition:all 0.2s ease}}
+.opt:hover{{background:#36343b;border-color:#4f378b}}
+.opt-title{{font-size:1rem;font-weight:700;margin-bottom:4px}}
+.opt-sub{{font-size:0.8rem;color:#938f99}}
+.footer{{margin-top:24px;text-align:center;font-size:0.75rem;color:#938f99}}
+</style></head><body>
+<div class="card">
+    <div class="title">找队友</div>
+    <div class="subtitle">选择你要玩的模式</div>
+    <div class="options">
+        <div class="opt">
+            <div class="opt-title">排位赛</div>
+            <div class="opt-sub">/lfg 排位</div>
+        </div>
+        <div class="opt">
+            <div class="opt-title">娱乐匹配</div>
+            <div class="opt-sub">/lfg 娱乐</div>
+        </div>
+    </div>
+    <div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
+</div>
+</body></html>"""
+
+
+def _build_lfg_html(entries: list[dict]) -> str:
+    rank_colors = {
+        "Predator": "#ffb4ab", "Master": "#d0bcff", "Diamond": "#bac3ff",
+        "Platinum": "#99f1ff", "Gold": "#ffd966", "Silver": "#c0c0c0",
+        "Bronze": "#cd7f32", "Unranked": "#938f99",
+    }
+
+    rows = ""
+    for e in entries:
+        mode = e.get("mode", "ranked")
+        rank_name = e.get("rank_name", "Unranked")
+        rank_score = e.get("rank_score", 0)
+        rank_img = e.get("rank_img", "")
+        level = e.get("level", 0)
+        kills = e.get("kills", 0)
+        apex_name = e.get("apex_name", "Unknown")
+        platform = e.get("platform", "PC")
+        ladder_pos = e.get("rank_ladder_pos", 0) or 0
+        state = e.get("state", "offline")
+
+        rank_type = rank_name.lower().split(" ")[0] if rank_name else "unranked"
+        text_color = rank_colors.get(rank_name, "#938f99")
+        rank_display = _rank_zh(rank_name)
+        if ladder_pos and rank_name in ("Predator", "Master"):
+            rank_display += f" #{ladder_pos}"
+
+        chip_class = "chip-highlight" if mode == "ranked" else ""
+        chip_icon = '<span class="material-symbols-rounded" style="font-size:16px">workspace_premium</span>' if mode == "ranked" else ""
+        mode_label = "排位赛" if mode == "ranked" else "娱乐匹配"
+
+        state_map = {"online": "在线", "in_game": "游戏中", "offline": "离线"}
+        state_text = state_map.get(state, "在线")
+        dot_color = "#4CE5B1" if state in ("online", "in_game") else "#555"
+
+        dot_icon = f'<span class="material-symbols-rounded" style="font-variation-settings:\'FILL\' 1;font-size:8px;color:{dot_color}">circle</span>'
+
+        display_name = e.get("qq_name") or apex_name
+        qq_avatar = e.get("qq_avatar", "")
+
+        rows += f"""
+        <div class="player-row">
+            <div class="col-player">
+                <img class="avatar" src="{qq_avatar}" alt="">
+                <div class="player-info">
+                    <div class="player-name" title="{display_name}">{display_name}</div>
+                    <div class="status-tag">{dot_icon} {state_text} · {platform}</div>
+                </div>
+            </div>
+            <div class="col-rank">
+                <img class="rank-icon" src="{rank_img}" alt="{rank_name}">
+                <div class="rank-text">
+                    <span class="rank-score text-{rank_type}">{rank_score:,}</span>
+                    <span class="rank-label">{rank_display}</span>
+                </div>
+            </div>
+            <div class="col-wants">
+                <div class="md3-chip {chip_class}">{chip_icon} {mode_label}</div>
+            </div>
+            <div class="col-data">{level}</div>
+            <div class="col-data">{kills:,}</div>
+        </div>"""
+
+    if not rows:
+        rows = '<div style="text-align:center;padding:40px;color:#938f99;">目前没有玩家在线发起组队</div>'
+
+    font_family = "'Noto Sans SC','Roboto',sans-serif" if not _USE_LOCAL_FONTS else "sans-serif"
+    fonts_link = "" if _USE_LOCAL_FONTS else '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
+    ms_link = "" if _USE_LOCAL_FONTS else ""
+    if _USE_LOCAL_FONTS:
+        ms_link = '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
+
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+{fonts_link}
+{ms_link}
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#1e1e2e;color:#e6e1e5;font-family:{font_family};display:flex;justify-content:center;padding:32px 24px}}
+.lfg-list{{width:100%;max-width:1280px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
+.list-header{{display:grid;grid-template-columns:1.5fr 1fr 0.8fr 0.5fr 0.5fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:16px}}
+.list-header>div{{text-align:center}}
+.list-header>div:first-child{{text-align:left}}
+.list-header>div:nth-child(2){{text-align:left}}
+.list-header>div:nth-child(3){{text-align:left}}
+.player-row{{display:grid;grid-template-columns:1.5fr 1fr 0.8fr 0.5fr 0.5fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent;gap:16px}}
+.player-row:hover{{background:#303042;transform:translateY(-2px);border-color:#49454f}}
+.col-player{{display:flex;align-items:center;gap:18px}}
+.avatar{{width:52px;height:52px;border-radius:14px;object-fit:cover;flex-shrink:0}}
+.player-info{{display:flex;flex-direction:column;gap:4px}}
+.player-name{{font-weight:700;font-size:1rem}}
+.status-tag{{font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px}}
+.col-rank{{display:flex;align-items:center;gap:14px}}
+.rank-icon{{width:44px;height:44px;flex-shrink:0}}
+.rank-text{{display:flex;flex-direction:column;gap:2px;white-space:nowrap}}
+.rank-score{{font-weight:700;font-size:1.15rem}}
+.rank-label{{font-size:0.78rem;color:#938f99}}
+.col-wants{{display:flex;gap:8px;flex-wrap:wrap}}
+.md3-chip{{background:#333537;color:#e3e2e6;padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap}}
+.chip-highlight{{background:#633b48;color:#ffd8e4}}
+.col-data{{font-weight:700;font-size:1.1rem;text-align:center;white-space:nowrap}}
+.text-predator{{color:#ffb4ab}} .text-master{{color:#d0bcff}} .text-diamond{{color:#bac3ff}}
+.text-platinum{{color:#99f1ff}} .text-gold{{color:#ffd966}} .text-silver{{color:#c0c0c0}}
+.text-bronze{{color:#cd7f32}} .text-unranked{{color:#938f99}}
+.footer{{padding:16px 32px 0 32px;font-size:11px;color:#555;display:flex;justify-content:space-between;border-top:1px solid #383850;margin-top:8px}}
+</style></head><body>
+<div class="lfg-list">
+    <div class="list-header">
+        <div>玩家</div><div>段位 / 分数</div><div>寻找队友</div><div>等级</div><div>击杀数</div>
+    </div>
+    {rows}
+    <div class="footer">
+        <span>Data: apexlegendsstatus.com</span>
+        <span>auth.赤羽真白 · Apex Chiyuchan</span>
+    </div>
+</div>
+</body></html>"""
+
+
+async def draw_lfg_card(entries: list[dict]) -> bytes:
+    html = _build_lfg_html(entries)
+    return await _render_card_sync(html, 1328)
+
+
+async def draw_lfg_mode_card() -> bytes:
+    html = _build_lfg_mode_card()
+    return await _render_card_sync(html, 420)

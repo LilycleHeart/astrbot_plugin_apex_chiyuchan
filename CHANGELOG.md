@@ -3,12 +3,14 @@
 ## v1.2.0 (2026-06-16)
 
 ### ✨ 新功能
+- **LFG 找队友**: `/lfg 排位|娱乐|列表|退出`，按群隔离，卡片展示在线状态及战绩
+- **管理员代操作**: 命令加 `@目标` 可为他人 bind/unbind/lfg，LLM 工具加 `target_qq` 参数
 - **ALS 实时爬取**: 排名/击杀/等级数据每次实时从 ALS 抓取（`force=True`）
 - **DB 媒体缓存**: 赛季/特殊徽章永久存 `badge_cache` 表，仅首次爬取
-- **rankTopPct/rankPcPos DOM 提取**: 从 `.v2-sb-stat__pill--rank/top` 直接提取
+- **rankTopPct/rankPcPos DOM 提取**: 从 `.v2-sb-stat__pill--rank/top` 直接提取，不再用分布估算
 - **段位分布参考**: 卡片底部展示各段位人数分布（全平台）
 - **LVL 计算**: `P3 100` 合并显示为 `1600`（prestige × 500 + level）
-- **管理员代操作**: 命令加 `@目标` 可为他人 bind/unbind
+- **LFG 列表 DB 缓存**: kills/level/prestige/rank 等静态数据 30min 缓存，在线状态始终实时
 - **`/stats @某人`**: 解析 CQ 码查对方绑定账号战绩
 
 ### 🔧 优化
@@ -19,11 +21,18 @@
 - **`use_local_fonts` 配置**: 开启时跳过 CDN 字体
 - **水印居中**: `auth.赤羽真白 · Apex Chiyuchan` 始终在 footer 居中
 - **LLM 工具收紧**: `apex_stats` 描述防"介绍我/评价我"误触发
+- **LFG 爬虫**: 优先用 `users` 表 UID 避免消歧页，消歧页自动重定向到 `/profile/uid/`
+- **LFG 注册降级**: 纯文本消息确认，不渲染卡片
+
+### 🗑️ 移除
+- 移除 `/team` 组队系统（-313 行）
 
 ### 🐛 修复
 - 修复大师/猎杀不显示 I-IV 分段号
 - 修复 `_calc_global_pct` 对 Predator/Master 返回空字符串
 - 修复排名卡片重复显示 Top% 的问题
+- 修复 `image_renderer.py` 缩进错误
+- 修复 LLM `apex_lfg` handler 缩进错误
 
 ---
 

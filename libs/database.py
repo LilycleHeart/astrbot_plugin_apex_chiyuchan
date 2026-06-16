@@ -53,22 +53,6 @@ class Database:
                 created_at TEXT DEFAULT (datetime('now','localtime'))
             );
 
-            CREATE TABLE IF NOT EXISTS teams (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                name        TEXT NOT NULL,
-                owner_qq    TEXT NOT NULL,
-                ttl_hours   INTEGER DEFAULT 12,
-                created_at  TEXT DEFAULT (datetime('now','localtime')),
-                expires_at  TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS team_members (
-                team_id     INTEGER NOT NULL,
-                qq_id       TEXT NOT NULL,
-                joined_at   TEXT DEFAULT (datetime('now','localtime')),
-                PRIMARY KEY (team_id, qq_id)
-            );
-
             CREATE TABLE IF NOT EXISTS rp_history (
                 uid         TEXT NOT NULL,
                 platform    TEXT NOT NULL DEFAULT 'PC',
@@ -82,9 +66,78 @@ class Database:
                 enabled       INTEGER DEFAULT 1,
                 last_state    TEXT DEFAULT ''
             );
+
+            CREATE TABLE IF NOT EXISTS lfg_users (
+                qq_id       TEXT NOT NULL,
+                group_id    TEXT NOT NULL DEFAULT 'global',
+                uid         TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                qq_name     TEXT DEFAULT '',
+                platform    TEXT DEFAULT 'PC',
+                mode        TEXT DEFAULT 'ranked',
+                registered_at TEXT DEFAULT (datetime('now','localtime')),
+                PRIMARY KEY (group_id, qq_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS badge_cache (
+                uid         TEXT NOT NULL,
+                platform    TEXT NOT NULL DEFAULT 'PC',
+                data        TEXT NOT NULL,
+                updated_at  TEXT DEFAULT (datetime('now','localtime')),
+                PRIMARY KEY (uid, platform)
+            );
         """)
+        # migrate: add qq_name / group_id columns; recreate PK if old schema
+        try:
+            await conn.execute("ALTER TABLE lfg_users ADD COLUMN qq_name TEXT DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            await conn.execute("ALTER TABLE lfg_users ADD COLUMN group_id TEXT NOT NULL DEFAULT 'global'")
+        except Exception:
+            pass
+        # check if old schema (single PK on qq_id) — recreate with composite PK
+        cursor = await conn.execute("PRAGMA table_info(lfg_users)")
+        cols = {row[1]: row for row in await cursor.fetchall()}
+        pk_cols = [name for name, info in cols.items() if info[5] == 1]
+        if pk_cols == ["qq_id"]:  # old single-column PK
+            await conn.execute("""
+                CREATE TABLE lfg_users_new (
+                    qq_id TEXT NOT NULL, group_id TEXT NOT NULL DEFAULT 'global',
+                    uid TEXT NOT NULL, name TEXT NOT NULL, qq_name TEXT DEFAULT '',
+                    platform TEXT DEFAULT 'PC', mode TEXT DEFAULT 'ranked',
+                    registered_at TEXT DEFAULT (datetime('now','localtime')),
+                    kills INTEGER DEFAULT 0, level INTEGER DEFAULT 0,
+                    prestige INTEGER DEFAULT 0, rank_pos INTEGER DEFAULT 0,
+                    rank_name TEXT DEFAULT '', rank_score INTEGER DEFAULT 0,
+                    rank_img TEXT DEFAULT '', state TEXT DEFAULT 'offline', stats_updated_at TEXT,
+                    PRIMARY KEY (group_id, qq_id)
+                )
+            """)
+            await conn.execute("""
+                INSERT OR IGNORE INTO lfg_users_new
+                SELECT qq_id, COALESCE(group_id,'global'), uid, name, COALESCE(qq_name,''),
+                       platform, mode, registered_at,
+                       0,0,0,0,'',0,'','offline',NULL FROM lfg_users
+            """)
+            await conn.execute("DROP TABLE lfg_users")
+            await conn.execute("ALTER TABLE lfg_users_new RENAME TO lfg_users")
+        else:
+            # add stats columns if missing
+            for col_def in (
+                "kills INTEGER DEFAULT 0", "level INTEGER DEFAULT 0",
+                "prestige INTEGER DEFAULT 0", "rank_pos INTEGER DEFAULT 0",
+                "rank_score INTEGER DEFAULT 0", "state TEXT DEFAULT 'offline'",
+                "rank_name TEXT DEFAULT ''", "rank_img TEXT DEFAULT ''",
+                "stats_updated_at TEXT",
+            ):
+                col_name = col_def.split()[0]
+                if col_name not in cols:
+                    try:
+                        await conn.execute(f"ALTER TABLE lfg_users ADD COLUMN {col_def}")
+                    except Exception:
+                        pass
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform)")
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_teams_expires ON teams(expires_at)")
         await conn.commit()
         logger.info("[Database] SQLite tables ready (WAL mode)")
 
@@ -111,199 +164,7 @@ class Database:
         await conn.execute("DELETE FROM users WHERE qq_id = ?", (qq_id,))
         await conn.commit()
 
-    # ── 队伍操作 ──
-
-    async def create_team(
-        self, name: str, owner_qq: str, ttl_hours: int = 12
-    ) -> int | None:
-        existing = await self.get_team_by_member(owner_qq)
-        if existing:
-            return None
-
-        expires_at = datetime.now() + timedelta(hours=ttl_hours)
-        expires_str = expires_at.strftime("%Y-%m-%d %H:%M:%S")
-
-        conn = await self._get_conn()
-        async with self._lock:
-            cursor = await conn.execute(
-                "INSERT INTO teams (name, owner_qq, ttl_hours, expires_at) VALUES (?, ?, ?, ?)",
-                (name, owner_qq, ttl_hours, expires_str),
-            )
-            team_id = cursor.lastrowid
-            await conn.execute(
-                "INSERT INTO team_members (team_id, qq_id) VALUES (?, ?)",
-                (team_id, owner_qq),
-            )
-            await conn.commit()
-        return team_id
-
-    async def join_team(self, name: str, qq_id: str) -> str | None:
-        existing = await self.get_team_by_member(qq_id)
-        if existing:
-            return "你已在队伍中"
-
-        conn = await self._get_conn()
-        async with conn.execute(
-            "SELECT id, owner_qq, ttl_hours FROM teams WHERE name = ?", (name,)
-        ) as cursor:
-            team = await cursor.fetchone()
-
-        if not team:
-            return "队伍不存在"
-        team_id = team[0]
-
-        async with conn.execute(
-            "SELECT COUNT(*) FROM team_members WHERE team_id = ?", (team_id,)
-        ) as cursor:
-            count = (await cursor.fetchone())[0]
-
-        if count >= 3:
-            return "队伍已满（上限3人）"
-
-        await conn.execute(
-            "INSERT INTO team_members (team_id, qq_id) VALUES (?, ?)",
-            (team_id, qq_id),
-        )
-        await conn.commit()
-        return None
-
-    async def leave_team(self, qq_id: str) -> str | None:
-        team = await self.get_team_by_member(qq_id)
-        if not team:
-            return "你不在任何队伍中"
-
-        team_id = team["id"]
-        conn = await self._get_conn()
-        await conn.execute(
-            "DELETE FROM team_members WHERE team_id = ? AND qq_id = ?", (team_id, qq_id)
-        )
-        if team["owner_qq"] == qq_id:
-            await conn.execute("DELETE FROM team_members WHERE team_id = ?", (team_id,))
-            await conn.execute("DELETE FROM teams WHERE id = ?", (team_id,))
-        else:
-            async with conn.execute(
-                "SELECT COUNT(*) FROM team_members WHERE team_id = ?", (team_id,)
-            ) as cursor:
-                remaining = (await cursor.fetchone())[0]
-            if remaining == 0:
-                await conn.execute("DELETE FROM teams WHERE id = ?", (team_id,))
-        await conn.commit()
-        return None
-
-    async def disband_team(self, qq_id: str) -> str | None:
-        team = await self.get_team_by_member(qq_id)
-        if not team:
-            return "你不在任何队伍中"
-        if team["owner_qq"] != qq_id:
-            return "只有队长才能解散队伍"
-
-        team_id = team["id"]
-        conn = await self._get_conn()
-        await conn.execute("DELETE FROM team_members WHERE team_id = ?", (team_id,))
-        await conn.execute("DELETE FROM teams WHERE id = ?", (team_id,))
-        await conn.commit()
-        return None
-
-    async def get_team_by_member(self, qq_id: str) -> dict | None:
-        conn = await self._get_conn()
-        async with conn.execute(
-            """
-            SELECT t.id, t.name, t.owner_qq, t.ttl_hours, t.created_at, t.expires_at
-            FROM teams t JOIN team_members m ON t.id = m.team_id
-            WHERE m.qq_id = ?
-        """,
-            (qq_id,),
-        ) as cursor:
-            row = await cursor.fetchone()
-        if row:
-            return dict(row)
-        return None
-
-    async def get_team_members(self, team_id: int) -> list[str]:
-        conn = await self._get_conn()
-        async with conn.execute(
-            "SELECT qq_id FROM team_members WHERE team_id = ?", (team_id,)
-        ) as cursor:
-            rows = await cursor.fetchall()
-            return [r[0] for r in rows]
-
-    async def get_all_teams(self) -> list[dict]:
-        conn = await self._get_conn()
-        async with conn.execute("""
-            SELECT t.id, t.name, t.owner_qq, t.ttl_hours, t.created_at, t.expires_at,
-                   m.qq_id as member_qq
-            FROM teams t
-            LEFT JOIN team_members m ON t.id = m.team_id
-            ORDER BY t.id
-        """) as cursor:
-            rows = await cursor.fetchall()
-
-        teams_map: dict[int, dict] = {}
-        for row in rows:
-            tid = row[0]
-            if tid not in teams_map:
-                teams_map[tid] = {
-                    "id": row[0],
-                    "name": row[1],
-                    "owner_qq": row[2],
-                    "ttl_hours": row[3],
-                    "created_at": row[4],
-                    "expires_at": row[5],
-                    "members": [],
-                }
-            member_qq = row[6]
-            if member_qq:
-                teams_map[tid]["members"].append(member_qq)
-
-        result = list(teams_map.values())
-        for t in result:
-            t["member_count"] = len(t["members"])
-        return result
-
-    async def set_team_ttl(self, qq_id: str, hours: int) -> str | None:
-        team = await self.get_team_by_member(qq_id)
-        if not team:
-            return "你不在任何队伍中"
-        if team["owner_qq"] != qq_id:
-            return "只有队长才能修改时限"
-        if hours < 1 or hours > 48:
-            return "时限范围 1~48 小时"
-
-        expires_at = datetime.now() + timedelta(hours=hours)
-        expires_str = expires_at.strftime("%Y-%m-%d %H:%M:%S")
-
-        conn = await self._get_conn()
-        await conn.execute(
-            "UPDATE teams SET ttl_hours = ?, expires_at = ? WHERE id = ?",
-            (hours, expires_str, team["id"]),
-        )
-        await conn.commit()
-        return None
-
-    async def expire_teams(self) -> list[dict]:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn = await self._get_conn()
-
-        async with conn.execute(
-            "SELECT id, name, owner_qq FROM teams WHERE expires_at <= ?", (now,)
-        ) as cursor:
-            rows = await cursor.fetchall()
-            expired_ids = [row[0] for row in rows]
-
-        if not expired_ids:
-            return []
-
-        expired = [{"id": row[0], "name": row[1], "owner_qq": row[2]} for row in rows]
-
-        placeholders = ",".join("?" * len(expired_ids))
-        await conn.execute(
-            f"DELETE FROM team_members WHERE team_id IN ({placeholders})", expired_ids
-        )
-        await conn.execute(
-            f"DELETE FROM teams WHERE id IN ({placeholders})", expired_ids
-        )
-        await conn.commit()
-        return expired
+    # ── RP 操作 ──
 
     async def get_rp_delta(
         self, uid: str, platform: str, current_score: int
@@ -362,5 +223,72 @@ class Database:
         await conn.execute(
             "UPDATE monitor SET last_state = ? WHERE session_id = ?",
             (last_state, session_id),
+        )
+        await conn.commit()
+
+    async def upsert_lfg_user(self, qq_id: str, group_id: str, uid: str, name: str, platform: str, mode: str = "ranked", qq_name: str = "", kills: int = 0, level: int = 0, prestige: int = 0, rank_pos: int = 0, rank_name: str = "", rank_score: int = 0, rank_img: str = "", state: str = "offline"):
+        conn = await self._get_conn()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        await conn.execute(
+            "INSERT OR REPLACE INTO lfg_users (qq_id, group_id, uid, name, qq_name, platform, mode, registered_at, kills, level, prestige, rank_pos, rank_name, rank_score, rank_img, state, stats_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'), ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (qq_id, group_id, uid, name, qq_name, platform, mode, kills, level, prestige, rank_pos, rank_name, rank_score, rank_img, state, now),
+        )
+        await conn.commit()
+
+    async def remove_lfg_user(self, qq_id: str, group_id: str):
+        conn = await self._get_conn()
+        await conn.execute("DELETE FROM lfg_users WHERE qq_id = ? AND group_id = ?", (qq_id, group_id))
+        await conn.commit()
+
+    async def get_lfg_user(self, qq_id: str, group_id: str) -> dict | None:
+        conn = await self._get_conn()
+        async with conn.execute("SELECT * FROM lfg_users WHERE qq_id = ? AND group_id = ?", (qq_id, group_id)) as cursor:
+            row = await cursor.fetchone()
+        return dict(row) if row else None
+
+    async def list_lfg_users(self, group_id: str = "") -> list[dict]:
+        conn = await self._get_conn()
+        if group_id:
+            async with conn.execute("SELECT * FROM lfg_users WHERE group_id = ? ORDER BY registered_at DESC", (group_id,)) as cursor:
+                rows = await cursor.fetchall()
+        else:
+            async with conn.execute("SELECT * FROM lfg_users ORDER BY registered_at DESC") as cursor:
+                rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    async def update_lfg_qq_name(self, qq_id: str, group_id: str, qq_name: str):
+        conn = await self._get_conn()
+        await conn.execute(
+            "UPDATE lfg_users SET qq_name = ? WHERE qq_id = ? AND group_id = ?",
+            (qq_name, qq_id, group_id),
+        )
+        await conn.commit()
+
+    async def get_all_lfg_uids(self) -> list[dict]:
+        conn = await self._get_conn()
+        async with conn.execute("SELECT qq_id, group_id, uid, platform FROM lfg_users") as cursor:
+            rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    # ── 徽章缓存 ──
+
+    async def get_badge_cache(self, uid: str, platform: str = "PC") -> dict | None:
+        conn = await self._get_conn()
+        async with conn.execute(
+            "SELECT data, updated_at FROM badge_cache WHERE uid = ? AND platform = ?",
+            (uid, platform),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if row:
+            import json
+            return {"data": json.loads(row["data"]), "updated_at": row["updated_at"]}
+        return None
+
+    async def set_badge_cache(self, uid: str, platform: str, data: dict):
+        import json
+        conn = await self._get_conn()
+        await conn.execute(
+            "INSERT OR REPLACE INTO badge_cache (uid, platform, data, updated_at) VALUES (?, ?, ?, datetime('now','localtime'))",
+            (uid, platform, json.dumps(data)),
         )
         await conn.commit()
