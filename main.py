@@ -156,14 +156,15 @@ class XiaoChiyu(Star):
         return target_qq or event.get_sender_id(), cleaned, None
 
     async def _get_badges_cached(self, uid: str, platform: str) -> dict:
-        """获取徽章数据。媒体资源（赛季/特殊徽章）首次爬取后永久存 DB，不再重爬。
-        排名/击杀等变化数据来自 API + 计算，不走 DB 缓存。"""
-        cached = await self.db.get_badge_cache(uid, platform)
-        if cached:
-            return cached["data"]
+        """获取徽章+战绩数据。从 ALS 网站抓取（内存缓存 1h），
+        媒体资源（赛季/特殊徽章）额外永久存 DB 作为冷启动/失败兜底。"""
         badges = await fetch_badges(uid, platform)
         if badges.get("seasons") or badges.get("special"):
             await self.db.set_badge_cache(uid, platform, badges)
+        elif not badges.get("kills") and not badges.get("level"):
+            cached = await self.db.get_badge_cache(uid, platform)
+            if cached:
+                badges.update(cached["data"])
         return badges
 
     async def _send_card(
