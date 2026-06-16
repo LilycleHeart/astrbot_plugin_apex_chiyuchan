@@ -87,24 +87,16 @@
 
 ---
 
-## 🖼️ 卡片展示
+## 🖼️ 卡片预览
 
-### 战绩卡片
-
-- 玩家信息 + 段位
-- RP / 战绩统计
-- 英雄数据
-- 徽章展示
-
-### 地图卡片
-
-- 官方背景图
-- 当前地图 + 倒计时
-
-### 数据卡片
-
-- Moe Counter 数字风格
-- 猎杀线 / 大师人数
+<p align="center">
+  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/stats.png" width="45%" alt="战绩卡片" />
+  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" width="45%" alt="地图卡片" />
+</p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="45%" alt="猎杀/大师数据" />
+  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/server.png" width="45%" alt="服务器状态" />
+</p>
 
 ---
 
