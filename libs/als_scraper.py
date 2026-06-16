@@ -215,7 +215,18 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
         if (brRank) rankPos = parseInt(brRank[1].replace(/,/g,''));
         const brScore = text.match(/BR Rank[\\s\\S]*?([\\d,]+)\\s*RP/);
         if (brScore) rankScore = parseInt(brScore[1].replace(/,/g,''));
-        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore};
+        let rankTopPct = 0, rankPcPos = 0;
+        const rp = document.querySelector('.v2-sb-stat__pill--rank');
+        if (rp) {
+            const sp = rp.querySelector('span');
+            if (sp) rankTopPct = parseFloat(sp.textContent.trim().replace('%',''));
+        }
+        const tp = document.querySelector('.v2-sb-stat__pill--top');
+        if (tp) {
+            const m2 = tp.textContent.trim().match(/#([\\d,]+)/);
+            if (m2) rankPcPos = parseInt(m2[1].replace(/,/g,''));
+        }
+        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore, rankTopPct, rankPcPos};
     }""")
 
 
@@ -334,7 +345,7 @@ async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
         if not await page.query_selector(".player-name"):
             return {}
         text = await page.evaluate("document.body.innerText")
-        kills = 0; level = 0; prestige = 0; rankPos = 0
+        kills = 0; level = 0; prestige = 0; rankPos = 0; rankTopPct = 0; rankPcPos = 0
         gIdx = text.find("\nGlobal\n")
         if gIdx >= 0:
             sec = text[gIdx:gIdx + 500]
@@ -345,7 +356,17 @@ async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
         if lv: level = int(lv.group(1)); prestige = int(lv.group(2))
         br = __import__("re").search(r"BR Rank[\s\S]*?#([\d,]{1,12})\b", text)
         if br: rankPos = int(br.group(1).replace(",", ""))
-        return {"kills": kills, "level": level, "prestige": prestige, "rankPos": rankPos}
+        # DOM 方式提取排名百分比和位置
+        rp_el = await page.query_selector('.v2-sb-stat__pill--rank span')
+        if rp_el:
+            try: rankTopPct = float((await rp_el.text_content()).strip().replace('%',''))
+            except: pass
+        tp_el = await page.query_selector('.v2-sb-stat__pill--top')
+        if tp_el:
+            import re
+            m = re.search(r'#([\d,]+)', await tp_el.text_content())
+            if m: rankPcPos = int(m.group(1).replace(',',''))
+        return {"kills": kills, "level": level, "prestige": prestige, "rankPos": rankPos, "rankTopPct": rankTopPct, "rankPcPos": rankPcPos}
 
     async with run_with_page() as page:
         await _block_noise(page)

@@ -393,12 +393,12 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
-        global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
-
         # ── 构建渲染数据 ──
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
         _lv = badges.get("level") or stats.level
         _pr = badges.get("prestige") or stats.prestige
+        global_pct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        rank_ladder_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
@@ -415,7 +415,7 @@ class XiaoChiyu(Star):
             "rank_img": stats.rank_img,
             "rank_top_pct": stats.rank_top_pct,
             "rank_top_pct_global": global_pct,
-            "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            "rank_ladder_pos": rank_ladder_pos,
             "rp_delta": rp_delta,
             "kills": badges.get("kills", 0) or stats.kills,
             "damage": stats.damage,
@@ -520,16 +520,17 @@ class XiaoChiyu(Star):
         bind_user = await self.db.get_user(u["qq_id"])
         als_lookup = bind_user["uid"] if bind_user else u["uid"]
         badges = await fetch_lfg_stats(als_lookup, u["platform"])
-        gpct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        gpct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
         lvl_raw = badges.get("level") or stats.level
         pr_raw = badges.get("prestige") or stats.prestige
         total_lvl = pr_raw * 500 + lvl_raw if pr_raw else lvl_raw
+        rp_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
         await self.db.upsert_lfg_user(
             u["qq_id"], group_id, u["uid"], stats.name, u["platform"], u["mode"],
             qq_name=qq_name or "",
             kills=badges.get("kills", 0) or stats.kills,
             level=lvl_raw, prestige=pr_raw,
-            rank_pos=badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            rank_pos=rp_pos,
             rank_name=stats.rank_name, rank_score=stats.rank_score,
             rank_img=stats.rank_img, state=stats.state,
         )
@@ -541,7 +542,7 @@ class XiaoChiyu(Star):
             "rank_name": stats.rank_name, "rank_score": stats.rank_score,
             "rank_img": stats.rank_img,
             "rank_top_pct_global": gpct,
-            "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            "rank_ladder_pos": rp_pos,
             "level": total_lvl, "kills": badges.get("kills", 0) or stats.kills,
             "state": stats.state,
         }
@@ -996,11 +997,11 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
-        global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
-
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
         _lv2 = badges.get("level") or stats.level
         _pr2 = badges.get("prestige") or stats.prestige
+        global_pct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        rank_ladder_pos = badges.get("rankPcPos") or badges.get("rankPos", 0) or stats.rank_ladder_pos
         profile_data = {
             "name": stats.name,
             "tag": stats.tag,
@@ -1017,7 +1018,7 @@ class XiaoChiyu(Star):
             "rank_img": stats.rank_img,
             "rank_top_pct": stats.rank_top_pct,
             "rank_top_pct_global": global_pct,
-            "rank_ladder_pos": badges.get("rankPos", 0) or stats.rank_ladder_pos,
+            "rank_ladder_pos": rank_ladder_pos,
             "rp_delta": rp_delta,
             "kills": badges.get("kills", 0) or stats.kills,
             "damage": stats.damage,
