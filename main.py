@@ -119,6 +119,46 @@ class XiaoChiyu(Star):
         above += tier_count * (3 - div) / 4
         return round(above / total * 100, 2)
 
+    def _extract_at_target(self, args: str) -> tuple[str | None, str]:
+        """从参数字符串中提取 @QQ，返回 (target_qq, cleaned_args)。"""
+        m = re.search(r'\[CQ:at,qq=(\d+)\]', args)
+        if m:
+            target = m.group(1)
+            cleaned = args.replace(m.group(0), "").strip()
+            return target, cleaned
+        m = re.search(r'@(\d+)', args)
+        if m:
+            target = m.group(1)
+            cleaned = args.replace(m.group(0), "").strip()
+            return target, cleaned
+        return None, args
+
+    async def _resolve_admin_target(
+        self, event: AstrMessageEvent, args: str
+    ) -> tuple[str | None, str, str | None]:
+        """解析命令中的 @目标。管理员可为他人操作。
+        Returns (target_qq, cleaned_args, error_msg).
+        若 non-admin 使用 @目标，返回 (None, cleaned_args, 错误消息)。
+        """
+        target_qq, cleaned = self._extract_at_target(args)
+        if target_qq and not event.is_admin():
+            return None, cleaned, "只有管理员才能为他人操作"
+        return target_qq or event.get_sender_id(), cleaned, None
+
+    async def _get_badges_cached(self, uid: str, platform: str) -> dict:
+        """获取战绩页数据。实时从 ALS 抓取排名/击杀数据；媒体资源（赛季/特殊徽章）
+        首次成功后永久存 DB，不再重爬。爬虫失败时用 DB 媒体兜底。"""
+        cached = await self.db.get_badge_cache(uid, platform)
+        media = cached["data"] if cached else {}
+        # 实时抓取（force=True 跳过内存缓存）
+        badges = await fetch_badges(uid, platform, force=True)
+        if badges.get("seasons") or badges.get("special"):
+            await self.db.set_badge_cache(uid, platform, badges)
+            return badges
+        # 爬虫失败：用 DB 媒体 + 尽力保留已有数据
+        if media:
+            badges.update(media)
+        return badges
     async def _send_card(
         self, event: AstrMessageEvent, img_bytes: bytes, suffix: str = ".png", **kwargs
     ):
