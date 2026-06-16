@@ -35,6 +35,12 @@
     <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" width="360" /></td>
     <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="360" /></td>
   </tr>
+  <tr>
+    <td align="center" colspan="2"><b>找队友 (LFG)</b></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/lfg.png" width="720" /></td>
+  </tr>
 </table>
 
 ---
