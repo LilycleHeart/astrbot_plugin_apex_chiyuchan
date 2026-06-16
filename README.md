@@ -1,7 +1,7 @@
 <h1 align="center">⚡ 小赤羽 / AstrBot Apex 数据查询插件</h1>
 
 <p align="center">
-  <b>一个专注于 Apex 英雄数据查询 · 组队 · 状态追踪 的 AstrBot 多功能插件</b>
+  <b>一个专注于 Apex 英雄数据查询 · 状态追踪 的 AstrBot 多功能插件</b>
 </p>
 
 <p align="center">
@@ -13,6 +13,29 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB" />
   <a href="https://github.com/LilycleHeart/astrbot_plugin_apex_chiyuchan"><img src="https://img.shields.io/github/license/LilycleHeart/astrbot_plugin_apex_chiyuchan" /></a>
 </p>
+
+---
+
+## 🖼️ 卡片预览
+
+<table align="center">
+  <tr>
+    <td align="center"><b>战绩查询</b></td>
+    <td align="center"><b>服务器状态</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/stats.png" width="360" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/server.png" width="360" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>地图轮换</b></td>
+    <td align="center"><b>猎杀 / 大师</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" width="360" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="360" /></td>
+  </tr>
+</table>
 
 ---
 
@@ -57,7 +80,7 @@
 
 ---
 
----
+
 
 ### 🤖 LLM 自然语言支持
 
@@ -84,19 +107,9 @@
 | `/unbind` | 解绑 |
 | `/map` | 地图轮换 |
 | `/server` | 服务器状态 |
+| `/master` | 猎杀 / 大师数据 |
 
 ---
-
-## 🖼️ 卡片预览
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/stats.png" width="45%" alt="战绩卡片" />
-  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" width="45%" alt="地图卡片" />
-</p>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="45%" alt="猎杀/大师数据" />
-  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/server.png" width="45%" alt="服务器状态" />
-</p>
 
 ---
 
