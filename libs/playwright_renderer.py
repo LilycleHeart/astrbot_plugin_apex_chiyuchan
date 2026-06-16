@@ -287,6 +287,8 @@ def _build_stats_html(**d) -> str:
     selected_legend = d.get("selected_legend")
     rank_dist_entries = d.get("rank_dist_entries", None)
 
+    top_pct_label = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
+
     display_name = f"{name} [{tag}]" if tag else name
     online_map = {"online": "在线", "offline": "离线", "in_game": "游戏中"}
     state_text = online_map.get(online, online)
@@ -492,7 +494,7 @@ body{{
     <div class="rank-rp">{rank_score:,} RP{rp_delta_html}</div>
   </div>
   <div class="rank-stats">
-    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top (全平台)</div></div>
+    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top ({top_pct_label})</div></div>
   </div>
 </div>
 
