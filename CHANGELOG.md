@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.2.0 (2026-06-16)
+
+### ✨ 新功能
+- **ALS 实时爬取**: 排名/击杀/等级数据每次实时从 ALS 抓取（`force=True`）
+- **DB 媒体缓存**: 赛季/特殊徽章永久存 `badge_cache` 表，仅首次爬取
+- **rankTopPct/rankPcPos DOM 提取**: 从 `.v2-sb-stat__pill--rank/top` 直接提取
+- **段位分布参考**: 卡片底部展示各段位人数分布（全平台）
+- **LVL 计算**: `P3 100` 合并显示为 `1600`（prestige × 500 + level）
+- **管理员代操作**: 命令加 `@目标` 可为他人 bind/unbind
+- **`/stats @某人`**: 解析 CQ 码查对方绑定账号战绩
+
+### 🔧 优化
+- **排名编号优先级**: `rankPcPos`(ALS DOM) > `rankPos`(ALS text) > `rank_ladder_pos`(API)
+- **Top% 标签按平台**: 非大师/猎杀显示 `Top (PC/PS/Xbox)`，大师/猎杀显示 `Top (全平台)`
+- **SLOW 不再推送**: 服务器监控仅对 DOWN/UNSTABLE 推送
+- **段位分布标签加 `(全平台)`** 注释
+- **`use_local_fonts` 配置**: 开启时跳过 CDN 字体
+- **水印居中**: `auth.赤羽真白 · Apex Chiyuchan` 始终在 footer 居中
+- **LLM 工具收紧**: `apex_stats` 描述防"介绍我/评价我"误触发
+
+### 🐛 修复
+- 修复大师/猎杀不显示 I-IV 分段号
+- 修复 `_calc_global_pct` 对 Predator/Master 返回空字符串
+- 修复排名卡片重复显示 Top% 的问题
+
+---
+
 ## v1.1.0 (2026-05-21)
 
 ### ✨ 新功能
