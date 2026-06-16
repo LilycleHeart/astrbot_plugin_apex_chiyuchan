@@ -215,7 +215,10 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
         if (brRank) rankPos = parseInt(brRank[1].replace(/,/g,''));
         const brScore = text.match(/BR Rank[\\s\\S]*?([\\d,]+)\\s*RP/);
         if (brScore) rankScore = parseInt(brScore[1].replace(/,/g,''));
-        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore};
+        let topPct = 0;
+        const tp = text.match(/Top\\s*([\\d.]+)%/);
+        if (tp) topPct = parseFloat(tp[1]);
+        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore, topPct};
     }""")
 
 
@@ -334,7 +337,7 @@ async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
         if not await page.query_selector(".player-name"):
             return {}
         text = await page.evaluate("document.body.innerText")
-        kills = 0; level = 0; prestige = 0; rankPos = 0
+        kills = 0; level = 0; prestige = 0; rankPos = 0; topPct = 0
         gIdx = text.find("\nGlobal\n")
         if gIdx >= 0:
             sec = text[gIdx:gIdx + 500]
@@ -345,7 +348,9 @@ async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
         if lv: level = int(lv.group(1)); prestige = int(lv.group(2))
         br = __import__("re").search(r"BR Rank[\s\S]*?#([\d,]{1,12})\b", text)
         if br: rankPos = int(br.group(1).replace(",", ""))
-        return {"kills": kills, "level": level, "prestige": prestige, "rankPos": rankPos}
+        tp = __import__("re").search(r"Top\s*([\d.]+)%", text)
+        if tp: topPct = float(tp.group(1))
+        return {"kills": kills, "level": level, "prestige": prestige, "rankPos": rankPos, "topPct": topPct}
 
     async with run_with_page() as page:
         await _block_noise(page)

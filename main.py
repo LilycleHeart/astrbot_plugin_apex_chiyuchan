@@ -116,6 +116,12 @@ class XiaoChiyu(Star):
         if total == 0:
             return None
         major = rank_name.split(" ")[0] if rank_name else ""
+        # "Apex Predator" → "Predator"
+        if major == "Apex" and "Predator" in rank_name:
+            major = "Predator"
+        # 段位不存在于分布数据中（如 Predator），无法计算
+        if not any(e.name == major for e in rank_dist.entries):
+            return None
         above = 0
         found = False
         for e in rank_dist.entries:
@@ -125,8 +131,11 @@ class XiaoChiyu(Star):
             if found:
                 above += e.count
         tier_count = next((e.count for e in rank_dist.entries if e.name == major), 0)
-        div = min(rank_div, 3)
-        above += tier_count * (3 - div) / 4
+        # Master / Predator 无 I-IV 分段，段内排名为 0
+        if major in ("Master", "Predator"):
+            above += 0
+        else:
+            above += tier_count * (3 - min(rank_div, 3)) / 4
         return round(above / total * 100, 2)
 
     def _extract_at_target(self, args: str) -> tuple[str | None, str]:
@@ -156,13 +165,17 @@ class XiaoChiyu(Star):
         return target_qq or event.get_sender_id(), cleaned, None
 
     async def _get_badges_cached(self, uid: str, platform: str) -> dict:
-        """从 DB 获取徽章数据（永久缓存），不存在时爬 ALS 并存入。空结果不缓存，下次重试。"""
+        """从 DB 获取徽章数据（永久缓存），不存在时爬 ALS 并存入。空结果不缓存，下次重试。
+        rankPos 是动态数据，不缓存，始终从 API 获取。"""
         cached = await self.db.get_badge_cache(uid, platform)
         if cached:
-            return cached["data"]
+            data = dict(cached["data"])
+            data.pop("rankPos", None)
+            return data
         badges = await fetch_badges(uid, platform)
         if badges.get("seasons") or badges.get("special"):
-            await self.db.set_badge_cache(uid, platform, badges)
+            store = {k: v for k, v in badges.items() if k != "rankPos"}
+            await self.db.set_badge_cache(uid, platform, store)
         return badges
 
     async def _send_card(
@@ -393,7 +406,7 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
-        global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        global_pct = badges.get("topPct", 0) or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
 
         # ── 构建渲染数据 ──
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
@@ -520,7 +533,7 @@ class XiaoChiyu(Star):
         bind_user = await self.db.get_user(u["qq_id"])
         als_lookup = bind_user["uid"] if bind_user else u["uid"]
         badges = await fetch_lfg_stats(als_lookup, u["platform"])
-        gpct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        gpct = badges.get("topPct", 0) or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
         lvl_raw = badges.get("level") or stats.level
         pr_raw = badges.get("prestige") or stats.prestige
         total_lvl = pr_raw * 500 + lvl_raw if pr_raw else lvl_raw
@@ -996,7 +1009,7 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
-        global_pct = self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
+        global_pct = badges.get("topPct", 0) or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
 
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
         _lv2 = badges.get("level") or stats.level
