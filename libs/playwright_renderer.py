@@ -287,7 +287,8 @@ def _build_stats_html(**d) -> str:
     selected_legend = d.get("selected_legend")
     rank_dist_entries = d.get("rank_dist_entries", None)
 
-    top_pct_label = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
+    _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
+    top_pct_label = "全平台" if rank_name.startswith(("Predator", "Master")) else _p
 
     display_name = f"{name} [{tag}]" if tag else name
     online_map = {"online": "在线", "offline": "离线", "in_game": "游戏中"}

@@ -1268,7 +1268,8 @@ def _draw_profile_sync(
         fill=ON_SURFACE,
     )
 
-        _top_pct_label = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(data.get("platform", "PC").upper(), "PC")
+        _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(data.get("platform", "PC").upper(), "PC")
+        _top_pct_label = "全平台" if data.get("rank_name", "").startswith(("Predator", "Master")) else _p
         draw.text(
             (rank_text_x, cy + FONT_SIZES["title"] + FONT_SIZES["subtitle"] + 8),
             f"{_top_pct_label} Top {data.get('rank_top_pct_global', '--')}%",
