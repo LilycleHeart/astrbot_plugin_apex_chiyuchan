@@ -413,7 +413,7 @@ def _build_stats_html(**d) -> str:
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{
   font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;
-  background:{_C_SURFACE};color:{_C_TEXT};
+  background:transparent;color:{_C_TEXT};
   display:flex;justify-content:center;padding:24px
 }}
 .card{{
@@ -633,10 +633,9 @@ async def _render_card_sync(html: str, width: int) -> bytes:
             await page.wait_for_function("() => document.fonts.ready", timeout=8000)
         except Exception:
             pass
-        card_height = await page.evaluate(
-            "() => (document.querySelector('.card') || document.querySelector('.lfg-list'))?.offsetHeight || 600"
-        )
-        await page.set_viewport_size({"width": width, "height": card_height + 48})
+        card = await page.query_selector(".card, .lfg-list")
+        if card:
+            return await card.screenshot(type="png", omit_background=True)
         return await page.screenshot(full_page=False, type="png")
 
 
@@ -743,7 +742,7 @@ def _build_server_status_html(server_status) -> str:
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SURFACE};color:{_C_TEXT};display:flex;justify-content:center;padding:24px}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;color:{_C_TEXT};display:flex;justify-content:center;padding:24px}}
 .card{{width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;box-shadow:0 10px 20px rgba(0,0,0,.4)}}
 .header{{background:linear-gradient(135deg,{_C_CARD},{_C_CARD2});padding:20px 24px;border-bottom:1px solid {_C_OUTLINE}}}
 .header h2{{font-size:22px;font-weight:800}}
@@ -901,7 +900,7 @@ def _build_map_rotation_html(rotation) -> str:
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SURFACE};display:flex;justify-content:center;padding:24px}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
 .card{{width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.4)}}
 .title{{padding:18px 28px;font-size:20px;font-weight:800;color:{_C_TEXT};letter-spacing:0.5px;border-bottom:1px solid {_C_OUTLINE}}}
 
@@ -993,7 +992,7 @@ def _build_predator_html(predator) -> str:
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:{_C_SURFACE};color:{_C_TEXT};display:flex;justify-content:center;padding:24px}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;color:{_C_TEXT};display:flex;justify-content:center;padding:24px}}
 .card{{width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;box-shadow:0 10px 20px rgba(0,0,0,.4)}}
 .header{{background:linear-gradient(135deg,{_C_CARD},{_C_CARD2});padding:20px 24px;border-bottom:1px solid {_C_OUTLINE}}}
 .header h2{{font-size:22px;font-weight:800}}
@@ -1030,7 +1029,7 @@ def _build_lfg_mode_card() -> str:
 {ml}
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{background:#1c1b1f;color:#e6e1e5;font-family:{ff};display:flex;justify-content:center;padding:40px 20px}}
+body{{background:transparent;color:#e6e1e5;font-family:{ff};display:flex;justify-content:center;padding:40px 20px}}
 .card{{width:420px;background:#2b2930;border-radius:28px;padding:24px}}
 .title{{font-size:1.5rem;font-weight:700;margin-bottom:8px}}
 .subtitle{{font-size:0.85rem;color:#938f99;margin-bottom:24px}}
@@ -1136,7 +1135,7 @@ def _build_lfg_html(entries: list[dict]) -> str:
 {ms_link}
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{background:#1e1e2e;color:#e6e1e5;font-family:{font_family};display:flex;justify-content:center;padding:32px 24px}}
+body{{background:transparent;color:#e6e1e5;font-family:{font_family};display:flex;justify-content:center;padding:32px 24px}}
 .lfg-list{{width:100%;max-width:1280px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
 .list-header{{display:grid;grid-template-columns:1.5fr 1fr 0.8fr 0.5fr 0.5fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:16px}}
 .list-header>div{{text-align:center}}
