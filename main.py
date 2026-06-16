@@ -116,6 +116,9 @@ class XiaoChiyu(Star):
         if total == 0:
             return None
         major = rank_name.split(" ")[0] if rank_name else ""
+        # "Apex Predator" → "Predator"
+        if major == "Apex" and "Predator" in rank_name:
+            major = "Predator"
         above = 0
         found = False
         for e in rank_dist.entries:
@@ -125,8 +128,12 @@ class XiaoChiyu(Star):
             if found:
                 above += e.count
         tier_count = next((e.count for e in rank_dist.entries if e.name == major), 0)
-        div = min(rank_div, 3)
-        above += tier_count * (3 - div) / 4
+        # Master / Predator 无 I-IV 分段，段内排名为 0
+        if major in ("Master", "Predator"):
+            div_above = 0
+        else:
+            div_above = tier_count * (3 - min(rank_div, 3)) / 4
+        above += div_above
         return round(above / total * 100, 2)
 
     def _extract_at_target(self, args: str) -> tuple[str | None, str]:
