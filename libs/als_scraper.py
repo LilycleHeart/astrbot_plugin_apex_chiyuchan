@@ -230,16 +230,18 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
     }""")
 
 
-async def fetch_badges(name_or_uid: str, platform: str = "PC") -> dict:
-    """从 ALS 个人页面抓取赛季徽章和特殊徽章（仅网络超时重试，空数据不重试，TTL 缓存1h）"""
+async def fetch_badges(name_or_uid: str, platform: str = "PC", force: bool = False) -> dict:
+    """从 ALS 个人页面抓取赛季徽章和特殊徽章（仅网络超时重试，空数据不重试，TTL 缓存1h）
+    force=True 时跳过内存缓存，强制重新抓取。"""
     import time
     from astrbot.api import logger
 
     cache_key = f"badges:{platform}:{name_or_uid}"
-    cached = await cache_get(cache_key)
-    if cached is not None:
-        logger.info(f"[BadgeFetcher] 缓存命中 {cache_key}")
-        return cached
+    if not force:
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            logger.info(f"[BadgeFetcher] 缓存命中 {cache_key}")
+            return cached
 
     t0 = time.time()
 
