@@ -282,6 +282,8 @@ def _build_stats_html(**d) -> str:
     rank_dist_entries = d.get("rank_dist_entries", None)
 
     display_name = f"{name} [{tag}]" if tag else name
+    _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
+    top_pct_label = "全平台" if rank_name.startswith(("Predator", "Master")) else _p
     online_map = {"online": "在线", "offline": "离线", "in_game": "游戏中"}
     state_text = online_map.get(online, online)
     state_dot = "#4CE5B1" if online in ("online", "in_game") else "#555"
@@ -486,7 +488,7 @@ body{{
     <div class="rank-rp">{rank_score:,} RP{rp_delta_html}</div>
   </div>
   <div class="rank-stats">
-    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top (全平台)</div></div>
+    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top ({top_pct_label})</div></div>
   </div>
 </div>
 
