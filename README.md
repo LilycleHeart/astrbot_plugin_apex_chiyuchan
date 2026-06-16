@@ -16,6 +16,29 @@
 
 ---
 
+## 🖼️ 卡片预览
+
+<table align="center">
+  <tr>
+    <td align="center"><b>战绩查询</b></td>
+    <td align="center"><b>服务器状态</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/stats.png" width="360" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/server.png" width="360" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>地图轮换</b></td>
+    <td align="center"><b>猎杀 / 大师</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" width="360" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="360" /></td>
+  </tr>
+</table>
+
+---
+
 ## ✨ 特性一览
 
 ### 📊 战绩查询
@@ -95,17 +118,6 @@
 | `/lfg <排位|娱乐|列表|退出>` | 找队友 |
 
 ---
-
-## 🖼️ 卡片预览
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/stats.png" width="45%" alt="战绩卡片" />
-  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" width="45%" alt="地图卡片" />
-</p>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="45%" alt="猎杀/大师数据" />
-  <img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/server.png" width="45%" alt="服务器状态" />
-</p>
 
 ---
 
