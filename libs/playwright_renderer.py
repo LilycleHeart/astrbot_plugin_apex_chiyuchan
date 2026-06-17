@@ -1181,6 +1181,31 @@ async def draw_lfg_card(entries: list[dict]) -> bytes:
     return await _render_card_sync(html, 1328)
 
 
-async def draw_lfg_mode_card() -> bytes:
-    html = _build_lfg_mode_card()
-    return await _render_card_sync(html, 420)
+async def draw_text_card_pw(title: str, message: str, is_error: bool = False) -> bytes:
+    color = "#DA292A" if is_error else "#4CE5B1"
+    msg_lines = "".join(f'<div class="msg-line">{html.escape(line)}</div>' for line in message.split("\n"))
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{
+  font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;
+  background:transparent;display:flex;justify-content:center;padding:24px
+}}
+.card{{
+  width:420px;background:#1A2635;border-radius:16px;overflow:hidden;
+  box-shadow:0 4px 24px rgba(0,0,0,.4)
+}}
+.header{{padding:24px 24px 0;font-size:20px;font-weight:800;color:{color}}}
+.body{{padding:16px 24px 24px;font-size:15px;color:#938f99;line-height:1.6}}
+.msg-line{{margin-top:4px}}
+.footer{{padding:0 24px 20px;font-size:12px;color:#49454f;text-align:center}}
+</style></head><body>
+<div class="card">
+  <div class="header">{html.escape(title)}</div>
+  <div class="body">{msg_lines}</div>
+  <div class="footer">auth.赤羽真白 &middot; Apex Chiyuchan</div>
+</div>
+</body></html>"""
+    import html as _html
+    return await _render_card_sync(html, 460)
+

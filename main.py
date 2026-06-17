@@ -230,11 +230,7 @@ class XiaoChiyu(Star):
         # ALS搜不到，回退API
         api_results = await self.apex.name_to_uid_all(name, platform)
         if not api_results:
-            img = await renderer.draw_text_card(
-                "绑定失败", f"找不到玩家 '{name}'", is_error=True
-            )
-            async for r in self._send_card(event, img):
-                yield r
+            yield event.plain_result(f"绑定失败，找不到玩家 '{name}'")
             return
         if len(api_results) > 1:
             lines = [f"找到 {len(api_results)} 个匹配玩家，请用 /bind_uid <UID> 绑定:"]
@@ -323,9 +319,7 @@ class XiaoChiyu(Star):
                 target_qq = at_match.group(1)
                 target_user = await self.db.get_user(target_qq)
                 if not target_user:
-                    img = await renderer.draw_text_card("查询失败", "对方未绑定 Apex 账号", is_error=True)
-                    async for r in self._send_card(event, img):
-                        yield r
+                    yield event.plain_result("对方未绑定 Apex 账号")
                     return
                 uid = target_user["uid"]
                 platform = target_user.get("platform", "PC")
@@ -357,11 +351,7 @@ class XiaoChiyu(Star):
                     # ALS搜不到，回退API
                     api_results = await self.apex.name_to_uid_all(name.strip())
                     if not api_results:
-                        img = await renderer.draw_text_card(
-                            "查询失败", f"找不到玩家 '{name}'", is_error=True
-                        )
-                        async for r in self._send_card(event, img):
-                            yield r
+                        yield event.plain_result(f"找不到玩家 '{name}'")
                         return
                     uid = api_results[0].uid
                     platform = "PC"
@@ -369,11 +359,7 @@ class XiaoChiyu(Star):
         else:
             user = await self.db.get_user(qq_id)
             if not user:
-                img = await renderer.draw_text_card(
-                    "未绑定", "请先使用 /bind <玩家名> 绑定账号", is_error=True
-                )
-                async for r in self._send_card(event, img):
-                    yield r
+                yield event.plain_result("请先使用 /bind <玩家名> 绑定账号")
                 return
             uid = user["uid"]
             platform = user["platform"]
@@ -387,11 +373,7 @@ class XiaoChiyu(Star):
         )
 
         if not stats:
-            img = await renderer.draw_text_card(
-                "查询失败", "无法获取战绩数据", is_error=True
-            )
-            async for r in self._send_card(event, img):
-                yield r
+            yield event.plain_result("无法获取战绩数据")
             return
 
         # ── RP 变化（距上次查询）──
@@ -573,9 +555,7 @@ class XiaoChiyu(Star):
         if arg in ("list", "列表"):
             lfg_users = await self.db.list_lfg_users(group_id)
             if not lfg_users:
-                img = await renderer.draw_text_card("LFG", "当前没有人在找队友", is_error=True)
-                async for r in self._send_card(event, img):
-                    yield r
+                yield event.plain_result("当前没有人在找队友")
                 return
 
             entries = []
@@ -586,9 +566,7 @@ class XiaoChiyu(Star):
                     entries.append(entry)
 
             if not entries:
-                img = await renderer.draw_text_card("LFG", "没有有效的战绩数据", is_error=True)
-                async for r in self._send_card(event, img):
-                    yield r
+                yield event.plain_result("没有有效的战绩数据")
                 return
 
             img = await renderer.draw_lfg_card(entries)
@@ -613,11 +591,7 @@ class XiaoChiyu(Star):
         elif arg in ("register", "注册", "登记"):
             mode = None
         elif arg and arg not in ("list", "列表", "leave", "退出", "取消"):
-            img = await renderer.draw_text_card(
-                "LFG", "用法: /lfg [排位|娱乐|列表|退出]", is_error=True
-            )
-            async for r in self._send_card(event, img):
-                yield r
+            yield event.plain_result("用法: /lfg [排位|娱乐|列表|退出]")
             return
 
         if not mode:
@@ -652,11 +626,7 @@ class XiaoChiyu(Star):
                     self._profile_cache[qq_id] = cached
 
         if not cached:
-            img = await renderer.draw_text_card(
-                "LFG", "请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友", is_error=True
-            )
-            async for r in self._send_card(event, img):
-                yield r
+            yield event.plain_result("请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友")
             return
 
         # 注册时一并爬取 ALS 数据存入 DB
@@ -700,11 +670,7 @@ class XiaoChiyu(Star):
         """查询当前 Apex 地图轮换"""
         rotation = await self.apex.get_map_rotation()
         if not rotation:
-            img = await renderer.draw_text_card(
-                "查询失败", "无法获取地图轮换数据", is_error=True
-            )
-            async for r in self._send_card(event, img):
-                yield r
+            yield event.plain_result("无法获取地图轮换数据")
             return
         img = await renderer.draw_map_card(rotation)
         async for r in self._send_card(event, img):
@@ -719,11 +685,7 @@ class XiaoChiyu(Star):
         """查询大师 / 猎杀数据"""
         predator = await self.apex.get_predator()
         if not predator:
-            img = await renderer.draw_text_card(
-                "查询失败", "无法获取大师 / 猎杀数据", is_error=True
-            )
-            async for r in self._send_card(event, img):
-                yield r
+            yield event.plain_result("无法获取大师 / 猎杀数据")
             return
         img = await renderer.draw_master_card(predator)
         async for r in self._send_card(event, img):
@@ -738,11 +700,7 @@ class XiaoChiyu(Star):
         """查询 Apex 服务器状态"""
         server_status = await self.apex.get_server_status()
         if not server_status or not getattr(server_status, "als", None):
-            img = await renderer.draw_text_card(
-                "查询失败", "无法获取服务器状态", is_error=True
-            )
-            async for r in self._send_card(event, img):
-                yield r
+            yield event.plain_result("无法获取服务器状态")
             return
         img = await renderer.draw_server_status_card(server_status)
         async for r in self._send_card(event, img):
