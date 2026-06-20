@@ -310,42 +310,33 @@ def _build_stats_html(**d) -> str:
     # ── 徽章 HTML ──
     badge_rows = ""
     if season_badges:
-        chips = []
+        items = []
         for b in season_badges:
             url = b.get("badge_url", "")
             s = b.get("season", "")
-            tier = b.get("tier", "")
-            color = b.get("color") or "#666"
-            fw = "font-weight:700;" if tier == "master" else ""
-            chips.append(
-                f'<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;'
-                f"border-radius:20px;font-size:12px;font-weight:600;{fw}"
-                f"background:rgba({_hex_to_rgba(color, 0.15)});color:{color};"
-                f'border:1px solid rgba({_hex_to_rgba(color, 0.3)});">'
-                f'<img src="{url}" style="width:36px;height:36px;vertical-align:middle;" onerror="this.remove()">{s}</span>'
+            items.append(
+                f'<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">'
+                f'<img src="{url}" style="width:48px;height:48px;" onerror="this.remove()">'
+                f'<span style="font-size:10px;color:{_C_MUTED};">{s}</span></div>'
             )
         badge_rows += (
-            f'<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 12px;'
-            f'justify-content:center;">{"".join(chips)}</div>'
+            f'<div style="display:flex;flex-wrap:wrap;gap:12px;padding:0 24px 16px;'
+            f'justify-content:center;">{"".join(items)}</div>'
         )
 
     spec_rows = ""
     if special_badges:
-        chips = []
+        items = []
         for b in special_badges:
             b_url = b.get("badge_url", "")
             if not b_url:
                 continue
-            chips.append(
-                f'<span style="display:inline-flex;align-items:center;justify-content:center;'
-                f'width:40px;height:40px;border-radius:50%;'
-                f'background:rgba(177,244,250,0.12);'
-                f'border:1px solid rgba(177,244,250,0.25);">'
-                f'<img src="{b_url}" style="width:28px;height:28px;display:block;" onerror="this.remove()"></span>'
+            items.append(
+                f'<img src="{b_url}" style="width:48px;height:48px;" onerror="this.remove()">'
             )
         spec_rows += (
-            f'<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 16px;'
-            f'justify-content:center;">{"".join(chips)}</div>'
+            f'<div style="display:flex;flex-wrap:wrap;gap:12px;padding:0 24px 16px;'
+            f'justify-content:center;">{"".join(items)}</div>'
         )
 
     # ── 英雄排行 ──
