@@ -865,17 +865,29 @@ class XiaoChiyu(Star):
     # ═══════════════════════════════════════════════
 
     @filter.llm_tool(name="apex_stats")
-    async def llm_stats(self, event: AstrMessageEvent, player_name: str = ""):
+    async def llm_stats(self, event: AstrMessageEvent, player_name: str = "", uid: str = ""):
         """获取 Apex Legends 游戏内战绩数据并生成卡片。仅当用户明确要求查询 Apex 段位、击杀、胜场、KD 等游戏数据时调用。不要因为用户说"介绍我"或"评价我"就触发。
+        ⚠️ 如果有 UID（从绑定记录或用户提到的数字），必须传 uid 参数，不要用 player_name 搜索（同名玩家会查错）。
 
         Args:
-            player_name(string): 玩家名或UID，留空查绑定账号
+            player_name(string): 玩家名或数字序号（仅在无 uid 时使用）
+            uid(string): Apex 数字 UID，有 UID 时优先使用
         """
         import base64
         from mcp.types import CallToolResult, TextContent, ImageContent
 
         qq_id = event.get_sender_id()
-        if player_name:
+        # 优先 UID 直接查询，避免同名搜索错误
+        if uid.strip():
+            uid_val = uid.strip()
+            platform = "PC"
+            # 尝试从绑定记录取平台
+            for try_qq in (qq_id,):
+                u = await self.db.get_user(try_qq)
+                if u and u["uid"] == uid_val:
+                    platform = u.get("platform", "PC")
+                    break
+        elif player_name:
             # 处理 @提及：查对方绑定
             at_match = re.search(r'\[CQ:at,qq=(\d+)\]', player_name) or re.search(r'@(\d+)', player_name)
             if at_match:
@@ -1055,10 +1067,11 @@ class XiaoChiyu(Star):
         self, event: AstrMessageEvent, player_name: str = "", platform: str = "PC", target_qq: str = "", uid: str = ""
     ):
         """绑定 Apex 账号到当前 QQ（管理员可绑定到其他人的 QQ）。
-        优先使用 uid 直接绑定（避免同名搜索错误）；仅在用户提供玩家名时用 player_name 搜索。
+        ⚠️ 重要：如果用户提供了 UID 数字，必须用 uid 参数绑定，禁止用 player_name 搜索（同名玩家会导致绑错账号）。
+        只有用户只提供玩家名没提供 UID 时，才用 player_name 搜索。
         Args:
-            player_name(string): 要绑定的玩家名或数字序号（与 uid 二选一）
-            uid(string): Apex 数字 UID，有 UID 时优先使用，避免同名误绑
+            player_name(string): 玩家名或数字序号（仅在无 uid 时使用）
+            uid(string): Apex 数字 UID。用户提到 UID 时必须传此参数，不要转成 player_name
             platform(string): 平台，PC/PS4/X1，默认PC
             target_qq(string): 要绑定到的QQ号，不填则绑定给自己（仅管理员可用）
         """
