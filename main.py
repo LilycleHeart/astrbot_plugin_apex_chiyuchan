@@ -1052,11 +1052,13 @@ class XiaoChiyu(Star):
 
     @filter.llm_tool(name="apex_bind")
     async def llm_bind(
-        self, event: AstrMessageEvent, player_name: str, platform: str = "PC", target_qq: str = ""
+        self, event: AstrMessageEvent, player_name: str = "", platform: str = "PC", target_qq: str = "", uid: str = ""
     ):
         """绑定 Apex 账号到当前 QQ（管理员可绑定到其他人的 QQ）。
+        优先使用 uid 直接绑定（避免同名搜索错误）；仅在用户提供玩家名时用 player_name 搜索。
         Args:
-            player_name(string): 要绑定的玩家名或数字序号
+            player_name(string): 要绑定的玩家名或数字序号（与 uid 二选一）
+            uid(string): Apex 数字 UID，有 UID 时优先使用，避免同名误绑
             platform(string): 平台，PC/PS4/X1，默认PC
             target_qq(string): 要绑定到的QQ号，不填则绑定给自己（仅管理员可用）
         """
@@ -1081,6 +1083,36 @@ class XiaoChiyu(Star):
                     content=[TextContent(type="text", text="只有管理员才能为他人绑定账号")]
                 )
             qq_id = target_qq
+
+        # 优先 UID 直接绑定，避免同名搜索错误
+        if uid.strip():
+            stats = await self.apex.get_stats(uid.strip(), platform)
+            if not stats:
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text", text=f"找不到 UID '{uid}'，请提示用户检查 UID"
+                        )
+                    ]
+                )
+            await self.db.upsert_user(qq_id, uid.strip(), stats.name, platform)
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=f"已成功绑定 {stats.name} (UID {uid.strip()}, {platform})。请告知用户绑定成功。",
+                    )
+                ]
+            )
+
+        if not player_name.strip():
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text", text="请提供玩家名或 UID 来绑定账号"
+                    )
+                ]
+            )
 
         if player_name.strip().isdigit():
             idx = int(player_name.strip())
