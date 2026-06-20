@@ -125,8 +125,10 @@ class XiaoChiyu(Star):
             if found:
                 above += e.count
         tier_count = next((e.count for e in rank_dist.entries if e.name == major), 0)
-        div = min(rank_div, 3)
-        above += tier_count * (3 - div) / 4
+        # div=1 是段位最高小段（如 Diamond I），同段位内没人比自己高
+        # div=4 是最低小段，同段位内 75% 比自己高
+        div = max(1, min(rank_div, 4))
+        above += tier_count * (div - 1) / 4
         return round(above / total * 100, 2)
 
     def _extract_at_target(self, args: str) -> tuple[str | None, str]:
