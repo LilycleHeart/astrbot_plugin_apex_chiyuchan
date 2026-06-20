@@ -159,7 +159,7 @@ class XiaoChiyu(Star):
 
     async def _get_badges_cached(self, uid: str, platform: str) -> dict:
         """获取战绩页数据。实时从 ALS 抓取排名/击杀数据；媒体资源（赛季/特殊徽章）
-        首次成功后永久存 DB，不再重爬。爬虫失败时用 DB 媒体兜底。"""
+        首次成功后永久存 DB，不再重爬。爬虫失败时用 DB 媒体兜底，但保留实时数据。"""
         cached = await self.db.get_badge_cache(uid, platform)
         media = cached["data"] if cached else {}
         # 实时抓取（force=True 跳过内存缓存）
@@ -167,9 +167,12 @@ class XiaoChiyu(Star):
         if badges.get("seasons") or badges.get("special"):
             await self.db.set_badge_cache(uid, platform, badges)
             return badges
-        # 爬虫失败：用 DB 媒体 + 尽力保留已有数据
+        # 爬虫失败：用 DB 媒体兜底，保留实时数据（level_icon/kills/level/prestige/rank等）
         if media:
-            badges.update(media)
+            for k in ("level_icon", "kills", "level", "prestige", "rankPos", "rankScore", "rankTopPct", "rankPcPos"):
+                if badges.get(k):
+                    media[k] = badges[k]
+            badges = media
         return badges
 
     async def _send_card(

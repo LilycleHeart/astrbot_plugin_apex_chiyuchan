@@ -169,6 +169,11 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
         await page.wait_for_selector(".v2-sb-stat__pill--rank", timeout=8000)
     except Exception:
         pass
+    # 等级图标也等 DOM 渲染
+    try:
+        await page.wait_for_selector(".v2-sb-stat--level img, img[alt='level']", timeout=5000)
+    except Exception:
+        pass
     return await page.evaluate("""() => {
         const colors = {
             bronze:'#cd7f32',silver:'#c0c0c0',gold:'#ffd700',
@@ -203,8 +208,8 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
             }
         });
         let level_icon = '';
-        const li = document.querySelector('.v2-sb-stat--level img');
-        if (li) level_icon = li.src;
+        const li = document.querySelector('.v2-sb-stat--level img') || document.querySelector('img[alt="level"]');
+        if (li && li.src) level_icon = li.src;
         const text = document.body.innerText;
         const gIdx = text.indexOf('\\nGlobal\\n');
         let kills = 0, wins = 0, rankScore = 0;
