@@ -579,21 +579,37 @@ def _render_moe_number_base64(number: int) -> str:
 
 import asyncio
 import re
-from functools import lru_cache
+from functools import lru_cache as _unused_lru_cache  # kept for reference only
 
 _image_cache: dict[str, str] = {}
 
 
-@lru_cache(maxsize=128)
+_MIME_MAP = {
+    b'\x89PNG': 'image/png',
+    b'\xff\xd8\xff': 'image/jpeg',
+    b'GIF8': 'image/gif',
+    b'RIFF': 'image/webp',
+    b'<svg': 'image/svg+xml',
+    b'<?xml': 'image/svg+xml',
+}
+
 def _download_sync(url: str) -> str | None:
-    """同步下载图片转base64 (lru_cache保证线程安全)"""
+    """同步下载图片转base64 (无lru_cache，避免永久缓存失败值)"""
     import httpx
     try:
         with httpx.Client(timeout=8.0, follow_redirects=True) as c:
             r = c.get(url)
             r.raise_for_status()
-            b64 = base64.b64encode(r.content).decode()
-            return f"data:image/png;base64,{b64}"
+            raw = r.content
+            if not raw:
+                return None
+            mime = 'image/png'
+            for prefix, m in _MIME_MAP.items():
+                if raw[:4].startswith(prefix) or raw[:5].startswith(prefix):
+                    mime = m
+                    break
+            b64 = base64.b64encode(raw).decode()
+            return f"data:{mime};base64,{b64}"
     except Exception:
         return None
 
