@@ -597,21 +597,28 @@ def _download_sync(url: str) -> str | None:
     """同步下载图片转base64 (无lru_cache，避免永久缓存失败值)"""
     import httpx
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
-        with httpx.Client(timeout=8.0, follow_redirects=True, headers=headers) as c:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Referer": "https://apexlegendsstatus.com/",
+            "Accept": "image/svg+xml,image/png,image/*,*/*;q=0.8",
+        }
+        with httpx.Client(timeout=10.0, follow_redirects=True, headers=headers) as c:
             r = c.get(url)
             r.raise_for_status()
             raw = r.content
             if not raw:
                 return None
+            stripped = raw.lstrip()
             mime = 'image/png'
             for prefix, m in _MIME_MAP.items():
-                if raw[:4].startswith(prefix) or raw[:5].startswith(prefix):
+                if stripped[:4].startswith(prefix) or stripped[:5].startswith(prefix):
                     mime = m
                     break
             b64 = base64.b64encode(raw).decode()
             return f"data:{mime};base64,{b64}"
-    except Exception:
+    except Exception as e:
+        from astrbot.api import logger
+        logger.warning(f"[Renderer] 下载失败 {url[:80]}: {e}")
         return None
 
 
