@@ -461,7 +461,10 @@ body{{
   filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))
 }}
 .level-text{{
-  font-size:20px;font-weight:700;color:#DA292A;white-space:nowrap
+  font-size:20px;font-weight:700;
+  background:linear-gradient(135deg,{_C_PRED},#ff6b6b);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  white-space:nowrap
 }}
 .level-sub{{font-size:12px;color:{_C_MUTED};font-weight:400}}
 .level-bar{{flex:1;height:6px;background:{_C_CARD3};border-radius:3px;overflow:hidden}}
