@@ -865,20 +865,30 @@ class XiaoChiyu(Star):
     # ═══════════════════════════════════════════════
 
     @filter.llm_tool(name="apex_stats")
-    async def llm_stats(self, event: AstrMessageEvent, player_name: str = "", uid: str = ""):
+    async def llm_stats(self, event: AstrMessageEvent, player_name: str = "", uid: str = "", target_qq: str = ""):
         """获取 Apex Legends 游戏内战绩数据并生成卡片。仅当用户明确要求查询 Apex 段位、击杀、胜场、KD 等游戏数据时调用。不要因为用户说"介绍我"或"评价我"就触发。
-        ⚠️ 如果有 UID（从绑定记录或用户提到的数字），必须传 uid 参数，不要用 player_name 搜索（同名玩家会查错）。
+        ⚠️ 查别人战绩（@某人）时，必须传 target_qq 参数（从 @提及 解析出的 QQ 号），不要用 player_name 搜索（同名玩家会查错）。
+        ⚠️ 如果有 UID（从绑定记录或用户提到的数字），必须传 uid 参数。
 
         Args:
-            player_name(string): 玩家名或数字序号（仅在无 uid 时使用）
+            player_name(string): 玩家名或数字序号（仅在无 uid 且无 target_qq 时使用）
             uid(string): Apex 数字 UID，有 UID 时优先使用
+            target_qq(string): 要查询的 QQ 号（@某人查战绩时使用，从绑定记录取 UID，避免同名搜索错误）
         """
         import base64
         from mcp.types import CallToolResult, TextContent, ImageContent
 
         qq_id = event.get_sender_id()
-        # 优先 UID 直接查询，避免同名搜索错误
-        if uid.strip():
+        # 优先 target_qq：从绑定记录取 UID，避免同名搜索错误
+        if target_qq.strip():
+            target_user = await self.db.get_user(target_qq.strip())
+            if not target_user:
+                return CallToolResult(
+                    content=[TextContent(type="text", text=f"对方 (QQ {target_qq}) 未绑定 Apex 账号")]
+                )
+            uid = target_user["uid"]
+            platform = target_user.get("platform", "PC")
+        elif uid.strip():
             uid_val = uid.strip()
             platform = "PC"
             # 尝试从绑定记录取平台
