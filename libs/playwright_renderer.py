@@ -461,7 +461,7 @@ body{{
   filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))
 }}
 .level-text{{
-  font-size:20px;font-weight:700;color:{_C_TEXT};white-space:nowrap
+  font-size:20px;font-weight:700;color:#DA292A;white-space:nowrap
 }}
 .level-sub{{font-size:12px;color:{_C_MUTED};font-weight:400}}
 .level-bar{{flex:1;height:6px;background:{_C_CARD3};border-radius:3px;overflow:hidden}}
@@ -509,7 +509,7 @@ body{{
 <div class="level-row">
   <img class="level-icon" src="{level_icon}" onerror="this.style.display='none'">
   <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
-    <div class="level-text">Level {level}</div>
+    <div class="level-text">{level}</div>
     <div class="level-bar"><div class="level-fill"></div></div>
     <div class="level-sub">{level_pct}% to next level</div>
   </div>
