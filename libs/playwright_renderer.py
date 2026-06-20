@@ -597,7 +597,8 @@ def _download_sync(url: str) -> str | None:
     """同步下载图片转base64 (无lru_cache，避免永久缓存失败值)"""
     import httpx
     try:
-        with httpx.Client(timeout=8.0, follow_redirects=True) as c:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
+        with httpx.Client(timeout=8.0, follow_redirects=True, headers=headers) as c:
             r = c.get(url)
             r.raise_for_status()
             raw = r.content
