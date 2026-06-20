@@ -457,17 +457,9 @@ body{{
   border-bottom:1px solid {_C_OUTLINE}
 }}
 .level-icon{{
-  width:32px;height:32px;object-fit:contain;
-  filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))
+  width:48px;height:48px;object-fit:contain;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))
 }}
-.level-info{{
-  display:flex;flex-direction:column;gap:1px;min-width:0;
-}}
-.level-label{{
-  font-size:13px;font-weight:600;color:{_C_TEXT};
-  white-space:nowrap;
-}}
-.level-pre{{font-size:11px;color:{_C_MUTED};}}
 .level-bar{{flex:1;height:6px;background:{_C_CARD3};border-radius:3px;overflow:hidden}}
 .level-fill{{height:100%;width:{level_pct}%;background:linear-gradient(90deg,{_C_PRED},#ff6b6b);border-radius:3px}}
 
@@ -512,10 +504,7 @@ body{{
 
 <div class="level-row">
   <img class="level-icon" src="{level_icon}" onerror="this.style.display='none'">
-  <div class="level-info">
-    <span class="level-label">Level {level_raw} · P{prestige}</span>
-    <span class="level-pre">{level_pct}% to next</span>
-  </div>
+  <div style="font-size:12px;color:{_C_MUTED};">{level_pct}% to next</div>
   <div class="level-bar"><div class="level-fill"></div></div>
 </div>
 
