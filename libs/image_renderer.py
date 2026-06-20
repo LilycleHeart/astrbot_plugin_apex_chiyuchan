@@ -1536,39 +1536,53 @@ async def draw_player_list_card(
         "Master": "#A855F7", "Predator": "#DA292A",
     }
 
+    plat_icons = {
+        "PC": '<i class="fab fa-steam" style="color:#00adee;"></i>',
+        "PS4": '<i class="fab fa-playstation" style="color:#003791;"></i>',
+        "PS5": '<i class="fab fa-playstation" style="color:#003791;"></i>',
+        "X1": '<i class="fab fa-xbox" style="color:#107c10;"></i>',
+        "SWITCH": '<i class="fas fa-gamepad" style="color:#e60012;"></i>',
+    }
+
     cards_html = ""
     for i, r in enumerate(players):
         name = r.get("name", "?")
         uid = r.get("uid", "?")
         plat = r.get("platform", "PC").upper()
-        pc = plat_colors.get(plat, "#89A0B0")
-        css = plat.lower()
         level = str(r.get("level", ""))
-        prestige = str(r.get("prestige", ""))
+        prestige = str(r.get("prestige", "0"))
         rp_val = str(r.get("rp", ""))
         rank_img = r.get("rank_img", "")
         rank_name = _parse_rank_name(rank_img)
+        plat_icon = plat_icons.get(plat, plat_icons["PC"])
 
-        lvl_str = f"Lv.{level}" if level else ""
-        lvl_html = f'<span class="level">{lvl_str}</span>' if lvl_str else ""
+        lvl_str = f"{level}" if level else "?"
+        if prestige and prestige != "0":
+            lvl_str += f" (Prestige {prestige})"
 
-        rank_html = ""
+        rank_img_html = f'<img src="{rank_img}" style="width:32px;height:32px;vertical-align:middle;">' if rank_img else ""
+        rp_html = ""
+        if rp_val and rp_val.isdigit():
+            rp_html = f'<span style="color:white;font-weight:700;">{int(rp_val):,} RP</span>'
+        elif rp_val:
+            rp_html = f'<span style="color:white;font-weight:700;">{rp_val}</span>'
+
+        rank_name_html = ""
         if rank_name:
             rc = rank_colors.get(rank_name.split()[0] if rank_name else "", "#89A0B0")
-            rank_html += f'<span class="rank-badge" style="color:{rc}">\u2666 {rank_name}</span>'
-        if rp_val:
-            rp_fmt = f"{int(rp_val):,} RP" if rp_val.isdigit() else rp_val
-            sep = " \u00b7 " if rank_html else ""
-            rank_html += f'<span class="rp">{sep}{rp_fmt}</span>'
+            rank_name_html = f'<div style="font-size:11px;color:{rc};font-weight:600;">{rank_name}</div>'
 
         cards_html += f"""<div class="player-card">
-            <div class="badge">{i+1}</div>
-            <div class="info">
-                <div class="name">{name}{lvl_html}</div>
-                {'<div class="rank">' + rank_html + '</div>' if rank_html else ''}
-                <div class="uid">UID: {uid}</div>
+            <div class="num">{i+1}</div>
+            <div class="name-row">
+                <span class="name">{name}</span>
+                <span class="plat">{plat_icon}</span>
             </div>
-            <div class="platform {css}">{plat}</div>
+            <hr>
+            <div class="lvl">Lv. <b>{lvl_str}</b></div>
+            {rank_name_html}
+            <div class="rp-row">{rank_img_html} {rp_html}</div>
+            <div class="uid">UID: {uid}</div>
         </div>"""
 
     n = len(players)
@@ -1579,62 +1593,63 @@ async def draw_player_list_card(
 * {{ margin:0; padding:0; box-sizing:border-box; }}
 body {{
     background: transparent; font-family: "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-    display: flex; justify-content: center; padding: 16px 8px; -webkit-font-smoothing: antialiased;
+    display: flex; justify-content: center; padding: 16px; -webkit-font-smoothing: antialiased;
 }}
 .card-container {{
-    width: 500px; background: #1A2635; border-radius: 16px;
-    padding: 24px; box-shadow: 3px 5px 20px #060D14;
+    width: 720px; background: #1A2635; border-radius: 16px;
+    padding: 24px; box-shadow: 3px 5px 20px rgba(0,0,0,0.4);
 }}
 .title {{
     text-align: center; font-size: 22px; font-weight: 700;
     color: #4CE5B1; margin-bottom: 20px;
 }}
+.grid {{
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}}
 .player-card {{
-    display: flex; align-items: center;
-    background: #1D2E3F; border-radius: 10px;
-    padding: 13px 16px; margin-bottom: 10px; min-height: 80px;
+    text-align: center; background: #1f212b; border-radius: 10px;
+    padding: 14px 10px; box-shadow: 2px 2px rgba(43,45,58,0.3);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
 }}
-.badge {{
-    width: 36px; height: 36px; border-radius: 50%;
-    background: #4CE5B1; color: #0F1923;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px; font-weight: 700; flex-shrink: 0; margin-right: 14px;
+.num {{
+    position: absolute; top: 8px; left: 10px;
+    font-size: 12px; font-weight: 700; color: #4CE5B1;
 }}
-.info {{
-    flex: 1; min-width: 0;
-    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+.player-card {{ position: relative; }}
+.name-row {{
+    display: flex; align-items: center; gap: 6px; justify-content: center;
 }}
 .name {{
-    font-size: 15px; font-weight: 600; color: #FFFFFF;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 15px; font-weight: 700; color: #FFFFFF;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;
 }}
-.level {{ color: #7A8FA0; font-size: 12px; font-weight: 400; margin-left: 8px; }}
-.rank {{ font-size: 12px; }}
-.rank-badge {{ font-weight: 600; }}
-.rp {{ color: #C4D0DB; }}
-.uid {{ font-size: 11px; color: #89A0B0; }}
-.platform {{
-    font-size: 12px; font-weight: 600;
-    padding: 4px 12px; border-radius: 6px;
-    flex-shrink: 0; margin-left: 14px;
+.plat {{ font-size: 14px; }}
+.player-card hr {{
+    width: 100%; border: none; border-top: 1px solid #2A3A4A; margin: 6px 0;
 }}
-.platform.pc  {{ color:#4DABF7; background:#4DABF740; }}
-.platform.x1  {{ color:#4CE5B1; background:#4CE5B140; }}
-.platform.ps4 {{ color:#4ECDC4; background:#4ECDC440; }}
+.lvl {{ font-size: 12px; color: #89A0B0; }}
+.lvl b {{ color: #FFFFFF; }}
+.rp-row {{
+    display: flex; align-items: center; gap: 6px; justify-content: center;
+    font-size: 13px; margin-top: 2px;
+}}
+.uid {{ font-size: 10px; color: #6A7A8A; margin-top: 2px; }}
 .hint {{
     text-align: center; font-size: 12px; color: #89A0B0;
     margin-top: 18px; padding-top: 14px; border-top: 1px solid #2A3A4A;
 }}
-.watermark {{ text-align: center; font-size: 11px; color: #89A0B0; margin-top: 12px; }}
-</style></head><body><div class="card-container">
+.watermark {{ text-align: center; font-size: 11px; color: #6A7A8A; margin-top: 12px; }}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head><body><div class="card-container">
     <div class="title">{title}</div>
-    {cards_html}
+    <div class="grid">{cards_html}</div>
     {hint_html}
     <div class="watermark">auth.赤羽真白 · Apex Chiyuchan</div>
 </div></body></html>"""
 
     try:
-        async with run_with_page(viewport={"width": 560, "height": 800}, device_scale_factor=1.5) as page:
+        async with run_with_page(viewport={"width": 780, "height": 800}, device_scale_factor=1.5) as page:
             await page.set_content(html, wait_until="domcontentloaded")
             card = await page.query_selector(".card-container")
             if card:
