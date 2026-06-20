@@ -988,8 +988,9 @@ async def draw_profile_card(data: dict) -> bytes:
     if _draw_profile_card_pw is not None:
         try:
             return await _draw_profile_card_pw(data)
-        except Exception:
-            pass  # playwright 失败则回退
+        except Exception as e:
+            from astrbot.api import logger
+            logger.warning(f"[ProfileCard] Playwright 渲染失败，回退 Pillow: {type(e).__name__}: {e}")
     return await draw_player_profile_card(data)
 
 
@@ -998,8 +999,9 @@ async def draw_map_card(rotation) -> bytes:
     if _draw_map_rotation_card_pw is not None:
         try:
             return await _draw_map_rotation_card_pw(rotation)
-        except Exception:
-            pass
+        except Exception as e:
+            from astrbot.api import logger
+            logger.warning(f"[MapCard] Playwright 渲染失败，回退 Pillow: {type(e).__name__}: {e}")
     return await _draw_map_card_pillow(rotation)
 
 
@@ -1008,8 +1010,9 @@ async def draw_server_status_card(server_status) -> bytes:
     if _draw_server_status_card_pw is not None:
         try:
             return await _draw_server_status_card_pw(server_status)
-        except Exception:
-            pass
+        except Exception as e:
+            from astrbot.api import logger
+            logger.warning(f"[ServerCard] Playwright 渲染失败，回退 Pillow: {type(e).__name__}: {e}")
     return await _draw_server_status_card_pillow(server_status)
 
 
@@ -1018,8 +1021,9 @@ async def draw_master_card(predator) -> bytes:
     if _draw_predator_card_pw is not None:
         try:
             return await _draw_predator_card_pw(predator)
-        except Exception:
-            pass
+        except Exception as e:
+            from astrbot.api import logger
+            logger.warning(f"[MasterCard] Playwright 渲染失败，回退 Pillow: {type(e).__name__}: {e}")
     return await _draw_master_card_pillow(predator)
 
 
@@ -1356,8 +1360,8 @@ def _draw_profile_sync(
         draw.text((sel_name_x, cy), sel_name, font=FONT_SUBTITLE, fill=ON_SURFACE)
 
         for i, st in enumerate(sel_stats):
-            sname = st.get("name", "")
-            sval = st.get("value", "")
+            sname = str(st.get("name", "") or "")
+            sval = str(st.get("value", "") or "")
             sx = sel_name_x + 160 + i * 200
             draw.text((sx, cy + 2), sname, font=FONT_CAPTION, fill=MUTED)
             draw.text(
@@ -1816,8 +1820,9 @@ async def draw_lfg_mode_card() -> bytes:
     if _draw_lfg_mode_card_pw is not None:
         try:
             return await _draw_lfg_mode_card_pw()
-        except Exception:
-            pass
+        except Exception as e:
+            from astrbot.api import logger
+            logger.warning(f"[LfgModeCard] Playwright 渲染失败，回退 Pillow: {type(e).__name__}: {e}")
     return await asyncio.get_event_loop().run_in_executor(
         None, _draw_lfg_mode_sync
     )
@@ -1855,8 +1860,9 @@ async def draw_lfg_card(entries: list[dict]) -> bytes:
     if _draw_lfg_card_pw is not None:
         try:
             return await _draw_lfg_card_pw(entries)
-        except Exception:
-            pass
+        except Exception as e:
+            from astrbot.api import logger
+            logger.warning(f"[LfgCard] Playwright 渲染失败，回退 Pillow: {type(e).__name__}: {e}")
     return await asyncio.get_event_loop().run_in_executor(
         None, _draw_lfg_sync, entries
     )
