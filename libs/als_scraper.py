@@ -164,6 +164,11 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
         await page.wait_for_selector(".player-name", timeout=5000)
     except Exception:
         pass
+    # 段位 pill 是 fetchApiData 异步加载后才插入 DOM 的，必须等它出现
+    try:
+        await page.wait_for_selector(".v2-sb-stat__pill--rank", timeout=8000)
+    except Exception:
+        pass
     return await page.evaluate("""() => {
         const colors = {
             bronze:'#cd7f32',silver:'#c0c0c0',gold:'#ffd700',
@@ -348,6 +353,11 @@ async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
             pass
         if not await page.query_selector(".player-name"):
             return {}
+        # 段位 pill 异步加载，等它出现
+        try:
+            await page.wait_for_selector(".v2-sb-stat__pill--rank", timeout=8000)
+        except Exception:
+            pass
         text = await page.evaluate("document.body.innerText")
         kills = 0; level = 0; prestige = 0; rankPos = 0; rankTopPct = 0; rankPcPos = 0
         gIdx = text.find("\nGlobal\n")
