@@ -1537,12 +1537,22 @@ async def draw_player_list_card(
     }
 
     plat_icons = {
-        "PC": '<i class="fab fa-steam" style="color:#00adee;"></i>',
-        "PS4": '<i class="fab fa-playstation" style="color:#003791;"></i>',
-        "PS5": '<i class="fab fa-playstation" style="color:#003791;"></i>',
-        "X1": '<i class="fab fa-xbox" style="color:#107c10;"></i>',
-        "SWITCH": '<i class="fas fa-gamepad" style="color:#e60012;"></i>',
+        "PC": '<i class="fab fa-steam" style="color:#6DA8FF;"></i>',
+        "PS4": '<i class="fab fa-playstation" style="color:#64C3D3;"></i>',
+        "PS5": '<i class="fab fa-playstation" style="color:#64C3D3;"></i>',
+        "X1": '<i class="fab fa-xbox" style="color:#4CE5B1;"></i>',
+        "SWITCH": '<i class="fas fa-gamepad" style="color:#FF6B6B;"></i>',
     }
+
+    # MD3 配色（Diamond 主题）
+    C_SURFACE = "#0F1218"
+    C_CARD = "#171A22"
+    C_CARD2 = "#1D222C"
+    C_CARD3 = "#272D39"
+    C_TEXT = "#DDE4F3"
+    C_MUTED = "#BFC7DA"
+    C_OUTLINE = "#444C5C"
+    C_PRIMARY = "#6DA8FF"
 
     cards_html = ""
     for i, r in enumerate(players):
@@ -1558,19 +1568,19 @@ async def draw_player_list_card(
 
         lvl_str = f"{level}" if level else "?"
         if prestige and prestige != "0":
-            lvl_str += f" (Prestige {prestige})"
+            lvl_str += f" (P{prestige})"
 
-        rank_img_html = f'<img src="{rank_img}" style="width:32px;height:32px;vertical-align:middle;">' if rank_img else ""
+        rank_img_html = f'<img src="{rank_img}" style="width:28px;height:28px;vertical-align:middle;">' if rank_img else ""
         rp_html = ""
         if rp_val and rp_val.isdigit():
-            rp_html = f'<span style="color:white;font-weight:700;">{int(rp_val):,} RP</span>'
+            rp_html = f'<span class="rp-val">{int(rp_val):,} RP</span>'
         elif rp_val:
-            rp_html = f'<span style="color:white;font-weight:700;">{rp_val}</span>'
+            rp_html = f'<span class="rp-val">{rp_val}</span>'
 
         rank_name_html = ""
         if rank_name:
-            rc = rank_colors.get(rank_name.split()[0] if rank_name else "", "#89A0B0")
-            rank_name_html = f'<div style="font-size:11px;color:{rc};font-weight:600;">{rank_name}</div>'
+            rc = rank_colors.get(rank_name.split()[0] if rank_name else "", C_MUTED)
+            rank_name_html = f'<div class="rank-name" style="color:{rc};">{rank_name}</div>'
 
         cards_html += f"""<div class="player-card">
             <div class="num">{i+1}</div>
@@ -1578,11 +1588,11 @@ async def draw_player_list_card(
                 <span class="name">{name}</span>
                 <span class="plat">{plat_icon}</span>
             </div>
-            <hr>
+            <div class="divider"></div>
             <div class="lvl">Lv. <b>{lvl_str}</b></div>
             {rank_name_html}
             <div class="rp-row">{rank_img_html} {rp_html}</div>
-            <div class="uid">UID: {uid}</div>
+            <div class="uid">{uid}</div>
         </div>"""
 
     n = len(players)
@@ -1596,49 +1606,51 @@ body {{
     display: flex; justify-content: center; padding: 16px; -webkit-font-smoothing: antialiased;
 }}
 .card-container {{
-    width: 720px; background: #1A2635; border-radius: 16px;
-    padding: 24px; box-shadow: 3px 5px 20px rgba(0,0,0,0.4);
+    width: 720px; background: {C_CARD}; border-radius: 24px;
+    padding: 24px; box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    border: 1px solid {C_OUTLINE};
 }}
 .title {{
-    text-align: center; font-size: 22px; font-weight: 700;
-    color: #4CE5B1; margin-bottom: 20px;
+    text-align: center; font-size: 20px; font-weight: 700;
+    color: {C_PRIMARY}; margin-bottom: 20px; letter-spacing: 0.5px;
 }}
 .grid {{
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
 }}
 .player-card {{
-    text-align: center; background: #1f212b; border-radius: 10px;
-    padding: 14px 10px; box-shadow: 2px 2px rgba(43,45,58,0.3);
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    position: relative; text-align: center; background: {C_CARD2}; border-radius: 16px;
+    padding: 16px 12px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    border: 1px solid {C_OUTLINE};
 }}
 .num {{
-    position: absolute; top: 8px; left: 10px;
-    font-size: 12px; font-weight: 700; color: #4CE5B1;
+    position: absolute; top: 8px; left: 12px;
+    font-size: 11px; font-weight: 700; color: {C_PRIMARY}; opacity: 0.7;
 }}
-.player-card {{ position: relative; }}
 .name-row {{
     display: flex; align-items: center; gap: 6px; justify-content: center;
 }}
 .name {{
-    font-size: 15px; font-weight: 700; color: #FFFFFF;
+    font-size: 14px; font-weight: 600; color: {C_TEXT};
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;
 }}
-.plat {{ font-size: 14px; }}
-.player-card hr {{
-    width: 100%; border: none; border-top: 1px solid #2A3A4A; margin: 6px 0;
+.plat {{ font-size: 13px; }}
+.divider {{
+    width: 80%; border-top: 1px solid {C_OUTLINE}; margin: 6px 0 4px;
 }}
-.lvl {{ font-size: 12px; color: #89A0B0; }}
-.lvl b {{ color: #FFFFFF; }}
+.lvl {{ font-size: 12px; color: {C_MUTED}; }}
+.lvl b {{ color: {C_TEXT}; font-weight: 600; }}
+.rank-name {{ font-size: 11px; font-weight: 600; }}
 .rp-row {{
     display: flex; align-items: center; gap: 6px; justify-content: center;
     font-size: 13px; margin-top: 2px;
 }}
-.uid {{ font-size: 10px; color: #6A7A8A; margin-top: 2px; }}
+.rp-val {{ color: {C_TEXT}; font-weight: 700; }}
+.uid {{ font-size: 10px; color: {C_MUTED}; opacity: 0.6; margin-top: 2px; }}
 .hint {{
-    text-align: center; font-size: 12px; color: #89A0B0;
-    margin-top: 18px; padding-top: 14px; border-top: 1px solid #2A3A4A;
+    text-align: center; font-size: 12px; color: {C_MUTED};
+    margin-top: 18px; padding-top: 14px; border-top: 1px solid {C_OUTLINE};
 }}
-.watermark {{ text-align: center; font-size: 11px; color: #6A7A8A; margin-top: 12px; }}
+.watermark {{ text-align: center; font-size: 11px; color: {C_MUTED}; opacity: 0.5; margin-top: 12px; }}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head><body><div class="card-container">
