@@ -321,7 +321,7 @@ def _build_stats_html(**d) -> str:
                 f"border-radius:20px;font-size:12px;font-weight:600;{fw}"
                 f"background:rgba({_hex_to_rgba(color, 0.15)});color:{color};"
                 f'border:1px solid rgba({_hex_to_rgba(color, 0.3)});">'
-                f'<img src="{url}" style="width:28px;height:28px;vertical-align:middle;" onerror="this.remove()">{s}</span>'
+                f'<img src="{url}" style="width:36px;height:36px;vertical-align:middle;" onerror="this.remove()">{s}</span>'
             )
         badge_rows += (
             f'<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 12px;'
@@ -332,16 +332,15 @@ def _build_stats_html(**d) -> str:
     if special_badges:
         chips = []
         for b in special_badges:
-            nm = b.get("name", "")
-            color = b.get("color") or "#666"
             b_url = b.get("badge_url", "")
-            icon_html = f'<img src="{b_url}" style="width:24px;height:24px;vertical-align:middle;" onerror="this.remove()">' if b_url else ""
+            if not b_url:
+                continue
             chips.append(
-                f'<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;'
-                f"border-radius:20px;font-size:12px;font-weight:600;"
-                f"background:rgba({_hex_to_rgba(color, 0.12)});color:{color};"
-                f'border:1px solid rgba({_hex_to_rgba(color, 0.25)});">'
-                f"{icon_html}{nm}</span>"
+                f'<span style="display:inline-flex;align-items:center;justify-content:center;'
+                f'width:40px;height:40px;border-radius:50%;'
+                f'background:rgba(177,244,250,0.12);'
+                f'border:1px solid rgba(177,244,250,0.25);">'
+                f'<img src="{b_url}" style="width:28px;height:28px;display:block;" onerror="this.remove()"></span>'
             )
         spec_rows += (
             f'<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 16px;'
