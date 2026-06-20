@@ -1578,7 +1578,7 @@ async def draw_player_list_card(
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
 body {{
-    background: #0F1923; font-family: "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    background: transparent; font-family: "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
     display: flex; justify-content: center; padding: 16px 8px; -webkit-font-smoothing: antialiased;
 }}
 .card-container {{
@@ -1638,9 +1638,9 @@ body {{
             await page.set_content(html, wait_until="domcontentloaded")
             card = await page.query_selector(".card-container")
             if card:
-                png = await card.screenshot(type="png")
+                png = await card.screenshot(type="png", omit_background=True)
             else:
-                png = await page.screenshot(type="png", full_page=True)
+                png = await page.screenshot(type="png", full_page=True, omit_background=True)
             dt = time.time() - t0
             from astrbot.api import logger
             logger.info(f"[PW卡片] 渲染耗时: {dt:.1f}s ({len(players)}个玩家)")
