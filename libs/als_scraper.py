@@ -198,10 +198,13 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
                        .replace(/ Ii$/,' II').replace(/ Vi$/,' VI');
                 if (!seen.has(nm) && nm.length < 40) {
                     seen.add(nm);
-                    special.push({name:nm, color:'#b1f4fa'});
+                    special.push({name:nm, color:'#b1f4fa', badge_url: src});
                 }
             }
         });
+        let level_icon = '';
+        const li = document.querySelector('.v2-sb-stat--level img');
+        if (li) level_icon = li.src;
         const text = document.body.innerText;
         const gIdx = text.indexOf('\\nGlobal\\n');
         let kills = 0, wins = 0, rankScore = 0;
@@ -233,7 +236,7 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
             const m2 = tp.textContent.trim().match(/#([\\d,]+)/);
             if (m2) rankPcPos = parseInt(m2[1].replace(/,/g,''));
         }
-        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore, rankTopPct, rankPcPos};
+        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore, rankTopPct, rankPcPos, level_icon};
     }""")
 
 

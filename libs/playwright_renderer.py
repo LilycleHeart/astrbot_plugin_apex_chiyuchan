@@ -258,6 +258,7 @@ def _build_stats_html(**d) -> str:
     level = d.get("level", 0)
     level_pct = d.get("level_pct", d.get("to_next_level_pct", 0))
     prestige = d.get("prestige", 0)
+    level_icon = d.get("level_icon", "")
     rank_name = d.get("rank_name", "Unranked")
     rank_div = d.get("rank_div", 0)
     rank_score = d.get("rank_score", 0)
@@ -333,12 +334,14 @@ def _build_stats_html(**d) -> str:
         for b in special_badges:
             nm = b.get("name", "")
             color = b.get("color") or "#666"
+            b_url = b.get("badge_url", "")
+            icon_html = f'<img src="{b_url}" style="width:24px;height:24px;vertical-align:middle;" onerror="this.remove()">' if b_url else ""
             chips.append(
-                f'<span style="display:inline-flex;align-items:center;gap:4px;padding:6px 14px;'
+                f'<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;'
                 f"border-radius:20px;font-size:12px;font-weight:600;"
                 f"background:rgba({_hex_to_rgba(color, 0.12)});color:{color};"
                 f'border:1px solid rgba({_hex_to_rgba(color, 0.25)});">'
-                f"{nm}</span>"
+                f"{icon_html}{nm}</span>"
             )
         spec_rows += (
             f'<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 16px;'
@@ -453,6 +456,10 @@ body{{
   display:flex;align-items:center;gap:12px;padding:12px 24px;
   border-bottom:1px solid {_C_OUTLINE}
 }}
+.level-icon{{
+  width:24px;height:24px;object-fit:contain;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))
+}}
 .level-num{{
   font-size:32px;font-weight:800;
   background:linear-gradient(135deg,{_C_PRED},#ff6b6b);
@@ -502,8 +509,9 @@ body{{
 </div>
 
 <div class="level-row">
+  <img class="level-icon" src="{level_icon}" onerror="this.style.display='none'">
   <div class="level-num">{level}</div>
-  <div style="font-size:12px;color:{_C_MUTED};">{prestige_str + " · " if prestige_str else ""}{level_pct}% to next</div>
+  <div style="font-size:12px;color:{_C_MUTED};">{level_pct}% to next</div>
   <div class="level-bar"><div class="level-fill"></div></div>
 </div>
 
