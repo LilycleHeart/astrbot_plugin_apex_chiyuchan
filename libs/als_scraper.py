@@ -219,7 +219,9 @@ async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
         const rp = document.querySelector('.v2-sb-stat__pill--rank');
         if (rp) {
             const sp = rp.querySelector('span');
-            if (sp) rankTopPct = parseFloat(sp.textContent.trim().replace('%',''));
+            const raw = sp ? sp.textContent.trim() : rp.textContent.trim();
+            const m = raw.replace('%','').match(/[\d.]+/);
+            if (m) rankTopPct = parseFloat(m[0]);
         }
         const tp = document.querySelector('.v2-sb-stat__pill--top');
         if (tp) {
@@ -250,7 +252,7 @@ async def fetch_badges(name_or_uid: str, platform: str = "PC", force: bool = Fal
             async with run_with_page() as page:
                 result = await _do_fetch(page, name_or_uid, platform)
                 dt = time.time() - t0
-                logger.info(f"[BadgeFetcher] 耗时: {dt:.1f}s (attempt={attempt+1})")
+                logger.info(f"[BadgeFetcher] 耗时: {dt:.1f}s (attempt={attempt+1}) rankTopPct={result.get('rankTopPct',0)} rankPcPos={result.get('rankPcPos',0)} rankPos={result.get('rankPos',0)}")
                 if result.get("seasons") or result.get("special"):
                     await cache_set(cache_key, result, 3600)
                 return result
