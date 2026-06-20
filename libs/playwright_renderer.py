@@ -399,7 +399,7 @@ def _build_stats_html(**d) -> str:
 </div>"""
 
     # ── 段位分布参考条 ──
-    rank_dist = _build_rank_dist(rank_name, rank_top_pct, rank_dist_entries, theme=_theme)
+    rank_dist = _build_rank_dist(rank_name, rank_top_pct_global, rank_dist_entries, theme=_theme)
 
     badge_section = ""
     if badge_rows:
