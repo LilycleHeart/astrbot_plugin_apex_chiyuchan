@@ -974,7 +974,9 @@ try:
     from .playwright_renderer import draw_predator_card as _draw_predator_card_pw
     from .playwright_renderer import draw_lfg_card as _draw_lfg_card_pw
     from .playwright_renderer import draw_lfg_mode_card as _draw_lfg_mode_card_pw
-except Exception:
+except Exception as _e:
+    from astrbot.api import logger as _lg
+    _lg.warning(f"[ImageRenderer] Playwright 渲染器导入失败，将使用 Pillow: {type(_e).__name__}: {_e}")
     _draw_profile_card_pw = None
     _draw_map_rotation_card_pw = None
     _draw_server_status_card_pw = None
@@ -987,10 +989,15 @@ async def draw_profile_card(data: dict) -> bytes:
     """渲染玩家详情卡片 (优先 playwright，回退 Pillow)"""
     if _draw_profile_card_pw is not None:
         try:
+            from astrbot.api import logger
+            logger.info("[ProfileCard] 使用 Playwright 渲染")
             return await _draw_profile_card_pw(data)
         except Exception as e:
             from astrbot.api import logger
             logger.warning(f"[ProfileCard] Playwright 渲染失败，回退 Pillow: {type(e).__name__}: {e}")
+    else:
+        from astrbot.api import logger
+        logger.info("[ProfileCard] Playwright 未导入，使用 Pillow 渲染")
     return await draw_player_profile_card(data)
 
 
