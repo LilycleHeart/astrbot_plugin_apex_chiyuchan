@@ -208,9 +208,7 @@ class XiaoChiyu(Star):
                 r = cached[idx - 1]
                 plat = r.get("platform", platform)
                 await self.db.upsert_user(qq_id, r["uid"], r["name"], plat)
-                img = await renderer.draw_bind_card(r["uid"], r["name"], plat)
-                async for r2 in self._send_card(event, img):
-                    yield r2
+                yield event.plain_result(f"绑定成功：{r['name']} (UID {r['uid']}, {plat})")
                 return
 
         results = await search_players(name, platform)
@@ -218,9 +216,7 @@ class XiaoChiyu(Star):
             if len(results) == 1:
                 r = results[0]
                 await self.db.upsert_user(qq_id, r["uid"], r["name"], platform)
-                img = await renderer.draw_bind_card(r["uid"], r["name"], platform)
-                async for r2 in self._send_card(event, img):
-                    yield r2
+                yield event.plain_result(f"绑定成功：{r['name']} (UID {r['uid']}, {platform})")
                 return
             self._last_search[qq_id] = results
             hint = f"共 {len(results)} 个结果，请使用 /bind 数字 选择"
@@ -238,30 +234,20 @@ class XiaoChiyu(Star):
             lines = [f"找到 {len(api_results)} 个匹配玩家，请用 /bind_uid <UID> 绑定:"]
             for r in api_results:
                 lines.append(f"  {r.name} — UID: {r.uid}")
-            img = await renderer.draw_text_card(
-                "多个匹配", "\n".join(lines), is_error=False
-            )
-            async for r in self._send_card(event, img):
-                yield r
+            yield event.plain_result("\n".join(lines))
             return
         api_result = api_results[0]
 
         expected = name.strip().lower().replace(" ", "")
         actual = api_result.name.lower().replace(" ", "")
         if expected not in actual and actual not in expected:
-            img = await renderer.draw_text_card(
-                "名字可能不匹配",
-                f"搜索 '{name}' 返回了 '{api_result.name}' (UID: {api_result.uid})\n"
-                f"绑定将继续。如果不对，请用 /bind_uid {api_result.uid} 重新绑定",
-                is_error=False,
+            yield event.plain_result(
+                f"名字可能不匹配：搜索 '{name}' 返回了 '{api_result.name}' (UID: {api_result.uid})\n"
+                f"绑定将继续。如果不对，请用 /bind_uid {api_result.uid} 重新绑定"
             )
-            async for r in self._send_card(event, img):
-                yield r
 
         await self.db.upsert_user(qq_id, api_result.uid, api_result.name, platform)
-        img = await renderer.draw_bind_card(api_result.uid, api_result.name, platform)
-        async for r in self._send_card(event, img):
-            yield r
+        yield event.plain_result(f"绑定成功：{api_result.name} (UID {api_result.uid}, {platform})")
 
     @filter.command("bind_uid", alias={"绑定UID"})
     async def cmd_bind_uid(self, event: AstrMessageEvent, uid: str, platform: str = "PC"):
@@ -281,9 +267,7 @@ class XiaoChiyu(Star):
             yield event.plain_result(f"找不到 UID '{uid}'")
             return
         await self.db.upsert_user(qq_id, uid, stats.name, platform)
-        img = await renderer.draw_bind_card(uid, stats.name, platform)
-        async for r in self._send_card(event, img):
-            yield r
+        yield event.plain_result(f"绑定成功：{stats.name} (UID {uid}, {platform})")
 
     @filter.command("unbind", alias={"解绑"})
     async def cmd_unbind(self, event: AstrMessageEvent):
@@ -299,9 +283,7 @@ class XiaoChiyu(Star):
             yield event.plain_result("你还没有绑定 Apex 账号")
             return
         await self.db.delete_user(qq_id)
-        img = await renderer.draw_unbind_card()
-        async for r in self._send_card(event, img):
-            yield r
+        yield event.plain_result("已解绑 Apex 账号")
 
     # ═══════════════════════════════════════════════
     #  战绩查询
