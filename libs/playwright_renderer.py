@@ -508,8 +508,11 @@ body{{
 
 <div class="level-row">
   <img class="level-icon" src="{level_icon}" onerror="this.style.display='none'">
-  <div><span class="level-text">{"P" + str(prestige) if prestige else ""}</span><span class="level-sub"> · {level_pct}% to next</span></div>
-  <div class="level-bar"><div class="level-fill"></div></div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+    <div class="level-text">Level {level}</div>
+    <div class="level-bar"><div class="level-fill"></div></div>
+    <div class="level-sub">{level_pct}% to next level</div>
+  </div>
 </div>
 
 <div class="stat-grid">
