@@ -259,6 +259,7 @@ def _build_stats_html(**d) -> str:
     level_pct = d.get("level_pct", d.get("to_next_level_pct", 0))
     prestige = d.get("prestige", 0)
     level_icon = d.get("level_icon", "")
+    level_raw = d.get("level_raw", level)
     rank_name = d.get("rank_name", "Unranked")
     rank_div = d.get("rank_div", 0)
     rank_score = d.get("rank_score", 0)
@@ -456,16 +457,18 @@ body{{
   border-bottom:1px solid {_C_OUTLINE}
 }}
 .level-icon{{
-  width:24px;height:24px;object-fit:contain;
+  width:32px;height:32px;object-fit:contain;
   filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))
 }}
-.level-num{{
-  font-size:32px;font-weight:800;
-  background:linear-gradient(135deg,{_C_PRED},#ff6b6b);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  background-clip:text
+.level-info{{
+  display:flex;flex-direction:column;gap:1px;min-width:0;
 }}
-.level-bar{{flex:1;height:6px;background:{_C_CARD3};border-radius:3px;overflow:hidden;margin-left:12px}}
+.level-label{{
+  font-size:13px;font-weight:600;color:{_C_TEXT};
+  white-space:nowrap;
+}}
+.level-pre{{font-size:11px;color:{_C_MUTED};}}
+.level-bar{{flex:1;height:6px;background:{_C_CARD3};border-radius:3px;overflow:hidden}}
 .level-fill{{height:100%;width:{level_pct}%;background:linear-gradient(90deg,{_C_PRED},#ff6b6b);border-radius:3px}}
 
 .stat-grid{{
@@ -509,8 +512,10 @@ body{{
 
 <div class="level-row">
   <img class="level-icon" src="{level_icon}" onerror="this.style.display='none'">
-  <div class="level-num">{level}</div>
-  <div style="font-size:12px;color:{_C_MUTED};">{level_pct}% to next</div>
+  <div class="level-info">
+    <span class="level-label">Level {level_raw} · P{prestige}</span>
+    <span class="level-pre">{level_pct}% to next</span>
+  </div>
   <div class="level-bar"><div class="level-fill"></div></div>
 </div>
 
