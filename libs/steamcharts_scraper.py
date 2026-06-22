@@ -33,8 +33,10 @@ class SteamchartsData:
     peak_24h: int = 0
     peak_all_time: int = 0
     months: list[MonthEntry] = field(default_factory=list)
-    # 最近 7 天按 12 小时分桶（14 个桶）
+    # 最近 7 天按 12 小时分桶（14 个桶）— 旧版柱状图用
     seven_day_buckets: list[HourlyBucket] = field(default_factory=list)
+    # 最近 7 天的原始数据点 [[ts_ms, players], ...] — Jinja 模板 Chart.js 用
+    raw_7d_points: list[list[int]] = field(default_factory=list)
 
 
 def _to_int(s: str) -> int:
@@ -141,7 +143,7 @@ async def fetch_steamcharts() -> SteamchartsData | None:
             MonthEntry(month=month, avg_players=avg, gain=gain, gain_pct=gain_pct, peak=peak)
         )
 
-    # ── chart-data.json：最近 7 天按 12 小时分桶 ──
+    # ── chart-data.json：最近 7 天数据 ──
     try:
         async with httpx.AsyncClient(
             timeout=10.0, follow_redirects=True,
@@ -152,6 +154,11 @@ async def fetch_steamcharts() -> SteamchartsData | None:
             chart_raw = r.json()
             if isinstance(chart_raw, list):
                 data.seven_day_buckets = _bucket_last_7_days(chart_raw)
+                # 保留最近 7 天的原始数据点（供 Jinja 模板 Chart.js 使用）
+                if chart_raw:
+                    now_ms = chart_raw[-1][0]
+                    start_ms = now_ms - 7 * 86400_000
+                    data.raw_7d_points = [[ts, p] for ts, p in chart_raw if ts >= start_ms]
     except Exception as e:
         from astrbot.api import logger
         logger.warning(f"[Steamcharts] chart-data.json 下载失败: {e}")

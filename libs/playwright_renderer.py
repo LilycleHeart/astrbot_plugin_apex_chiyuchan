@@ -1251,161 +1251,91 @@ body{{
 
 
 # ══════════════════════════════════════════
-#  Steamcharts 日活卡片
+#  Steamcharts 日活卡片（Jinja 模板 + Chart.js）
 # ══════════════════════════════════════════
 
+_STEAMCHARTS_TEMPLATE = None
 
-def _build_steamcharts_html(data) -> str:
-    """构建 Steamcharts MD3 卡片 HTML — 简洁现代风，7 天/12h 柱状图"""
+
+def _get_steamcharts_template():
+    """懒加载 Jinja 模板"""
+    global _STEAMCHARTS_TEMPLATE
+    if _STEAMCHARTS_TEMPLATE is None:
+        from pathlib import Path
+        from jinja2 import Environment, FileSystemLoader
+        tmpl_dir = Path(__file__).parent
+        env = Environment(loader=FileSystemLoader(str(tmpl_dir)), autoescape=False)
+        _STEAMCHARTS_TEMPLATE = env.get_template("steamcharts_template.jinja")
+    return _STEAMCHARTS_TEMPLATE
+
+
+def _render_steamcharts_html(data) -> str:
+    """用 Jinja 模板渲染 Steamcharts MD3 卡片 HTML"""
     import datetime as _dt
+    import json as _json
 
-    # 本地时区（Asia/Shanghai = UTC+8）
     _tz = _dt.timezone(_dt.timedelta(hours=8))
+    now = _dt.datetime.now(_tz)
+    updated = now.strftime("%Y-%m-%d %H:%M")
 
-    # ── 7 天 / 12 小时分桶柱状图（14 个柱子）──
-    buckets = data.seven_day_buckets or []
-    chart_w = 632
-    chart_h = 200
-    pad_l = 36
-    pad_r = 16
-    pad_t = 14
-    pad_b = 32
-    inner_w = chart_w - pad_l - pad_r
-    inner_h = chart_h - pad_t - pad_b
+    # 原始 7 天数据点 [[ts_ms, players], ...]
+    raw_points = getattr(data, "raw_7d_points", None) or []
+    # 如果没有原始数据，退回用分桶数据构造
+    if not raw_points:
+        for b in (data.seven_day_buckets or []):
+            raw_points.append([b.ts_ms, int(b.avg_players)])
 
-    vals = [b.avg_players for b in buckets if b.avg_players > 0]
-    vmin = 0
-    vmax = max(vals) if vals else 1
-    vmax = vmax * 1.08  # 顶部留白
-    vrange = (vmax - vmin) or 1
-
-    n = len(buckets)
-    bar_gap = 6
-    bar_w = (inner_w - bar_gap * (n - 1)) / max(n, 1)
-    bar_w = max(bar_w, 4)
-
-    def _bar_x(i):
-        return pad_l + i * (bar_w + bar_gap)
-
-    def _bar_h(v):
-        return inner_h * (v - vmin) / vrange
-
-    # 柱子（用强调色 + 圆角顶部）
-    bars_svg = ""
-    for i, b in enumerate(buckets):
-        x = _bar_x(i)
-        h = _bar_h(b.avg_players)
-        y = pad_t + inner_h - h
-        if h < 2:
-            h = 2
-            y = pad_t + inner_h - 2
-        # 末柱（当前 12h）用更亮的强调色
-        is_last = (i == n - 1)
-        fill = "#DA292A" if not is_last else "#ff6b6b"
-        bars_svg += (
-            f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" '
-            f'rx="3" ry="3" fill="{fill}"/>'
-        )
-
-    # Y 轴刻度（3 条：max / mid / 0）
-    y_ticks = ""
-    for frac, label_val in [(0, vmax), (0.5, vmax / 2), (1, 0)]:
-        gy = pad_t + inner_h * frac
-        y_ticks += (
-            f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{chart_w - pad_r}" y2="{gy:.1f}" '
-            f'stroke="#272D39" stroke-width="1" stroke-dasharray="2,4"/>'
-            f'<text x="{pad_l - 6}" y="{gy + 3:.1f}" font-size="10" fill="#777f8c" '
-            f'text-anchor="end">{int(label_val):,}</text>'
-        )
-
-    # X 轴标签：每天显示一个日期（每 2 个柱子代表 1 天）
-    x_labels = ""
-    for i, b in enumerate(buckets):
-        if i % 2 != 0:  # 只标每天第一个 12h 桶
-            continue
-        dt = _dt.datetime.fromtimestamp(b.ts_ms / 1000, tz=_tz)
-        x = _bar_x(i) + bar_w / 2
-        label = f"{dt.month}/{dt.day}"
-        x_labels += (
-            f'<text x="{x:.1f}" y="{chart_h - 10:.1f}" font-size="10" '
-            f'fill="#BFC7DA" text-anchor="middle">{label}</text>'
-        )
-
-    # 时段标记（昼/夜 小标签）
-    am_pm = ""
-    for i, b in enumerate(buckets):
-        dt = _dt.datetime.fromtimestamp(b.ts_ms / 1000, tz=_tz)
-        # 本地时段：6-18 = 昼，否则 = 夜
-        is_day = 6 <= dt.hour < 18
-        slot = "昼" if is_day else "夜"
-        x = _bar_x(i) + bar_w / 2
-        am_pm += (
-            f'<text x="{x:.1f}" y="{chart_h - 22:.1f}" font-size="9" '
-            f'fill="#5a6273" text-anchor="middle">{slot}</text>'
-        )
-
-    svg_chart = f"""<svg viewBox="0 0 {chart_w} {chart_h}" width="{chart_w}" height="{chart_h}" xmlns="http://www.w3.org/2000/svg">
-        {y_ticks}
-        {bars_svg}
-        {am_pm}
-        {x_labels}
-    </svg>"""
-
-    # ── 顶部：大号当前在线 + 峰值并列 ──
-    top_block = f"""
-    <div style="padding:24px 28px 16px;">
-      <div style="font-size:13px;color:{_C_MUTED};font-weight:500;letter-spacing:0.5px;">当前在线人数</div>
-      <div style="font-size:44px;font-weight:800;color:#DA292A;letter-spacing:-1px;line-height:1.1;margin-top:2px;">{data.current_online:,}</div>
-      <div style="display:flex;gap:24px;margin-top:12px;">
-        <div>
-          <div style="font-size:11px;color:{_C_MUTED};">24 小时峰值</div>
-          <div style="font-size:16px;font-weight:600;color:{_C_TEXT};margin-top:2px;">{data.peak_24h:,}</div>
-        </div>
-        <div style="width:1px;background:{_C_OUTLINE};"></div>
-        <div>
-          <div style="font-size:11px;color:{_C_MUTED};">历史峰值</div>
-          <div style="font-size:16px;font-weight:600;color:{_C_TEXT};margin-top:2px;">{data.peak_all_time:,}</div>
-        </div>
-      </div>
-    </div>"""
-
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{
-  font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;
-  background:transparent;color:{_C_TEXT};
-  display:flex;justify-content:center;padding:24px
-}}
-.card{{
-  width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;
-  box-shadow:0 10px 30px rgba(0,0,0,.5);
-  border:1px solid {_C_OUTLINE}
-}}
-.chart-title{{
-  padding:0 28px 6px;font-size:13px;font-weight:600;color:{_C_MUTED};
-  letter-spacing:0.5px
-}}
-.chart-wrap{{padding:4px 16px 12px}}
-.footer{{
-  padding:12px 24px;border-top:1px solid {_C_OUTLINE};
-  font-size:11px;color:{_C_MUTED};display:flex;justify-content:space-between;align-items:center
-}}
-</style></head><body>
-<div class="card">
-  {top_block}
-  <div class="chart-title">近 7 天在线人数趋势 · 每 12 小时</div>
-  <div class="chart-wrap">{svg_chart}</div>
-  <div class="footer">
-    <span>数据来源 <span style="color:#DA292A;">steamcharts.com</span></span>
-    <span style="color:{_C_MUTED};">auth.赤羽真白 · Apex Chiyuchan</span>
-  </div>
-</div>
-</body></html>"""
+    ctx = {
+        "title": "Apex Legends",
+        "current_formatted": f"{data.current_online:,}",
+        "updated_local": updated,
+        "peak_24h_formatted": f"{data.peak_24h:,}",
+        "peak_all_formatted": f"{data.peak_all_time:,}",
+        "point_count": len(raw_points),
+        "app_id": "1172470",
+        "data": _json.dumps(raw_points),
+    }
+    return _get_steamcharts_template().render(**ctx)
 
 
 async def draw_steamcharts_card(data) -> bytes:
-    """渲染 Steamcharts 日活卡片 PNG"""
-    html = _build_steamcharts_html(data)
-    return await _render_card_sync(html, 720)
+    """渲染 Steamcharts Jinja 模板卡片 PNG — 等待 Chart.js 加载并渲染 canvas"""
+    html = _render_steamcharts_html(data)
+    from .playwright_manager import run_with_page
+
+    async with run_with_page(
+        viewport={"width": 600, "height": 900}, device_scale_factor=2
+    ) as page:
+        # 强制深色主题（与其他卡片统一）
+        await page.emulate_media(color_scheme="dark")
+        # 允许外部 CDN 资源加载（Chart.js + Google Fonts）
+        await page.set_content(html, wait_until="load", timeout=30000)
+        # 等待 Chart.js 库加载完成
+        try:
+            await page.wait_for_function(
+                "() => typeof window.Chart !== 'undefined'",
+                timeout=15000,
+            )
+        except Exception:
+            pass
+        # 等待 chart 实例创建 + canvas 渲染（等待 Chart.js 内部动画首帧）
+        try:
+            await page.wait_for_function(
+                "() => { const c = document.getElementById('trendChart'); "
+                "return c && c.width > 0 && c.height > 0; }",
+                timeout=10000,
+            )
+        except Exception:
+            pass
+        # 额外等待让 Chart.js 完成渲染动画
+        await page.wait_for_timeout(800)
+        # 等待字体就绪
+        try:
+            await page.wait_for_function("() => document.fonts.ready", timeout=5000)
+        except Exception:
+            pass
+        card = await page.query_selector(".card")
+        if card:
+            return await card.screenshot(type="png", omit_background=True)
+        return await page.screenshot(full_page=False, type="png")
 
