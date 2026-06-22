@@ -39,8 +39,8 @@ async def _send_status_card(context, sid: str, text: str, wrapper):
 @register(
     "apex_chiyuchan",
     "小赤羽",
-    "Apex 战绩查询 / 地图轮换 / 大师数据 / 组队系统",
-    "1.1.0",
+    "Apex 战绩查询 / 地图轮换 / 大师数据 / 组队系统 / Steam 日活",
+    "1.2.0",
 )
 class XiaoChiyu(Star):
     def __init__(self, context: Context, config: AstrBotConfig):

@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.3.0 (2026-06-22)
+
+### ✨ 新功能
+- **Steam 日活卡片**: `/online`（别名 `在线`/`在线人数`/`日活`）命令，展示 Apex Steam 当前在线人数、24 小时峰值、历史峰值
+- **7 日在线趋势图**: 卡片含 Chart.js 折线图，展示最近 7 天在线人数趋势（约 169 个数据点），支持深色/浅色主题
+- **`apex_online` LLM 工具**: 用户询问在线人数/日活/活跃玩家数时自动触发，返回卡片 + 文本摘要
+- **Jinja2 模板渲染**: 新增 `steamcharts_template.jinja` MD3 模板，Material Design 3 风格，绿色 primary 配色
+- **等级行重新设计**: 移除大数字 `1601`，改为 ALS 风格等级图标 + 红色渐变等级数字 + 进度条 + `% to next` 副标签
+- **等级图标修复**: 从 ALS `/core/level_badge/?level={total}` 下载 SVG，MIME 类型自动检测，User-Agent + Referer 头绕过 ALS 反爬
+
+### 🔧 优化
+- **MD3 搜索列表卡片**: Diamond 主题配色，圆角 24px，描边边框，平台图标着色
+- **特殊勋章改为纯图标**: 去掉名称文字，40px 圆形容器内 28px 图标
+- **赛季徽章尺寸加大**: 36×36（原 28×28）
+- **图片下载改进**: 移除 `@lru_cache`（避免永久缓存失败值），增加 User-Agent/Referer 头，内容嗅探 MIME 类型（SVG/PNG/JPEG/WebP/GIF）
+- **下载失败日志**: `_download_sync` 失败时输出 warning 日志便于排查
+- **卡片外背景透明**: Steamcharts 卡片 `body` 改为 `transparent`，配合 `omit_background=True` 截图
+
+### 🐛 修复
+- 修复等级图标不显示：`_download_sync` 的 `@lru_cache` 永久缓存 `None` 失败值导致重试无效
+- 修复 SVG 内容被标记为 `image/png` MIME 类型导致部分浏览器不渲染
+- 修复 `image_renderer` 未 re-export `draw_steamcharts_card` 导致 `/online` 命令报 `AttributeError`
+
+---
+
 ## v1.2.0 (2026-06-16)
 
 ### ✨ 新功能

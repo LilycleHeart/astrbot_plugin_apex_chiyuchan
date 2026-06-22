@@ -36,6 +36,12 @@
     <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="360" /></td>
   </tr>
   <tr>
+    <td align="center" colspan="2"><b>Steam 日活</b></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/online.png" width="720" /></td>
+  </tr>
+  <tr>
     <td align="center" colspan="2"><b>找队友 (LFG)</b></td>
   </tr>
   <tr>
@@ -95,6 +101,15 @@
 
 ---
 
+### 📈 Steam 日活
+
+- 当前在线人数 / 24 小时峰值 / 历史峰值
+- 近 7 天在线人数趋势图（Chart.js 折线图，约 169 个数据点）
+- MD3 风格卡片，支持深色主题
+- LLM 触发词：在线人数 / 日活 / 活跃玩家数
+
+---
+
 ### 🤖 LLM 自然语言支持
 
 开启后可直接说：
@@ -104,6 +119,7 @@
 现在什么地图
 服务器炸了吗
 大师多少分了
+现在多少人在线
 ```
 
 自动识别并返回结构化结果 + 卡片展示
@@ -122,6 +138,7 @@
 | `/server` | 服务器状态 |
 | `/master` | 猎杀 / 大师数据 |
 | `/lfg <排位|娱乐|列表|退出>` | 找队友 |
+| `/online` | Steam 日活 / 在线人数 |
 
 ---
 
@@ -166,6 +183,7 @@ https://portal.apexlegendsapi.com
 | aiosqlite | 本地数据 |
 | Pillow | 图片渲染 |
 | playwright | 卡片渲染 |
+| jinja2 | Steam 日活卡片模板 |
 | mcp | LLM 工具返回 |
 
 安装浏览器内核：
@@ -179,6 +197,7 @@ python -m playwright install webkit
 ## 📚 数据来源
 
 - Apex 数据：https://apexlegendsstatus.com  
+- Steam 日活：https://steamcharts.com/app/1172470
 - Moe Counter：https://github.com/journey-ad/Moe-Counter  
 - 地图资源：https://www.ea.com/zh-hant/games/apex-legends/apex-legends/game-objects/maps-hub
 
