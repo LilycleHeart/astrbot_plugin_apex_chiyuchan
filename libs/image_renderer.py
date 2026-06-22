@@ -974,6 +974,7 @@ try:
     from .playwright_renderer import draw_predator_card as _draw_predator_card_pw
     from .playwright_renderer import draw_lfg_card as _draw_lfg_card_pw
     from .playwright_renderer import draw_lfg_mode_card as _draw_lfg_mode_card_pw
+    from .playwright_renderer import draw_steamcharts_card as _draw_steamcharts_card_pw
 except Exception as _e:
     from astrbot.api import logger as _lg
     _lg.warning(f"[ImageRenderer] Playwright 渲染器导入失败，将使用 Pillow: {type(_e).__name__}: {_e}")
@@ -983,6 +984,7 @@ except Exception as _e:
     _draw_predator_card_pw = None
     _draw_lfg_card_pw = None
     _draw_lfg_mode_card_pw = None
+    _draw_steamcharts_card_pw = None
 
 
 async def draw_profile_card(data: dict) -> bytes:
@@ -1956,3 +1958,15 @@ def _draw_lfg_sync(entries: list[dict]) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+
+# ══════════════════════════════════════════
+#  Steamcharts 日活卡片（仅 Playwright，无 Pillow 回退）
+# ══════════════════════════════════════════
+
+
+async def draw_steamcharts_card(data) -> bytes:
+    """渲染 Steamcharts 日活卡片 PNG (Jinja 模板 + Chart.js，仅 Playwright)"""
+    if _draw_steamcharts_card_pw is None:
+        raise RuntimeError("Playwright 渲染器未导入，无法渲染 Steamcharts 卡片")
+    return await _draw_steamcharts_card_pw(data)
