@@ -1249,3 +1249,212 @@ body{{
 </body></html>"""
     return await _render_card_sync(html_str, 460)
 
+
+# ══════════════════════════════════════════
+#  Steamcharts 日活卡片
+# ══════════════════════════════════════════
+
+
+def _build_steamcharts_html(data) -> str:
+    """构建 Steamcharts MD3 卡片 HTML — 当前在线 + 峰值 + 月度日活折线图"""
+    from .steamcharts_scraper import SteamchartsData
+
+    # 取最近 12 个月（不含 "Last 30 Days" 滚动行，从第二个开始）
+    months_all = data.months
+    months = [m for m in months_all if m.month != "Last 30 Days"][:12]
+    months = list(reversed(months))  # 从旧到新
+
+    # ── SVG 折线图参数 ──
+    chart_w = 620
+    chart_h = 180
+    pad_l = 8
+    pad_r = 8
+    pad_t = 16
+    pad_b = 28
+    inner_w = chart_w - pad_l - pad_r
+    inner_h = chart_h - pad_t - pad_b
+
+    vals = [m.avg_players for m in months]
+    if vals:
+        vmin, vmax = min(vals), max(vals)
+    else:
+        vmin, vmax = 0, 1
+    vrange = (vmax - vmin) or 1
+    # 给上下留点空间
+    vmin = max(0, vmin - vrange * 0.1)
+    vmax = vmax + vrange * 0.1
+    vrange = (vmax - vmin) or 1
+
+    n = len(months)
+    if n == 0:
+        n = 1  # 防除零
+
+    def _x(i):
+        if n <= 1:
+            return pad_l + inner_w / 2
+        return pad_l + (inner_w * i / (n - 1))
+
+    def _y(v):
+        return pad_t + inner_h * (1 - (v - vmin) / vrange)
+
+    pts = []
+    for i, m in enumerate(months):
+        pts.append((_x(i), _y(m.avg_players)))
+
+    # 折线 path
+    line_path = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+    # 渐变填充 area path
+    if pts:
+        area_path = (
+            f"M {pts[0][0]:.1f},{pad_t + inner_h:.1f} "
+            + " ".join(f"L {x:.1f},{y:.1f}" for x, y in pts)
+            + f" L {pts[-1][0]:.1f},{pad_t + inner_h:.1f} Z"
+        )
+    else:
+        area_path = ""
+
+    # 柱状条（24h peak 用柱状对比）
+    bars_svg = ""
+    for i, m in enumerate(months):
+        x = _x(i)
+        y = _y(m.avg_players)
+        bars_svg += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3" fill="#DA292A"/>'
+
+    # X 轴标签（每隔几个显示一次避免拥挤）
+    label_step = max(1, n // 6)
+    x_labels = ""
+    for i, m in enumerate(months):
+        if i % label_step != 0 and i != n - 1:
+            continue
+        x = _x(i)
+        # 取月+年缩写
+        parts = m.month.split()
+        if len(parts) >= 2:
+            label = f"{parts[0][:3]} {parts[1][2:]}"  # "May 26"
+        else:
+            label = m.month[:6]
+        x_labels += (
+            f'<text x="{x:.1f}" y="{chart_h - 8:.1f}" '
+            f'font-size="10" fill="#BFC7DA" text-anchor="middle">{label}</text>'
+        )
+
+    # Y 轴参考线（3 条）
+    grid_lines = ""
+    for i in range(3):
+        gy = pad_t + inner_h * (i / 2)
+        gv = vmax - (vrange * i / 2)
+        grid_lines += (
+            f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{chart_w - pad_r}" y2="{gy:.1f}" '
+            f'stroke="#272D39" stroke-width="1" stroke-dasharray="3,3"/>'
+            f'<text x="{pad_l + 2}" y="{gy - 3:.1f}" font-size="9" fill="#777f8c">{int(gv):,}</text>'
+        )
+
+    svg_chart = f"""<svg viewBox="0 0 {chart_w} {chart_h}" width="{chart_w}" height="{chart_h}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#DA292A" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#DA292A" stop-opacity="0.02"/>
+            </linearGradient>
+            <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#ff6b6b"/>
+                <stop offset="100%" stop-color="#DA292A"/>
+            </linearGradient>
+        </defs>
+        {grid_lines}
+        {grid_lines and "" or ""}
+        <path d="{area_path}" fill="url(#areaGrad)"/>
+        <polyline points="{line_path}" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        {bars_svg}
+        {x_labels}
+    </svg>"""
+
+    # 三个顶部统计卡片
+    def _stat_card(label, value, accent):
+        return (
+            f'<div style="flex:1;background:{_C_CARD2};border-radius:16px;padding:16px 18px;'
+            f'border:1px solid {_C_OUTLINE};position:relative;overflow:hidden;">'
+            f'<div style="position:absolute;top:0;left:0;right:0;height:3px;background:{accent};"></div>'
+            f'<div style="font-size:11px;color:{_C_MUTED};text-transform:uppercase;letter-spacing:1px;">{label}</div>'
+            f'<div style="font-size:28px;font-weight:800;color:{accent};margin-top:6px;letter-spacing:-0.5px;">{value:,}</div>'
+            f"</div>"
+        )
+
+    stats_row = (
+        '<div style="display:flex;gap:12px;padding:20px 24px 16px;">'
+        + _stat_card("当前在线", data.current_online, "#4CE5B1")
+        + _stat_card("24 小时峰值", data.peak_24h, "#5D9FF0")
+        + _stat_card("历史峰值", data.peak_all_time, "#E7C150")
+        + "</div>"
+    )
+
+    # 最近 3 个月对比小卡片
+    recent = months_all[:3] if len(months_all) >= 3 else months_all
+    recent_items = ""
+    for m in recent:
+        gain = m.gain
+        if gain is None:
+            continue
+        arrow = "▲" if gain >= 0 else "▼"
+        gc = "#4CE5B1" if gain >= 0 else "#DA292A"
+        recent_items += (
+            f'<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;'
+            f'border-bottom:1px solid {_C_OUTLINE};">'
+            f'<span style="font-size:13px;color:{_C_TEXT};">{m.month}</span>'
+            f'<span style="font-size:13px;color:{_C_MUTED};">{int(m.avg_players):,} 均值</span>'
+            f'<span style="font-size:13px;color:{gc};font-weight:600;">{arrow} {abs(int(gain)):,}</span>'
+            f"</div>"
+        )
+    if recent_items:
+        recent_block = (
+            f'<div style="padding:8px 24px 16px;">'
+            f'<div style="font-size:13px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">最近 3 个月</div>'
+            f"{recent_items}"
+            f"</div>"
+        )
+    else:
+        recent_block = ""
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{
+  font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;
+  background:transparent;color:{_C_TEXT};
+  display:flex;justify-content:center;padding:24px
+}}
+.card{{
+  width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;
+  box-shadow:0 10px 30px rgba(0,0,0,.5);
+  border:1px solid {_C_OUTLINE}
+}}
+.title{{
+  padding:22px 24px 4px;font-size:22px;font-weight:800;letter-spacing:0.5px
+}}
+.subtitle{{
+  padding:0 24px 8px;font-size:12px;color:{_C_MUTED};letter-spacing:1px
+}}
+.chart-wrap{{padding:8px 16px 4px}}
+.footer{{
+  padding:14px 24px;border-top:1px solid {_C_OUTLINE};
+  font-size:11px;color:{_C_MUTED};display:flex;justify-content:space-between;align-items:center
+}}
+</style></head><body>
+<div class="card">
+  <div class="title">Apex Legends · Steam 日活</div>
+  <div class="subtitle">数据来源 steamcharts.com · 近 12 个月月均玩家趋势</div>
+  {stats_row}
+  <div class="chart-wrap">{svg_chart}</div>
+  {recent_block}
+  <div class="footer">
+    <span>Data: <span style="color:#DA292A;">steamcharts.com</span></span>
+    <span style="color:{_C_MUTED};">auth.赤羽真白 · Apex Chiyuchan</span>
+  </div>
+</div>
+</body></html>"""
+
+
+async def draw_steamcharts_card(data) -> bytes:
+    """渲染 Steamcharts 日活卡片 PNG"""
+    html = _build_steamcharts_html(data)
+    return await _render_card_sync(html, 720)
+

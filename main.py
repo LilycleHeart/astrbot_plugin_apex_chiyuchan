@@ -18,6 +18,7 @@ from .libs.apex_client import ApexClient
 from .libs.database import Database
 from .libs import image_renderer as renderer
 from .libs.als_scraper import fetch_badges, fetch_lfg_stats, search_players
+from .libs.steamcharts_scraper import fetch_steamcharts
 
 
 async def _send_status_card(context, sid: str, text: str, wrapper):
@@ -694,6 +695,17 @@ class XiaoChiyu(Star):
         async for r in self._send_card(event, img):
             yield r
 
+    @filter.command("online", alias={"在线", "在线人数", "日活"})
+    async def cmd_online(self, event: AstrMessageEvent):
+        """查询 Apex Steam 日活 / 当前在线人数"""
+        data = await fetch_steamcharts()
+        if not data:
+            yield event.plain_result("无法获取 Steam 日活数据，稍后再试")
+            return
+        img = await renderer.draw_steamcharts_card(data)
+        async for r in self._send_card(event, img):
+            yield r
+
     @filter.command("monitor", alias={"监控", "服务器监控"})
     async def cmd_monitor(self, event: AstrMessageEvent, action: str = ""):
         session = event.unified_msg_origin
@@ -1296,6 +1308,37 @@ class XiaoChiyu(Star):
         else:
             text = "服务器状态数据获取成功\n"
         text += "\n请根据服务器状态评论一下，然后用 send_message_to_user 发送服务器状态卡片图片。"
+        return CallToolResult(
+            content=[
+                TextContent(type="text", text=text),
+                ImageContent(type="image", data=img_b64, mimeType="image/png"),
+            ]
+        )
+
+    @filter.llm_tool(name="apex_online")
+    async def llm_online(self, event: AstrMessageEvent):
+        """查询 Apex Legends Steam 当前在线人数和月度日活趋势，生成卡片。当用户询问在线人数、日活、活跃玩家数、有多少人在玩 Apex 等问题时调用。
+        """
+        import base64
+        from mcp.types import CallToolResult, TextContent, ImageContent
+
+        data = await fetch_steamcharts()
+        if not data:
+            return CallToolResult(
+                content=[TextContent(type="text", text="获取 Steam 日活数据失败，稍后再试")]
+            )
+        img_bytes = await renderer.draw_steamcharts_card(data)
+        img_b64 = base64.b64encode(img_bytes).decode()
+
+        recent_avg = data.months[0].avg_players if data.months else 0
+        text = (
+            f"Apex Legends Steam 数据:\n"
+            f"当前在线: {data.current_online:,}\n"
+            f"24 小时峰值: {data.peak_24h:,}\n"
+            f"历史峰值: {data.peak_all_time:,}\n"
+            f"近 30 天日均: {int(recent_avg):,}\n"
+            f"\n请简短评论一下 Apex 当前的人气，然后用 send_message_to_user 发送日活卡片图片。"
+        )
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
