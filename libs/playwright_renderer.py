@@ -790,6 +790,8 @@ def _latency_color(response_time: str) -> str:
             return "good"
         elif ms < 300:
             return "medium"
+        else:
+            return "high"
     return "good" if "up" in response_time.lower() else "medium"
 
 
