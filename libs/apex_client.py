@@ -321,7 +321,7 @@ class ApexClient:
             logger.error(f"[ApexClient] HTTP {e.response.status_code} for {endpoint}")
             raise
         except Exception as e:
-            logger.error(f"[ApexClient] Request failed: {e}")
+            logger.error(f"[ApexClient] Request failed ({type(e).__name__}): {e}")
             raise
 
     async def name_to_uid(
