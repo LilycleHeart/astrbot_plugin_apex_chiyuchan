@@ -1336,7 +1336,7 @@ async def draw_steamcharts_card(data) -> bytes:
     from .playwright_manager import run_with_page
 
     async with run_with_page(
-        viewport={"width": 600, "height": 900}, device_scale_factor=2
+        viewport={"width": 720, "height": 900}, device_scale_factor=3
     ) as page:
         # 强制深色主题（与其他卡片统一）
         await page.emulate_media(color_scheme="dark")
