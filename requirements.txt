@@ -1,5 +1,8 @@
-# Apex API 请求
-httpx>=0.28.0
+# Apex API 请求（含 HTTP/2 支持）
+httpx[http2]>=0.28.0
+
+# Steam 日活卡片等 Jinja2 模板渲染
+jinja2>=3.0.0
 
 # SQLite 异步数据库
 aiosqlite>=0.20.0
