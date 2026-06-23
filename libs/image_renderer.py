@@ -191,7 +191,7 @@ FONT_SMALL = load_font(FONT_SIZES["small"])
 
 
 # ── Moe Counter 数字图片缓存 ──
-_MOE_DIGIT_BASE = "https://raw.githubusercontent.com/journey-ad/Moe-Counter/master/assets/theme/rule34"
+_MOE_DIGIT_BASE = "https://raw.githubusercontent.com/journey-ad/Moe-Counter/master/assets/theme/moebooru"
 _moe_digit_frames: dict[str, list[Image.Image]] = {}
 _moe_cache_dir: Path | None = None
 _moe_loaded = False

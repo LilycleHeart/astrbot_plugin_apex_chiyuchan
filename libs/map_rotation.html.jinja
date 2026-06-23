@@ -114,6 +114,17 @@ body {
   letter-spacing: -0.2px;
 }
 
+.mode-event {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
+  padding: 1px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 2px;
+}
+
 .mode-countdown {
   font-size: 12px;
   color: var(--md-on-surface-variant);
@@ -310,7 +321,11 @@ body {
   {%- for mode in modes %}
   <section class="mode-section" data-mode="{{ mode.key }}">
     <div class="mode-header">
-      <div class="mode-name">{{ mode.name }}</div>
+      <div>
+        <div class="mode-name">{{ mode.name }}</div>
+        {%- if mode.event_name %}      <span class="mode-event">{{ mode.event_name }}</span>
+        {%- endif %}
+      </div>
       <div class="mode-countdown">
         <span class="mode-countdown-label">剩余</span><span class="mode-countdown-value" data-countdown="{{ mode.current.end }}">--:--</span>
       </div>

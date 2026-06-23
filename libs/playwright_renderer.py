@@ -893,6 +893,9 @@ _MAP_ZH = {
     "Broken Moon": "残月",
     "E-District": "电流区",
     # LTM / 竞技场
+    "Fragment": "碎片",
+    "Hammond Labs": "哈蒙德实验室",
+    "Hammond Laboratories": "哈蒙德实验室",
     "Skulltown": "骷髅镇",
     "Skull Town": "骷髅镇",
     "Autumn Estates": "秋日庄园",
@@ -931,13 +934,23 @@ def _build_map_rotation_html(rotation) -> str:
     modes = []
 
     def _make_map_data(mode_data, fallback_map: str = ""):
-        """Build a map dict with image, name, start_fmt, end_fmt, end."""
+        """Build a map dict with image, name, start_fmt, end_fmt, end.
+        Uses real start/end timestamps from API when available,
+        falls back to computing from remaining timer + hardcoded duration."""
         if not mode_data or not mode_data.map:
             return None
-        remaining_sec = _parse_timer(mode_data.remaining_timer)
-        end_ts = int(_time.time()) + remaining_sec
-        duration = _BR_DURATION
-        start_ts = end_ts - duration
+        # Prefer real API timestamps (available from v2 API)
+        start_ts = getattr(mode_data, 'start', 0)
+        end_ts = getattr(mode_data, 'end', 0)
+        if not start_ts or not end_ts:
+            # Fallback: compute from remaining timer
+            remaining_sec = _parse_timer(mode_data.remaining_timer)
+            end_ts = int(_time.time()) + remaining_sec
+            duration = _BR_DURATION
+            start_ts = end_ts - duration
+        else:
+            start_ts = int(start_ts)
+            end_ts = int(end_ts)
         return {
             "image": _map_url(mode_data.map),
             "name": _MAP_ZH.get(mode_data.map, mode_data.map),
@@ -968,7 +981,7 @@ def _build_map_rotation_html(rotation) -> str:
             "next": [next_map] if next_map else [],
         })
 
-    # LTM
+    # 混合模式 (Mixtape — 原 LTM)
     if rotation.ltm_current and rotation.ltm_current.map:
         ltm_key = rotation.ltm_current.event_name.lower().replace(" ", "-") if rotation.ltm_current.event_name else "ltm"
         cur_map = _make_map_data(rotation.ltm_current)
@@ -976,7 +989,20 @@ def _build_map_rotation_html(rotation) -> str:
         if cur_map:
             modes.append({
                 "key": f"ltm-{ltm_key}",
-                "name": rotation.ltm_current.event_name or "限时模式",
+                "name": "混合模式",
+                "event_name": rotation.ltm_current.event_name or "",
+                "current": cur_map,
+                "next": [nxt_map] if nxt_map else [],
+            })
+
+    # 外卡（Wildcard）
+    if hasattr(rotation, 'wildcard_current') and rotation.wildcard_current and rotation.wildcard_current.map:
+        cur_map = _make_map_data(rotation.wildcard_current)
+        nxt_map = _make_map_data(rotation.wildcard_next)
+        if cur_map:
+            modes.append({
+                "key": "wildcard",
+                "name": "外卡",
                 "current": cur_map,
                 "next": [nxt_map] if nxt_map else [],
             })
@@ -1006,7 +1032,7 @@ def _build_predator_html(predator) -> str:
         if not pd:
             continue
         rp_imgs = _render_moe_digits_list(pd.predator_cap)
-        # No historical RP change data — show flat
+        # No historical RP change data from API
         change_class = "flat"
         change_text = "— RP"
         count_fmt = f"{pd.masters_and_preds:,}"
