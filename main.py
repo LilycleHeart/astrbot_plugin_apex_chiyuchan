@@ -68,6 +68,11 @@ class XiaoChiyu(Star):
             except Exception:
                 pass
 
+        # 时区 & 卡片主题
+        from .libs.playwright_manager import set_timezone, set_color_scheme
+        set_timezone(config.get("timezone", "Asia/Shanghai"))
+        set_color_scheme(config.get("color_scheme", "dark"))
+
         self._fire_and_forget(self._on_init(), "DB初始化")
 
     def _fire_and_forget(self, coro, name: str = ""):

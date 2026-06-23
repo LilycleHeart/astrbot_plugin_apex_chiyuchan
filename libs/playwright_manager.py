@@ -14,6 +14,20 @@ _semaphore = asyncio.Semaphore(2)
 _context_pool: asyncio.Queue[BrowserContext] = asyncio.Queue()
 _CONTEXT_POOL_SIZE = 2
 
+# 时区 & 主题（通过 main.py 从插件配置读取）
+_TIMEZONE_ID = "Asia/Shanghai"
+_COLOR_SCHEME = "dark"
+
+
+def set_timezone(tz: str):
+    global _TIMEZONE_ID
+    _TIMEZONE_ID = tz
+
+
+def set_color_scheme(scheme: str):
+    global _COLOR_SCHEME
+    _COLOR_SCHEME = scheme
+
 # 性能监控
 _stats: dict[str, list[float]] = {
     "sem_wait": [],
@@ -73,7 +87,11 @@ async def _get_context() -> BrowserContext:
     except asyncio.QueueEmpty:
         browser = await get_browser()
         t0 = time.perf_counter()
-        ctx = await browser.new_context(viewport={"width": 1280, "height": 800})
+        ctx = await browser.new_context(
+            viewport={"width": 1280, "height": 800},
+            timezone_id=_TIMEZONE_ID,
+            color_scheme=_COLOR_SCHEME,
+        )
         _log_stat("ctx_create", time.perf_counter() - t0)
         return ctx
 

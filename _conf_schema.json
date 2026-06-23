@@ -5,6 +5,18 @@
     "hint": "在 https://portal.apexlegendsapi.com 免费注册获取",
     "obvious_hint": true
   },
+  "timezone": {
+    "description": "卡片显示时区（地图轮换时间）",
+    "type": "string",
+    "default": "Asia/Shanghai",
+    "hint": "例如 Asia/Shanghai, America/New_York, UTC"
+  },
+  "color_scheme": {
+    "description": "卡片主题色调",
+    "type": "string",
+    "default": "dark",
+    "hint": "dark 或 light"
+  },
   "monitor_interval": {
     "description": "服务器状态监控检查间隔（秒）",
     "type": "int",
