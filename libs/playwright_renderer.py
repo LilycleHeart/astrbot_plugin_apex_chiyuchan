@@ -920,6 +920,18 @@ _MAP_ZH = {
     "Encore": "安可",
     "Party Crasher": "派对破坏者",
     "Drop-Off": "空降区",
+    # 混合模式地图
+    "Barometer": "气压计",
+    "Zeus Station": "宙斯站",
+    "Thunderdome": "雷霆穹顶",
+}
+
+# 混合模式类型翻译
+_MODE_ZH = {
+    "Control": "区域控制",
+    "TDM": "团队死斗",
+    "Gun Run": "枪械升级赛",
+    "Lockdown": "移动据点争夺",
 }
 
 
@@ -965,9 +977,18 @@ def _build_map_rotation_html(rotation) -> str:
         else:
             start_ts = int(start_ts)
             end_ts = int(end_ts)
+        # 翻译地图名（支持 "Map - Mode" 格式）
+        raw_name = mode_data.map
+        if " - " in raw_name:
+            map_part, mode_part = raw_name.split(" - ", 1)
+            translated_map = _MAP_ZH.get(map_part.strip(), map_part.strip())
+            translated_mode = _MODE_ZH.get(mode_part.strip(), mode_part.strip())
+            display_name = f"{translated_map} - {translated_mode}"
+        else:
+            display_name = _MAP_ZH.get(raw_name, raw_name)
         return {
-            "image": _map_url(mode_data.map),
-            "name": _MAP_ZH.get(mode_data.map, mode_data.map),
+            "image": _map_url(raw_name.split(" - ")[0].strip() if " - " in raw_name else raw_name),
+            "name": display_name,
             "start_fmt": _dt.datetime.fromtimestamp(start_ts, tz=_CST).strftime("%H:%M"),
             "end_fmt": _dt.datetime.fromtimestamp(end_ts, tz=_CST).strftime("%H:%M"),
             "end": end_ts,
