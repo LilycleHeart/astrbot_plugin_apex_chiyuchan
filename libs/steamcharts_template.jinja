@@ -12,21 +12,21 @@
 :root {
   --md-primary: #1565C0;
   --md-on-primary: #FFFFFF;
-  --md-primary-container: #D1E4FF;
-  --md-on-primary-container: #001D3C;
-  --md-secondary-container: #D5E8CF;
-  --md-on-secondary-container: #101F10;
-  --md-tertiary-container: #BCEBEF;
+  --md-primary-container: #D4E3FC;
+  --md-on-primary-container: #0B1A30;
+  --md-secondary-container: #D4E3FC;
+  --md-on-secondary-container: #0B1A30;
+  --md-tertiary-container: #BCEBEC;
   --md-on-tertiary-container: #002022;
-  --md-surface: #F7FBF3;
-  --md-on-surface: #181D17;
-  --md-surface-variant: #DEE5D9;
-  --md-on-surface-variant: #424940;
-  --md-outline-variant: #C6C9BE;
-  --md-surface-container-low: #F1F5ED;
-  --md-surface-container: #EBEFE8;
-  --md-surface-container-high: #E6E9E2;
-  --md-surface-container-highest: #E0E4DD;
+  --md-surface: #F8FAFF;
+  --md-on-surface: #181B20;
+  --md-surface-variant: #DDE3F0;
+  --md-on-surface-variant: #43474F;
+  --md-outline-variant: #C3C6CF;
+  --md-surface-container-low: #EFF2F9;
+  --md-surface-container: #E9ECF4;
+  --md-surface-container-high: #E3E6EE;
+  --md-surface-container-highest: #DDE0E8;
   --md-success: #2E7D32;
   --md-shadow-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
   --md-shadow-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
@@ -35,22 +35,22 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --md-primary: #A8C8FF;
-    --md-on-primary: #003258;
-    --md-primary-container: #00497D;
-    --md-on-primary-container: #D1E4FF;
-    --md-secondary-container: #3B4B39;
-    --md-on-secondary-container: #D5E8CF;
+    --md-on-primary: #002F65;
+    --md-primary-container: #00458C;
+    --md-on-primary-container: #A8C8FF;
+    --md-secondary-container: #324560;
+    --md-on-secondary-container: #D4E3FC;
     --md-tertiary-container: #1F4D51;
-    --md-on-tertiary-container: #BCEBEF;
-    --md-surface: #0F1510;
-    --md-on-surface: #E0E4DD;
-    --md-surface-variant: #424940;
-    --md-on-surface-variant: #C6C9BE;
-    --md-outline-variant: #424940;
-    --md-surface-container-low: #181D17;
-    --md-surface-container: #1C211B;
-    --md-surface-container-high: #262B25;
-    --md-surface-container-highest: #31362F;
+    --md-on-tertiary-container: #BCEBEC;
+    --md-surface: #101419;
+    --md-on-surface: #E0E2E9;
+    --md-surface-variant: #43474F;
+    --md-on-surface-variant: #C3C6CF;
+    --md-outline-variant: #43474F;
+    --md-surface-container-low: #1A1D24;
+    --md-surface-container: #1E2228;
+    --md-surface-container-high: #282C34;
+    --md-surface-container-highest: #32363E;
     --md-success: #7DD87D;
     --md-shadow-1: 0 1px 2px rgba(0,0,0,0.6), 0 1px 3px 1px rgba(0,0,0,0.4);
     --md-shadow-2: 0 1px 2px rgba(0,0,0,0.6), 0 2px 6px 2px rgba(0,0,0,0.4);
@@ -62,7 +62,7 @@ html, body { height: 100%; }
 
 body {
   font-family: 'Roboto Flex', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: transparent;
+  background: radial-gradient(ellipse at top, color-mix(in srgb, var(--md-primary) 8%, var(--md-surface)), var(--md-surface) 60%);
   color: var(--md-on-surface);
   min-height: 100vh;
   display: flex;
@@ -233,8 +233,7 @@ body {
   </div>
 
   <div class="attribution">
-    数据来源 <a href="https://steamcharts.com/app/{{ app_id }}" target="_blank" rel="noopener">steamcharts.com</a> · 不隶属于 Valve<br>
-    auth.赤羽真白 · Apex Chiyuchan
+    数据来源 <a href="https://steamcharts.com/app/{{ app_id }}" target="_blank" rel="noopener">steamcharts.com</a> · 不隶属于 Valve · auth.赤羽真白 · Apex Chiyuchan
   </div>
 </div>
 
@@ -274,7 +273,7 @@ new Chart(ctx, {
       pointRadius: 0,
       pointHoverRadius: 5,
       pointHoverBackgroundColor: isDark ? '#A8C8FF' : '#1565C0',
-      pointHoverBorderColor: isDark ? '#0F1510' : '#F7FBF3',
+      pointHoverBorderColor: isDark ? '#101419' : '#F8FAFF',
       pointHoverBorderWidth: 2,
       borderWidth: 2,
     }]
@@ -286,7 +285,7 @@ new Chart(ctx, {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: isDark ? '#31362F' : '#1A2618',
+        backgroundColor: isDark ? '#282C34' : '#1E2228',
         titleColor: '#FFFFFF',
         bodyColor: '#FFFFFF',
         padding: 12,
@@ -304,9 +303,9 @@ new Chart(ctx, {
     scales: {
       x: {
         grid: { display: false },
-        border: { color: isDark ? '#424940' : '#C6C9BE' },
+        border: { color: isDark ? '#43474F' : '#C3C6CF' },
         ticks: {
-          color: isDark ? '#C6C9BE' : '#424940',
+          color: isDark ? '#C3C6CF' : '#43474F',
           font: { size: 10 },
           maxRotation: 0,
           autoSkip: true,
@@ -314,10 +313,10 @@ new Chart(ctx, {
         }
       },
       y: {
-        grid: { color: isDark ? 'rgba(66, 73, 64, 0.5)' : 'rgba(66, 73, 64, 0.18)' },
+        grid: { color: isDark ? 'rgba(67, 71, 79, 0.5)' : 'rgba(67, 71, 79, 0.18)' },
         border: { display: false },
         ticks: {
-          color: isDark ? '#C6C9BE' : '#424940',
+          color: isDark ? '#C3C6CF' : '#43474F',
           font: { size: 10 },
           callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v
         }

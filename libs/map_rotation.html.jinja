@@ -1,73 +1,386 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex Legends 地图轮换</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}
-.card{width:680px;background:{{ card_color }};border-radius:24px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.4)}
-.title{padding:18px 28px;font-size:20px;font-weight:800;color:{{ text_color }};letter-spacing:0.5px;border-bottom:1px solid {{ outline_color }}}
+:root {
+  --md-primary: #1565C0;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #D4E3FC;
+  --md-on-primary-container: #0B1A30;
+  --md-secondary-container: #D4E3FC;
+  --md-on-secondary-container: #0B1A30;
+  --md-surface: #F8FAFF;
+  --md-on-surface: #181B20;
+  --md-surface-variant: #DDE3F0;
+  --md-on-surface-variant: #43474F;
+  --md-outline-variant: #C3C6CF;
+  --md-surface-container-low: #EFF2F9;
+  --md-surface-container: #E9ECF4;
+  --md-surface-container-high: #E3E6EE;
+  --md-surface-container-highest: #DDE0E8;
+  --md-success: #2E7D32;
+  --md-shadow-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+}
 
-.mode-card{position:relative;height:200px;overflow:hidden}
-.mode-card:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.06)}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-primary: #A8C8FF;
+    --md-on-primary: #002F65;
+    --md-primary-container: #00458C;
+    --md-on-primary-container: #A8C8FF;
+  --md-secondary-container: #324560;
+  --md-on-secondary-container: #D4E3FC;
+  --md-surface: #101419;
+  --md-on-surface: #E0E2E9;
+  --md-surface-variant: #43474F;
+  --md-on-surface-variant: #C3C6CF;
+  --md-outline-variant: #43474F;
+  --md-surface-container-low: #1A1D24;
+  --md-surface-container: #1E2228;
+  --md-surface-container-high: #282C34;
+  --md-surface-container-highest: #32363E;
+    --md-success: #7DD87D;
+    --md-shadow-1: 0 1px 2px rgba(0,0,0,0.6), 0 1px 3px 1px rgba(0,0,0,0.4);
+    --md-shadow-2: 0 1px 2px rgba(0,0,0,0.6), 0 2px 6px 2px rgba(0,0,0,0.4);
+  }
+}
 
-.split-bg-container{position:absolute;inset:0;background:#121212;z-index:1}
-.bg-img{position:absolute;top:0;width:70%;height:100%;background-size:cover;background-position:center}
-.bg-left{left:0;-webkit-mask-image:linear-gradient(to right,black 50%,transparent 100%);mask-image:linear-gradient(to right,black 50%,transparent 100%)}
-.bg-right{right:0;-webkit-mask-image:linear-gradient(to left,black 50%,transparent 100%);mask-image:linear-gradient(to left,black 50%,transparent 100%)}
-.hud-arrow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:36px;z-index:5;filter:drop-shadow(0 0 6px rgba(255,255,255,0.4))}
-.hud-arrow svg{width:100%;height:100%}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
 
-.content-layer{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:20px 28px;background:linear-gradient(180deg,rgba(0,0,0,0.35) 0%,rgba(0,0,0,0) 35%,rgba(0,0,0,0.75) 100%)}
-.top-row{display:flex;justify-content:space-between;align-items:flex-start}
-.badge{font-size:11px;font-weight:800;padding:5px 14px;border-radius:8px;text-transform:uppercase;letter-spacing:1px;color:#fff}
-.timer-chip{font-family:monospace;font-size:16px;font-weight:700;background:rgba(255,255,255,0.18);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.15);padding:6px 14px;border-radius:12px;color:{{ text_color }}}
-.bottom-row{display:flex;align-items:flex-end;gap:24px}
-.cur-info,.next-info{display:flex;flex-direction:column;gap:2px}
-.meta-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.5)}
-.cur-name{font-size:28px;font-weight:900;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6);line-height:1.1}
-.next-name{font-size:16px;font-weight:700;color:rgba(255,255,255,0.75)}
-.divider{flex:1;height:1px;background:rgba(255,255,255,0.15);align-self:flex-end;margin-bottom:8px}
-.footer{padding:10px 28px;font-size:11px;color:{{ muted_color }};text-align:center;line-height:1.6}
+body {
+  font-family: 'Roboto Flex', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: transparent;
+  color: var(--md-on-surface);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  background: var(--md-surface-container-low);
+  border-radius: 28px;
+  box-shadow: var(--md-shadow-2);
+  overflow: hidden;
+  max-width: 520px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding: 20px 16px 4px 16px;
+  gap: 16px;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---- Mode section ---- */
+.mode-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  z-index: 2;
+}
+
+.mode-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.mode-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  letter-spacing: -0.2px;
+}
+
+.mode-countdown {
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+.mode-countdown-label {
+  opacity: 0.7;
+  margin-right: 4px;
+}
+
+.mode-countdown-value {
+  color: var(--md-primary);
+  font-weight: 500;
+}
+
+/* ---- Rotation strip (2 tiles: now -> next) ---- */
+.rotation-strip {
+  display: flex;
+  height: 120px;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  background: var(--md-surface-container);
+}
+
+.map-tile {
+  flex: 1 1 0;
+  position: relative;
+  min-width: 0;
+}
+
+.map-tile:not(:first-child) {
+  margin-left: -80px;
+}
+
+.map-image-layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* Next map: fade the LEFT edge out so it blends into the current tile.
+   Gradient is wide (0 -> 80px) and soft (alpha ramp) for a natural crossfade. */
+.map-tile:not(:first-child) .map-image-layer {
+  -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0, rgba(0,0,0,0.35) 24px, rgba(0,0,0,1) 80px);
+  mask-image: linear-gradient(to right, rgba(0,0,0,0) 0, rgba(0,0,0,0.35) 24px, rgba(0,0,0,1) 80px);
+}
+
+/* Current map: fade the RIGHT edge out so the next tile's image shows through
+   on the right side, creating a true two-way crossfade in the overlap zone. */
+.map-tile:first-child .map-image-layer {
+  -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) calc(100% - 80px), rgba(0,0,0,0.35) calc(100% - 24px), rgba(0,0,0,0) 100%);
+  mask-image: linear-gradient(to right, rgba(0,0,0,1) calc(100% - 80px), rgba(0,0,0,0.35) calc(100% - 24px), rgba(0,0,0,0) 100%);
+}
+
+.map-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: brightness(2);
+}
+
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 100%);
+}
+
+.map-content {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px 14px;
+  color: #fff;
+  min-width: 0;
+}
+
+/* Current tile: left-aligned (kicker top-left, info bottom-left) */
+.map-tile:first-child .map-content {
+  align-items: flex-start;
+  text-align: left;
+}
+
+/* Next tile: right-aligned. Left padding reserves space for the
+   overlap/arrow zone so text never sits on top of the arrow. */
+.map-tile:not(:first-child) .map-content {
+  align-items: flex-end;
+  text-align: right;
+  padding-left: 90px;
+}
+
+.map-kicker {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  padding: 2px 7px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+/* Current tile: top-left */
+.map-tile:first-child .map-kicker {
+  align-self: flex-start;
+}
+
+/* Next tile: top-right */
+.map-tile:not(:first-child) .map-kicker {
+  align-self: flex-end;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.map-info {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-name {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.map-time {
+  font-size: 11px;
+  opacity: 0.85;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Arrow between tiles ----
+   Positioned at the center of the 80px overlap zone (40px from the tile's left edge). */
+.map-arrow {
+  position: absolute;
+  left: 40px;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.map-arrow svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* ---- Attribution ---- */
+.attribution {
+  padding: 10px 12px 16px 12px;
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  line-height: 1.5;
+  position: relative;
+  z-index: 2;
+}
+
+.attribution a {
+  color: var(--md-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.attribution a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 <div class="card">
-<div class="title">地图轮换</div>
-{% for mode in modes %}
-<div class="mode-card">
-    <div class="split-bg-container">
-        {% if mode.cur_bg %}<div class="bg-img bg-left" style="background-image:url({{ mode.cur_bg }})"></div>{% endif %}
-        <div class="hud-arrow">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" d="M6,18L14.5,12L6,6M13,18L21.5,12L13,6"/>
-            </svg>
-        </div>
-        {% if mode.nxt_bg %}<div class="bg-img bg-right" style="background-image:url({{ mode.nxt_bg }})"></div>{% endif %}
+  {%- for mode in modes %}
+  <section class="mode-section" data-mode="{{ mode.key }}">
+    <div class="mode-header">
+      <div class="mode-name">{{ mode.name }}</div>
+      <div class="mode-countdown">
+        <span class="mode-countdown-label">剩余</span><span class="mode-countdown-value" data-countdown="{{ mode.current.end }}">--:--</span>
+      </div>
     </div>
-    <div class="content-layer">
-        <div class="top-row">
-            <span class="badge" style="background:{{ mode.badge_color }}">{{ mode.label }}</span>
-            <span class="timer-chip">{{ mode.timer }}</span>
+    <div class="rotation-strip">
+      {# Tile 1: current map #}
+      <div class="map-tile">
+        <div class="map-image-layer">
+          <div class="map-bg" style="background-image: url('{{ mode.current.image }}');"></div>
+          <div class="map-overlay"></div>
         </div>
-        <div class="bottom-row">
-            <div class="cur-info">
-                <span class="meta-label">当前地图</span>
-                <span class="cur-name">{{ mode.cur_name }}</span>
-            </div>
-            <div class="divider"></div>
-            <div class="next-info">
-                <span class="meta-label">下一张</span>
-                <span class="next-name">{{ mode.nxt_name }}</span>
-            </div>
+        <div class="map-content">
+          <span class="map-kicker">现在</span>
+          <div class="map-info">
+            <div class="map-name">{{ mode.current.name }}</div>
+            <div class="map-time">{{ mode.current.start_fmt }} - {{ mode.current.end_fmt }}</div>
+          </div>
         </div>
+      </div>
+      {# Tile 2: next map (if any) #}
+      {%- if mode.next %}
+      <div class="map-tile">
+        <div class="map-arrow">
+          <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+        </div>
+        <div class="map-image-layer">
+          <div class="map-bg" style="background-image: url('{{ mode.next[0].image }}');"></div>
+          <div class="map-overlay"></div>
+        </div>
+        <div class="map-content">
+          <span class="map-kicker">下一张</span>
+          <div class="map-info">
+            <div class="map-name">{{ mode.next[0].name }}</div>
+            <div class="map-time">{{ mode.next[0].start_fmt }} - {{ mode.next[0].end_fmt }}</div>
+          </div>
+        </div>
+      </div>
+      {%- endif %}
     </div>
+  </section>
+  {%- endfor %}
+
+  <div class="attribution">
+    数据来源 <a href="https://apexlegendsstatus.com/current-map" target="_blank" rel="noopener">apexlegendsstatus.com</a> · auth.赤羽真白 · Apex Chiyuchan
+  </div>
 </div>
-{% endfor %}
-<div class="footer">
-    Data: apexlegendsstatus.com · 背景: EA<br>
-    auth.赤羽真白 · Apex Chiyuchan
-</div>
-</div>
+
+<script>
+// Countdown ticks for each mode-section's current map
+function fmtCountdown(seconds) {
+  if (seconds < 0) seconds = 0;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) {
+    return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function tick() {
+  const now = Math.floor(Date.now() / 1000);
+  document.querySelectorAll('[data-countdown]').forEach(function(el) {
+    const end = parseInt(el.dataset.countdown, 10);
+    el.textContent = fmtCountdown(end - now);
+  });
+}
+
+tick();
+setInterval(tick, 1000);
+</script>
 </body>
 </html>

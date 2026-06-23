@@ -579,6 +579,33 @@ def _render_moe_number_base64(number: int) -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
+def _render_moe_digits_list(number: int) -> list[str]:
+    """Render each digit as individual base64 data URIs (Moe Counter style).
+    Returns a list of data URI strings, one per digit."""
+    from .image_renderer import _moe_digit_frames, _load_moe_digits
+
+    _load_moe_digits()
+    digits = str(number)
+    if not _moe_digit_frames:
+        return []
+
+    scale = 100 / 100.0
+    dw = int(45 * scale)
+    total_h = 100
+    result = []
+    for ch in digits:
+        frames = _moe_digit_frames.get(ch, [])
+        if not frames:
+            continue
+        frame = frames[0]
+        resized = frame.resize((dw, total_h), Image.LANCZOS)
+        canvas = Image.new("RGBA", (dw, total_h), (0, 0, 0, 0))
+        canvas.paste(resized, (0, 0), resized)
+        buf = io.BytesIO()
+        canvas.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        result.append(f"data:image/png;base64,{b64}")
+    return result
 
 
 # ══════════════════════════════════════════
@@ -716,56 +743,103 @@ def _locale_section_name(name: str) -> str:
     return _ALS_SECTION_NAMES.get(name.strip(), name)
 
 
+# ── Region name → flag icon code mapping ──
+_REGION_FLAGS = {
+    "tokyo": "jp", "london": "gb", "dallas": "us", "frankfurt": "de",
+    "singapore": "sg", "sydney": "au", "são paulo": "br", "salt lake city": "us",
+    "oregon": "us", "bahrain": "bh", "hong kong": "hk", "miami": "us",
+    "vancouver": "ca", "taipei": "tw", "seoul": "kr", "chile": "cl",
+    "peru": "pe", "mumbai": "in", "south africa": "za", "japan": "jp",
+    "iowa": "us", "ohio": "us", "netherlands": "nl", "paris": "fr",
+    "madrid": "es", "milan": "it", "stockholm": "se", "warsaw": "pl",
+    "vienna": "at", "prague": "cz", "dubai": "ae", "istanbul": "tr",
+    "moskow": "ru", "moscow": "ru", "india": "in", "jakarta": "id",
+    "bangkok": "th", "osaka": "jp", "kansas city": "us", "atlanta": "us",
+    "seattle": "us", "los angeles": "us", "new york": "us", "chicago": "us",
+    "san jose": "us", "ashburn": "us",
+}
+
+
+def _region_flag(entry_name: str) -> str:
+    """Guess flag code from region / datacenter name (ALS entry name)."""
+    name_lower = entry_name.strip().lower()
+    if name_lower in _REGION_FLAGS:
+        return _REGION_FLAGS[name_lower]
+    first_word = name_lower.split()[0] if name_lower else ""
+    if first_word in _REGION_FLAGS:
+        return _REGION_FLAGS[first_word]
+    return ""
+
+
+def _latency_color(response_time: str) -> str:
+    """Classify latency from response_time string like '72 ms', '100% up'."""
+    import re
+    m = re.search(r"(\d+)", response_time)
+    if m:
+        ms = int(m.group(1))
+        if ms < 100:
+            return "good"
+        elif ms < 300:
+            return "medium"
+    return "good" if "up" in response_time.lower() else "medium"
+
+
+def _status_class_dot(status: str) -> str:
+    """Map ALS status string to template CSS class (running/degraded/down)."""
+    s = status.upper()
+    if "DOWN" in s:
+        return "down"
+    if "UNSTABLE" in s or "SLOW" in s:
+        return "degraded"
+    return "running"
+
+
 def _build_server_status_html(server_status) -> str:
     als = getattr(server_status, "als", None)
+    services = []
 
-    sections = []
     if als and als.sections:
-        for sec in als.sections:
-            s_lower = sec.status.lower()
-            is_unstable = "unstable" in s_lower or "slow" in s_lower
-            is_down = "down" in s_lower
-            pill_class = "down" if is_down else ("unstable" if is_unstable else "up")
+        # Compute overall status across all sections
+        any_down = any("down" in sec.status.lower() for sec in als.sections)
+        any_unstable = any(
+            "unstable" in sec.status.lower() or "slow" in sec.status.lower()
+            for sec in als.sections
+        )
+        if any_down:
+            overall_class = "down"
+            overall_text = "部分服务宕机"
+        elif any_unstable:
+            overall_class = "degraded"
+            overall_text = "部分服务异常"
+        else:
+            overall_class = "running"
+            overall_text = "全部服务正常运行"
 
-            entries = []
+        for sec in als.sections:
+            regions = []
             for entry in sec.entries[:5]:
-                e_upper = entry.status.upper()
-                if "DOWN" in e_upper:
-                    state_class = "down"
-                    dot_color = "#FF4444"
-                elif "UNSTABLE" in e_upper or "SLOW" in e_upper:
-                    state_class = "unstable"
-                    dot_color = "#FFA500"
-                elif is_down or is_unstable:
-                    state_class = "unstable"
-                    dot_color = "#FFA500"
-                else:
-                    state_class = "up"
-                    dot_color = "#4CE5B1"
-                entries.append({
+                regions.append({
+                    "flag": _region_flag(entry.name),
                     "name": _escape_html(entry.name),
-                    "state_class": state_class,
-                    "dot_color": dot_color,
-                    "status_text": _escape_html(_locale_status(entry.status)),
-                    "response_time": _escape_html(entry.response_time),
+                    "state_class": _status_class_dot(entry.status),
+                    "state": _escape_html(_locale_status(entry.status)),
+                    "latency_color": _latency_color(entry.response_time),
+                    "detail": _escape_html(entry.response_time),
                 })
 
-            sections.append({
+            services.append({
                 "name": _escape_html(_locale_section_name(sec.name)),
-                "pill_class": pill_class,
-                "status_text": _escape_html(_locale_status(sec.status)),
-                "entries": entries,
+                "status_class": _status_class_dot(sec.status),
+                "regions": regions,
             })
+    else:
+        overall_class = "running"
+        overall_text = "全部服务正常运行"
 
     context = {
-        "text_color": _C_TEXT,
-        "card_color": _C_CARD,
-        "card2_color": _C_CARD2,
-        "outline_color": _C_OUTLINE,
-        "muted_color": _C_MUTED,
-        "alert_banner": _escape_html(als.alert_banner) if als and als.alert_banner else "",
-        "outage_announcement": als.outage_announcement if als else False,
-        "sections": sections,
+        "overall_class": overall_class,
+        "overall_text": overall_text,
+        "services": services,
     }
     return _get_jinja_template("server_status.html.jinja").render(**context)
 
@@ -835,38 +909,79 @@ _MAP_ZH = {
 }
 
 
+def _parse_timer(timer_str: str) -> int:
+    """Parse 'HH:MM:SS' or 'MM:SS' timer string to total seconds."""
+    import re
+    m = re.match(r"(?:(\d+):)?(\d+):(\d+)$", timer_str.strip())
+    if not m:
+        return 0
+    h = int(m.group(1)) if m.group(1) else 0
+    mm = int(m.group(2))
+    s = int(m.group(3))
+    return h * 3600 + mm * 60 + s
+
+
+_BR_DURATION = 5400  # 90 min — standard BR/ranked rotation
+
+
 def _build_map_rotation_html(rotation) -> str:
+    import time as _time
+    import datetime as _dt
+
     modes = []
 
-    def _add_mode(label: str, badge_color: str, current, next_):
-        cur_map = current.map if current else ""
-        nxt_map = next_.map if next_ else ""
+    def _make_map_data(mode_data, fallback_map: str = ""):
+        """Build a map dict with image, name, start_fmt, end_fmt, end."""
+        if not mode_data or not mode_data.map:
+            return None
+        remaining_sec = _parse_timer(mode_data.remaining_timer)
+        end_ts = int(_time.time()) + remaining_sec
+        duration = _BR_DURATION
+        start_ts = end_ts - duration
+        return {
+            "image": _map_url(mode_data.map),
+            "name": _MAP_ZH.get(mode_data.map, mode_data.map),
+            "start_fmt": _dt.datetime.fromtimestamp(start_ts).strftime("%H:%M"),
+            "end_fmt": _dt.datetime.fromtimestamp(end_ts).strftime("%H:%M"),
+            "end": end_ts,
+        }
+
+    # 匹配 (Pubs)
+    current_map = _make_map_data(rotation.br_current)
+    next_map = _make_map_data(rotation.br_next)
+    if current_map:
         modes.append({
-            "label": label,
-            "badge_color": badge_color,
-            "timer": current.remaining_timer if current else "",
-            "cur_name": _MAP_ZH.get(cur_map, cur_map),
-            "nxt_name": _MAP_ZH.get(nxt_map, nxt_map),
-            "cur_bg": _map_url(cur_map),
-            "nxt_bg": _map_url(nxt_map),
+            "key": "pubs",
+            "name": "匹配",
+            "current": current_map,
+            "next": [next_map] if next_map else [],
         })
 
-    _add_mode("匹配", "#DA292A", rotation.br_current, rotation.br_next)
-    _add_mode("排位", "#E7C150", rotation.ranked_current, rotation.ranked_next)
+    # 排位 (Ranked)
+    current_map = _make_map_data(rotation.ranked_current)
+    next_map = _make_map_data(rotation.ranked_next)
+    if current_map:
+        modes.append({
+            "key": "ranked",
+            "name": "排位",
+            "current": current_map,
+            "next": [next_map] if next_map else [],
+        })
 
-    if rotation.ltm_current and rotation.ltm_current.event_name:
-        _add_mode(
-            rotation.ltm_current.event_name,
-            "#5D9FF0",
-            rotation.ltm_current,
-            rotation.ltm_next,
-        )
+    # LTM
+    if rotation.ltm_current and rotation.ltm_current.map:
+        ltm_key = rotation.ltm_current.event_name.lower().replace(" ", "-") if rotation.ltm_current.event_name else "ltm"
+        cur_map = _make_map_data(rotation.ltm_current)
+        nxt_map = _make_map_data(rotation.ltm_next)
+        if cur_map:
+            modes.append({
+                "key": f"ltm-{ltm_key}",
+                "name": rotation.ltm_current.event_name or "限时模式",
+                "current": cur_map,
+                "next": [nxt_map] if nxt_map else [],
+            })
 
     context = {
-        "text_color": _C_TEXT,
-        "card_color": _C_CARD,
-        "outline_color": _C_OUTLINE,
-        "muted_color": _C_MUTED,
         "modes": modes,
     }
     return _get_jinja_template("map_rotation.html.jinja").render(**context)
@@ -884,35 +999,27 @@ async def draw_map_rotation_card(rotation) -> bytes:
 
 def _build_predator_html(predator) -> str:
     platforms_order = ["PC", "PS4", "X1", "SWITCH"]
-    plat_colors = {
-        "PC": "#4DABF7",
-        "PS4": "#4ECDC4",
-        "X1": "#4CE5B1",
-        "SWITCH": "#DA292A",
-    }
 
     platforms = []
     for plat in platforms_order:
         pd = predator.platforms.get(plat)
         if not pd:
             continue
-        cap_img = _render_moe_number_base64(pd.predator_cap)
-        masters_img = _render_moe_number_base64(pd.masters_and_preds)
+        rp_imgs = _render_moe_digits_list(pd.predator_cap)
+        # No historical RP change data — show flat
+        change_class = "flat"
+        change_text = "— RP"
+        count_fmt = f"{pd.masters_and_preds:,}"
+
         platforms.append({
             "name": plat,
-            "color": plat_colors.get(plat, _C_TEXT),
-            "cap_img": cap_img,
-            "cap_value": f"{pd.predator_cap:,}",
-            "masters_img": masters_img,
-            "masters_value": f"{pd.masters_and_preds:,}",
+            "rp_imgs": rp_imgs,
+            "change_class": change_class,
+            "change_text": change_text,
+            "count_fmt": count_fmt,
         })
 
     context = {
-        "text_color": _C_TEXT,
-        "card_color": _C_CARD,
-        "card2_color": _C_CARD2,
-        "outline_color": _C_OUTLINE,
-        "muted_color": _C_MUTED,
         "platforms": platforms,
     }
     return _get_jinja_template("predator.html.jinja").render(**context)
