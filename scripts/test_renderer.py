@@ -210,6 +210,7 @@ def _parse_map_rotation(raw: any):
         br = raw.get("battle_royale") or raw.get("battleRoyale") or raw.get("br") or {}
         ranked = raw.get("ranked") or raw.get("ranked_royale") or {}
         ltm = raw.get("ltm") or raw.get("ltm_mode") or {}
+        wildcard = raw.get("wildcard", {})
 
         if br and isinstance(br, dict):
             # Convert MapData for br_current
@@ -220,6 +221,7 @@ def _parse_map_rotation(raw: any):
                     "battle_royale": br,
                     "ranked": ranked,
                     "ltm": ltm,
+                    "wildcard": wildcard,
                 })
     return None
 
@@ -395,6 +397,10 @@ def _make_mock_rotation():
         "ltm": {
             "current": {"map": "Skull Town", "remainingTimer": "02:10:00", "remainingMins": 130, "eventName": "闪回大乱斗"},
             "next": {"map": "Olympus", "remainingTimer": "", "remainingMins": 0, "eventName": ""},
+        },
+        "wildcard": {
+            "current": {"map": "Habitat", "remainingTimer": "04:30:00", "remainingMins": 270},
+            "next": {"map": "Royalty", "remainingTimer": "", "remainingMins": 0},
         },
     })
     return rot

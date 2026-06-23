@@ -565,10 +565,16 @@ def _draw_map_sync(rotation) -> bytes:
     )
     cy += 4
 
+    # 外卡（Wildcard）
+    if hasattr(rotation, 'wildcard_current') and rotation.wildcard_current and rotation.wildcard_current.map:
+        ltm_text = f"外卡  · {rotation.wildcard_current.map} · 剩余 {rotation.wildcard_current.remaining_timer}"
+        draw.text((cx, cy), ltm_text, font=FONT_BODY, fill=ACCENT_BLUE)
+        cy += FONT_SIZES["body"] + 4
+
     # LTM
     ltm_current = rotation.ltm_current
     if ltm_current and ltm_current.event_name:
-        ltm_text = f"限时模式  {ltm_current.event_name} · {ltm_current.map} · 剩余 {ltm_current.remaining_timer}"
+        ltm_text = f"混合模式  {ltm_current.event_name} · {ltm_current.map} · 剩余 {ltm_current.remaining_timer}"
         draw.text((cx, cy), ltm_text, font=FONT_BODY, fill=ACCENT_GREEN)
         cy += FONT_SIZES["body"] + 4
 
