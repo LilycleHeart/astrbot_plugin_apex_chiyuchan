@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}
+.card{width:680px;background:{{ card_color }};border-radius:24px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+.title{padding:18px 28px;font-size:20px;font-weight:800;color:{{ text_color }};letter-spacing:0.5px;border-bottom:1px solid {{ outline_color }}}
+
+.mode-card{position:relative;height:200px;overflow:hidden}
+.mode-card:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.06)}
+
+.split-bg-container{position:absolute;inset:0;background:#121212;z-index:1}
+.bg-img{position:absolute;top:0;width:70%;height:100%;background-size:cover;background-position:center}
+.bg-left{left:0;-webkit-mask-image:linear-gradient(to right,black 50%,transparent 100%);mask-image:linear-gradient(to right,black 50%,transparent 100%)}
+.bg-right{right:0;-webkit-mask-image:linear-gradient(to left,black 50%,transparent 100%);mask-image:linear-gradient(to left,black 50%,transparent 100%)}
+.hud-arrow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:36px;z-index:5;filter:drop-shadow(0 0 6px rgba(255,255,255,0.4))}
+.hud-arrow svg{width:100%;height:100%}
+
+.content-layer{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:20px 28px;background:linear-gradient(180deg,rgba(0,0,0,0.35) 0%,rgba(0,0,0,0) 35%,rgba(0,0,0,0.75) 100%)}
+.top-row{display:flex;justify-content:space-between;align-items:flex-start}
+.badge{font-size:11px;font-weight:800;padding:5px 14px;border-radius:8px;text-transform:uppercase;letter-spacing:1px;color:#fff}
+.timer-chip{font-family:monospace;font-size:16px;font-weight:700;background:rgba(255,255,255,0.18);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.15);padding:6px 14px;border-radius:12px;color:{{ text_color }}}
+.bottom-row{display:flex;align-items:flex-end;gap:24px}
+.cur-info,.next-info{display:flex;flex-direction:column;gap:2px}
+.meta-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.5)}
+.cur-name{font-size:28px;font-weight:900;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6);line-height:1.1}
+.next-name{font-size:16px;font-weight:700;color:rgba(255,255,255,0.75)}
+.divider{flex:1;height:1px;background:rgba(255,255,255,0.15);align-self:flex-end;margin-bottom:8px}
+.footer{padding:10px 28px;font-size:11px;color:{{ muted_color }};text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="title">地图轮换</div>
+{% for mode in modes %}
+<div class="mode-card">
+    <div class="split-bg-container">
+        {% if mode.cur_bg %}<div class="bg-img bg-left" style="background-image:url({{ mode.cur_bg }})"></div>{% endif %}
+        <div class="hud-arrow">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" d="M6,18L14.5,12L6,6M13,18L21.5,12L13,6"/>
+            </svg>
+        </div>
+        {% if mode.nxt_bg %}<div class="bg-img bg-right" style="background-image:url({{ mode.nxt_bg }})"></div>{% endif %}
+    </div>
+    <div class="content-layer">
+        <div class="top-row">
+            <span class="badge" style="background:{{ mode.badge_color }}">{{ mode.label }}</span>
+            <span class="timer-chip">{{ mode.timer }}</span>
+        </div>
+        <div class="bottom-row">
+            <div class="cur-info">
+                <span class="meta-label">当前地图</span>
+                <span class="cur-name">{{ mode.cur_name }}</span>
+            </div>
+            <div class="divider"></div>
+            <div class="next-info">
+                <span class="meta-label">下一张</span>
+                <span class="next-name">{{ mode.nxt_name }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+<div class="footer">
+    Data: apexlegendsstatus.com · 背景: EA<br>
+    auth.赤羽真白 · Apex Chiyuchan
+</div>
+</div>
+</body>
+</html>

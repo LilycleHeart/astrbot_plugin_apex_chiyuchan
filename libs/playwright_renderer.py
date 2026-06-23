@@ -716,99 +716,58 @@ def _locale_section_name(name: str) -> str:
     return _ALS_SECTION_NAMES.get(name.strip(), name)
 
 
-def _build_als_alert_html(als) -> str:
-    parts = ""
-    if als and als.alert_banner:
-        parts += f"""<div class="als-alert"><i class="warning-icon">⚠</i><span>{_escape_html(als.alert_banner)}</span></div>"""
-    if als and als.outage_announcement:
-        parts += """<div class="als-alert als-outage"><i class="warning-icon">🔴</i><span>服务中断进行中</span></div>"""
-    return parts
-
-
-def _build_als_sections_html(als) -> str:
-    if not als or not als.sections:
-        return ""
-    html = ""
-    for sec in als.sections:
-        s_lower = sec.status.lower()
-        is_unstable = "unstable" in s_lower or "slow" in s_lower
-        is_down = "down" in s_lower
-        pill_class = "pill-down" if is_down else ("pill-unstable" if is_unstable else "pill-up")
-        sec_name = _locale_section_name(sec.name)
-        sec_pill = _locale_status(sec.status)
-        html += f"""
-        <div class="als-section">
-            <div class="als-section-head">
-                <span class="als-section-name">{_escape_html(sec_name)}</span>
-                <span class="als-pill {pill_class}">{_escape_html(sec_pill)}</span>
-            </div>"""
-        for entry in sec.entries[:5]:
-            e_upper = entry.status.upper()
-            if "DOWN" in e_upper:
-                state_class = "state-down"
-                dot_color = "#FF4444"
-            elif "UNSTABLE" in e_upper or "SLOW" in e_upper:
-                state_class = "state-unstable"
-                dot_color = "#FFA500"
-            elif is_down or is_unstable:  # section abnormal → override UP entries to orange
-                state_class = "state-unstable"
-                dot_color = "#FFA500"
-            else:
-                state_class = "state-up"
-                dot_color = "#4CE5B1"
-            entry_status = _locale_status(entry.status)
-            html += f"""
-            <div class="als-row">
-                <span class="dot" style="background:{dot_color}"></span>
-                <span class="als-row-name">{_escape_html(entry.name)}</span>
-                <span class="als-row-state {state_class}">{_escape_html(entry_status)}</span>
-                <span class="als-row-rt">{_escape_html(entry.response_time)}</span>
-            </div>"""
-        html += "</div>"
-    return html
-
-
 def _build_server_status_html(server_status) -> str:
     als = getattr(server_status, "als", None)
 
-    alert_html = _build_als_alert_html(als)
-    als_sections_html = _build_als_sections_html(als)
+    sections = []
+    if als and als.sections:
+        for sec in als.sections:
+            s_lower = sec.status.lower()
+            is_unstable = "unstable" in s_lower or "slow" in s_lower
+            is_down = "down" in s_lower
+            pill_class = "down" if is_down else ("unstable" if is_unstable else "up")
 
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;color:{_C_TEXT};display:flex;justify-content:center;padding:24px}}
-.card{{width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;box-shadow:0 10px 20px rgba(0,0,0,.4)}}
-.header{{background:linear-gradient(135deg,{_C_CARD},{_C_CARD2});padding:20px 24px;border-bottom:1px solid {_C_OUTLINE}}}
-.header h2{{font-size:22px;font-weight:800}}
-.als-alert{{display:flex;align-items:flex-start;gap:8px;padding:12px 24px;background:rgba(255,165,0,.12);border-bottom:1px solid {_C_OUTLINE};font-size:12px;color:#FFB347;line-height:1.5}}
-.als-outage{{background:rgba(255,69,0,.18);font-weight:700;color:#FF6347}}
-.warning-icon{{flex-shrink:0;font-size:16px}}
-.als-section{{border-bottom:1px solid {_C_OUTLINE};padding:12px 24px}}
-.als-section:last-child{{border-bottom:none}}
-.als-section-head{{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}}
-.als-section-name{{font-size:14px;font-weight:700}}
-.als-pill{{font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px}}
-.pill-down{{background:rgba(255,68,68,.18);color:#FF4444}}
-.pill-unstable{{background:rgba(255,165,0,.2);color:#FFB347}}
-.pill-up{{background:rgba(76,229,177,.15);color:#4CE5B1}}
-.als-row{{display:flex;align-items:center;padding:6px 0;gap:8px}}
-.als-row .dot{{width:8px;height:8px}}
-.als-row-name{{flex:1;font-size:13px}}
-.als-row-state{{font-size:12px;font-weight:700;width:70px;text-align:center}}
-.state-unstable{{color:#FFB347}}
-.state-down{{color:#FF4444}}
-.state-up{{color:#4CE5B1}}
-.als-row-rt{{font-size:11px;color:{_C_MUTED};width:64px;text-align:right}}
-.footer{{padding:12px 24px;border-top:1px solid {_C_OUTLINE};font-size:11px;color:{_C_MUTED};text-align:center}}
-</style></head><body>
-<div class="card">
-<div class="header"><h2>Apex 服务器状态</h2></div>
-{alert_html}
-{als_sections_html}
-<div class="footer">数据来源: apexlegendsstatus.com</div>
-</div>
-</body></html>"""
+            entries = []
+            for entry in sec.entries[:5]:
+                e_upper = entry.status.upper()
+                if "DOWN" in e_upper:
+                    state_class = "down"
+                    dot_color = "#FF4444"
+                elif "UNSTABLE" in e_upper or "SLOW" in e_upper:
+                    state_class = "unstable"
+                    dot_color = "#FFA500"
+                elif is_down or is_unstable:
+                    state_class = "unstable"
+                    dot_color = "#FFA500"
+                else:
+                    state_class = "up"
+                    dot_color = "#4CE5B1"
+                entries.append({
+                    "name": _escape_html(entry.name),
+                    "state_class": state_class,
+                    "dot_color": dot_color,
+                    "status_text": _escape_html(_locale_status(entry.status)),
+                    "response_time": _escape_html(entry.response_time),
+                })
+
+            sections.append({
+                "name": _escape_html(_locale_section_name(sec.name)),
+                "pill_class": pill_class,
+                "status_text": _escape_html(_locale_status(sec.status)),
+                "entries": entries,
+            })
+
+    context = {
+        "text_color": _C_TEXT,
+        "card_color": _C_CARD,
+        "card2_color": _C_CARD2,
+        "outline_color": _C_OUTLINE,
+        "muted_color": _C_MUTED,
+        "alert_banner": _escape_html(als.alert_banner) if als and als.alert_banner else "",
+        "outage_announcement": als.outage_announcement if als else False,
+        "sections": sections,
+    }
+    return _get_jinja_template("server_status.html.jinja").render(**context)
 
 
 async def draw_server_status_card(server_status) -> bytes:
@@ -877,98 +836,40 @@ _MAP_ZH = {
 
 
 def _build_map_rotation_html(rotation) -> str:
-    def _section(mode_id: str, label: str, badge_color: str, current, next_) -> str:
+    modes = []
+
+    def _add_mode(label: str, badge_color: str, current, next_):
         cur_map = current.map if current else ""
         nxt_map = next_.map if next_ else ""
-        cur_zh = _MAP_ZH.get(cur_map, cur_map)
-        nxt_zh = _MAP_ZH.get(nxt_map, nxt_map)
-        cur_bg = _map_url(cur_map)
-        nxt_bg = _map_url(nxt_map)
-        timer = current.remaining_timer if current else ""
+        modes.append({
+            "label": label,
+            "badge_color": badge_color,
+            "timer": current.remaining_timer if current else "",
+            "cur_name": _MAP_ZH.get(cur_map, cur_map),
+            "nxt_name": _MAP_ZH.get(nxt_map, nxt_map),
+            "cur_bg": _map_url(cur_map),
+            "nxt_bg": _map_url(nxt_map),
+        })
 
-        cur_bg_css = f"background-image:url({cur_bg})" if cur_bg else ""
-        nxt_bg_css = f"background-image:url({nxt_bg})" if nxt_bg else ""
+    _add_mode("匹配", "#DA292A", rotation.br_current, rotation.br_next)
+    _add_mode("排位", "#E7C150", rotation.ranked_current, rotation.ranked_next)
 
-        return f"""
-        <div class="mode-card">
-            <div class="split-bg-container">
-                <div class="bg-img bg-left" style="{cur_bg_css}"></div>
-                <div class="hud-arrow">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" d="M6,18L14.5,12L6,6M13,18L21.5,12L13,6"/>
-                    </svg>
-                </div>
-                <div class="bg-img bg-right" style="{nxt_bg_css}"></div>
-            </div>
-            <div class="content-layer">
-                <div class="top-row">
-                    <span class="badge" style="background:{badge_color}">{label}</span>
-                    <span class="timer-chip">{timer}</span>
-                </div>
-                <div class="bottom-row">
-                    <div class="cur-info">
-                        <span class="meta-label">当前地图</span>
-                        <span class="cur-name">{cur_zh}</span>
-                    </div>
-                    <div class="divider"></div>
-                    <div class="next-info">
-                        <span class="meta-label">下一张</span>
-                        <span class="next-name">{nxt_zh}</span>
-                    </div>
-                </div>
-            </div>
-        </div>"""
-
-    br = _section("pubs", "匹配", "#DA292A", rotation.br_current, rotation.br_next)
-    ranked = _section("ranked", "排位", "#E7C150", rotation.ranked_current, rotation.ranked_next)
-
-    ltm = ""
     if rotation.ltm_current and rotation.ltm_current.event_name:
-        ltm = _section(
-            "ltm",
+        _add_mode(
             rotation.ltm_current.event_name,
             "#5D9FF0",
             rotation.ltm_current,
             rotation.ltm_next,
         )
 
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
-.card{{width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.4)}}
-.title{{padding:18px 28px;font-size:20px;font-weight:800;color:{_C_TEXT};letter-spacing:0.5px;border-bottom:1px solid {_C_OUTLINE}}}
-
-.mode-card{{position:relative;height:200px;overflow:hidden}}
-.mode-card:not(:last-child){{border-bottom:1px solid rgba(255,255,255,0.06)}}
-
-.split-bg-container{{position:absolute;inset:0;background:#121212;z-index:1}}
-.bg-img{{position:absolute;top:0;width:70%;height:100%;background-size:cover;background-position:center}}
-.bg-left{{left:0;-webkit-mask-image:linear-gradient(to right,black 50%,transparent 100%);mask-image:linear-gradient(to right,black 50%,transparent 100%)}}
-.bg-right{{right:0;-webkit-mask-image:linear-gradient(to left,black 50%,transparent 100%);mask-image:linear-gradient(to left,black 50%,transparent 100%)}}
-.hud-arrow{{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:36px;z-index:5;filter:drop-shadow(0 0 6px rgba(255,255,255,0.4))}}
-.hud-arrow svg{{width:100%;height:100%}}
-
-.content-layer{{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:20px 28px;background:linear-gradient(180deg,rgba(0,0,0,0.35) 0%,rgba(0,0,0,0) 35%,rgba(0,0,0,0.75) 100%)}}
-.top-row{{display:flex;justify-content:space-between;align-items:flex-start}}
-.badge{{font-size:11px;font-weight:800;padding:5px 14px;border-radius:8px;text-transform:uppercase;letter-spacing:1px;color:#fff}}
-.timer-chip{{font-family:monospace;font-size:16px;font-weight:700;background:rgba(255,255,255,0.18);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.15);padding:6px 14px;border-radius:12px;color:{_C_TEXT}}}
-.bottom-row{{display:flex;align-items:flex-end;gap:24px}}
-.cur-info,.next-info{{display:flex;flex-direction:column;gap:2px}}
-.meta-label{{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.5)}}
-.cur-name{{font-size:28px;font-weight:900;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6);line-height:1.1}}
-.next-name{{font-size:16px;font-weight:700;color:rgba(255,255,255,0.75)}}
-.divider{{flex:1;height:1px;background:rgba(255,255,255,0.15);align-self:flex-end;margin-bottom:8px}}
-.footer{{padding:10px 28px;font-size:11px;color:{_C_MUTED};text-align:center}}
-</style></head><body>
-<div class="card">
-<div class="title">地图轮换</div>
-{br}
-{ranked}
-{ltm}
-<div class="footer">Data: apexlegendsstatus.com · 背景: EA</div>
-</div>
-</body></html>"""
+    context = {
+        "text_color": _C_TEXT,
+        "card_color": _C_CARD,
+        "outline_color": _C_OUTLINE,
+        "muted_color": _C_MUTED,
+        "modes": modes,
+    }
+    return _get_jinja_template("map_rotation.html.jinja").render(**context)
 
 
 async def draw_map_rotation_card(rotation) -> bytes:
@@ -990,61 +891,31 @@ def _build_predator_html(predator) -> str:
         "SWITCH": "#DA292A",
     }
 
-    cells = ""
+    platforms = []
     for plat in platforms_order:
         pd = predator.platforms.get(plat)
         if not pd:
             continue
-        color = plat_colors.get(plat, _C_TEXT)
         cap_img = _render_moe_number_base64(pd.predator_cap)
         masters_img = _render_moe_number_base64(pd.masters_and_preds)
+        platforms.append({
+            "name": plat,
+            "color": plat_colors.get(plat, _C_TEXT),
+            "cap_img": cap_img,
+            "cap_value": f"{pd.predator_cap:,}",
+            "masters_img": masters_img,
+            "masters_value": f"{pd.masters_and_preds:,}",
+        })
 
-        cap_html = (
-            f'<img src="data:image/png;base64,{cap_img}" style="height:80px">'
-            if cap_img
-            else f'<span style="font-size:28px;font-weight:700;color:{_C_TEXT}">{pd.predator_cap:,}</span>'
-        )
-        masters_html = (
-            f'<img src="data:image/png;base64,{masters_img}" style="height:80px">'
-            if masters_img
-            else f'<span style="font-size:28px;font-weight:700;color:{_C_MUTED}">{pd.masters_and_preds:,}</span>'
-        )
-
-        cells += f"""
-            <div class="plat-cell">
-                <div class="plat-name" style="color:{color}">{plat}</div>
-                <div class="plat-metric">
-                    <div class="metric-label">猎杀线</div>
-                    {cap_html}
-                </div>
-                <div class="plat-divider"></div>
-                <div class="plat-metric">
-                    <div class="metric-label">大师人数</div>
-                    {masters_html}
-                </div>
-            </div>"""
-
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;color:{_C_TEXT};display:flex;justify-content:center;padding:24px}}
-.card{{width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;box-shadow:0 10px 20px rgba(0,0,0,.4)}}
-.header{{background:linear-gradient(135deg,{_C_CARD},{_C_CARD2});padding:20px 24px;border-bottom:1px solid {_C_OUTLINE}}}
-.header h2{{font-size:22px;font-weight:800}}
-.plat-grid{{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:{_C_OUTLINE}}}
-.plat-cell{{background:{_C_CARD};padding:20px;text-align:center}}
-.plat-name{{font-size:16px;font-weight:800;margin-bottom:12px}}
-.plat-metric{{margin:10px 0}}
-.metric-label{{font-size:12px;color:{_C_MUTED};margin-bottom:4px}}
-.plat-divider{{height:1px;background:{_C_OUTLINE};margin:12px 0}}
-.footer{{padding:12px 24px;border-top:1px solid {_C_OUTLINE};font-size:11px;color:{_C_MUTED};text-align:center}}
-</style></head><body>
-<div class="card">
-<div class="header"><h2>大师 / 猎杀 数据</h2></div>
-<div class="plat-grid">{cells}</div>
-<div class="footer">Data: apexlegendsstatus.com</div>
-</div>
-</body></html>"""
+    context = {
+        "text_color": _C_TEXT,
+        "card_color": _C_CARD,
+        "card2_color": _C_CARD2,
+        "outline_color": _C_OUTLINE,
+        "muted_color": _C_MUTED,
+        "platforms": platforms,
+    }
+    return _get_jinja_template("predator.html.jinja").render(**context)
 
 
 async def draw_predator_card(predator) -> bytes:
@@ -1251,22 +1122,26 @@ body{{
 
 
 # ══════════════════════════════════════════
-#  Steamcharts 日活卡片（Jinja 模板 + Chart.js）
+#  Jinja2 模板加载器（共享）
 # ══════════════════════════════════════════
 
-_STEAMCHARTS_TEMPLATE = None
+_TEMPLATE_CACHE: dict[str, "Template"] = {}
 
 
-def _get_steamcharts_template():
-    """懒加载 Jinja 模板"""
-    global _STEAMCHARTS_TEMPLATE
-    if _STEAMCHARTS_TEMPLATE is None:
+def _get_jinja_template(name: str) -> "Template":
+    """懒加载任意 Jinja 模板（缓存）"""
+    if name not in _TEMPLATE_CACHE:
         from pathlib import Path
         from jinja2 import Environment, FileSystemLoader
         tmpl_dir = Path(__file__).parent
         env = Environment(loader=FileSystemLoader(str(tmpl_dir)), autoescape=False)
-        _STEAMCHARTS_TEMPLATE = env.get_template("steamcharts_template.jinja")
-    return _STEAMCHARTS_TEMPLATE
+        _TEMPLATE_CACHE[name] = env.get_template(name)
+    return _TEMPLATE_CACHE[name]
+
+
+# ══════════════════════════════════════════
+#  Steamcharts 日活卡片（Jinja 模板 + Chart.js）
+# ══════════════════════════════════════════
 
 
 def _render_steamcharts_html(data) -> str:
@@ -1295,7 +1170,7 @@ def _render_steamcharts_html(data) -> str:
         "app_id": "1172470",
         "data": _json.dumps(raw_points),
     }
-    return _get_steamcharts_template().render(**ctx)
+    return _get_jinja_template("steamcharts_template.jinja").render(**ctx)
 
 
 async def draw_steamcharts_card(data) -> bytes:

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;color:{{ text_color }};display:flex;justify-content:center;padding:24px}
+.card{width:680px;background:{{ card_color }};border-radius:24px;overflow:hidden;box-shadow:0 10px 20px rgba(0,0,0,.4)}
+.header{background:linear-gradient(135deg,{{ card_color }},{{ card2_color }});padding:20px 24px;border-bottom:1px solid {{ outline_color }}}
+.header h2{font-size:22px;font-weight:800}
+.plat-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:{{ outline_color }}}
+.plat-cell{background:{{ card_color }};padding:20px;text-align:center}
+.plat-name{font-size:16px;font-weight:800;margin-bottom:12px}
+.plat-metric{margin:10px 0}
+.metric-label{font-size:12px;color:{{ muted_color }};margin-bottom:4px}
+.plat-divider{height:1px;background:{{ outline_color }};margin:12px 0}
+.footer{padding:12px 24px;border-top:1px solid {{ outline_color }};font-size:11px;color:{{ muted_color }};text-align:center;line-height:1.6}
+.plat-metric img{display:block;margin:0 auto}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="header"><h2>大师 / 猎杀 数据</h2></div>
+<div class="plat-grid">
+{% for plat in platforms %}
+    <div class="plat-cell">
+        <div class="plat-name" style="color:{{ plat.color }}">{{ plat.name }}</div>
+        <div class="plat-metric">
+            <div class="metric-label">猎杀线</div>
+            {% if plat.cap_img %}
+            <img src="data:image/png;base64,{{ plat.cap_img }}" style="height:80px">
+            {% else %}
+            <span style="font-size:28px;font-weight:700;color:{{ text_color }}">{{ plat.cap_value }}</span>
+            {% endif %}
+        </div>
+        <div class="plat-divider"></div>
+        <div class="plat-metric">
+            <div class="metric-label">大师人数</div>
+            {% if plat.masters_img %}
+            <img src="data:image/png;base64,{{ plat.masters_img }}" style="height:80px">
+            {% else %}
+            <span style="font-size:28px;font-weight:700;color:{{ muted_color }}">{{ plat.masters_value }}</span>
+            {% endif %}
+        </div>
+    </div>
+{% endfor %}
+</div>
+<div class="footer">
+    Data: apexlegendsstatus.com<br>
+    auth.赤羽真白 · Apex Chiyuchan
+</div>
+</div>
+</body>
+</html>

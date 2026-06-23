@@ -10,10 +10,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 :root {
-  --md-primary: #006E2C;
+  --md-primary: #1565C0;
   --md-on-primary: #FFFFFF;
-  --md-primary-container: #8DFCB0;
-  --md-on-primary-container: #002107;
+  --md-primary-container: #D1E4FF;
+  --md-on-primary-container: #001D3C;
   --md-secondary-container: #D5E8CF;
   --md-on-secondary-container: #101F10;
   --md-tertiary-container: #BCEBEF;
@@ -34,10 +34,10 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --md-primary: #71DF96;
-    --md-on-primary: #003914;
-    --md-primary-container: #005224;
-    --md-on-primary-container: #8DFCB0;
+    --md-primary: #A8C8FF;
+    --md-on-primary: #003258;
+    --md-primary-container: #00497D;
+    --md-on-primary-container: #D1E4FF;
     --md-secondary-container: #3B4B39;
     --md-on-secondary-container: #D5E8CF;
     --md-tertiary-container: #1F4D51;
@@ -254,11 +254,11 @@ function formatDate(ts) {
 const ctx = document.getElementById('trendChart').getContext('2d');
 const gradient = ctx.createLinearGradient(0, 0, 0, 200);
 if (isDark) {
-  gradient.addColorStop(0, 'rgba(113, 223, 150, 0.35)');
-  gradient.addColorStop(1, 'rgba(113, 223, 150, 0.02)');
+  gradient.addColorStop(0, 'rgba(168, 200, 255, 0.35)');
+  gradient.addColorStop(1, 'rgba(168, 200, 255, 0.02)');
 } else {
-  gradient.addColorStop(0, 'rgba(0, 110, 44, 0.25)');
-  gradient.addColorStop(1, 'rgba(0, 110, 44, 0.02)');
+  gradient.addColorStop(0, 'rgba(21, 101, 192, 0.25)');
+  gradient.addColorStop(1, 'rgba(21, 101, 192, 0.02)');
 }
 
 new Chart(ctx, {
@@ -267,13 +267,13 @@ new Chart(ctx, {
     labels: CHART_DATA.map(d => formatDate(d[0])),
     datasets: [{
       data: CHART_DATA.map(d => d[1]),
-      borderColor: isDark ? '#71DF96' : '#006E2C',
+      borderColor: isDark ? '#A8C8FF' : '#1565C0',
       backgroundColor: gradient,
       fill: true,
       tension: 0.35,
       pointRadius: 0,
       pointHoverRadius: 5,
-      pointHoverBackgroundColor: isDark ? '#71DF96' : '#006E2C',
+      pointHoverBackgroundColor: isDark ? '#A8C8FF' : '#1565C0',
       pointHoverBorderColor: isDark ? '#0F1510' : '#F7FBF3',
       pointHoverBorderWidth: 2,
       borderWidth: 2,
