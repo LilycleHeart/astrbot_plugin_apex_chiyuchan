@@ -33,6 +33,23 @@ def _escape_html(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
+def _parse_rank_name(rank_img: str) -> str:
+    """从段位图URL提取段位名，如 ranks/diamond4.png → Diamond 4"""
+    import re
+    m = re.search(r"ranks/(\w+?)(\d+)\.png", rank_img)
+    if not m:
+        return ""
+    tier = m.group(1).capitalize()
+    div = m.group(2)
+    rank_zh = {
+        "Rookie": "Rookie", "Bronze": "Bronze", "Silver": "Silver",
+        "Gold": "Gold", "Platinum": "Platinum", "Diamond": "Diamond",
+        "Master": "Master", "Predator": "Predator",
+    }
+    tier = rank_zh.get(tier, tier)
+    return f"{tier} {div}"
+
+
 # ── MD3 每段位动态深色主题 ──
 _RANK_THEMES = {
     "Bronze": {
@@ -754,6 +771,10 @@ def _locale_section_name(name: str) -> str:
 
 # ── Region name → flag icon code mapping ──
 _REGION_FLAGS = {
+    # ALS broad region names
+    "eu west": "ie", "eu east": "de", "us west": "us", "us central": "us",
+    "us east": "us", "south america": "br", "asia": "jp",
+    # City names
     "tokyo": "jp", "london": "gb", "dallas": "us", "frankfurt": "de",
     "singapore": "sg", "sydney": "au", "são paulo": "br", "salt lake city": "us",
     "oregon": "us", "bahrain": "bh", "hong kong": "hk", "miami": "us",
@@ -780,10 +801,20 @@ def _region_flag(entry_name: str) -> str:
     return ""
 
 
+def _flag_emoji(code: str) -> str:
+    """Convert 2-letter country code to emoji flag (e.g. 'JP' → '🇯🇵')."""
+    if not code or len(code) != 2:
+        return ""
+    return chr(0x1F1E6 + ord(code[0].upper()) - ord("A")) + chr(0x1F1E6 + ord(code[1].upper()) - ord("A"))
+
+
 def _latency_color(response_time: str) -> str:
     """Classify latency from response_time string like '72 ms', '100% up'."""
     import re
-    m = re.search(r"(\d+)", response_time)
+    # "100% up" means uptime percentage, not latency — always good
+    if "%" in response_time and "up" in response_time.lower():
+        return "good"
+    m = re.search(r"(\d+)\s*ms", response_time)
     if m:
         ms = int(m.group(1))
         if ms < 100:
@@ -828,9 +859,10 @@ def _build_server_status_html(server_status) -> str:
 
         for sec in als.sections:
             regions = []
-            for entry in sec.entries[:5]:
+            for entry in sec.entries:
+                flag_cls = getattr(entry, "flag_class", "") or _region_flag(entry.name)
                 regions.append({
-                    "flag": _region_flag(entry.name),
+                    "flag_class": flag_cls,
                     "name": _escape_html(entry.name),
                     "state_class": _status_class_dot(entry.status),
                     "state": _escape_html(_locale_status(entry.status)),
@@ -1300,6 +1332,229 @@ body{{
 </div>
 </body></html>"""
     return await _render_card_sync(html_str, 460)
+
+
+# ══════════════════════════════════════════
+#  绑定 / 解绑 / 队伍 / 战绩卡片 HTML
+# ══════════════════════════════════════════
+
+
+def _build_bind_html(uid: str, name: str, platform: str) -> str:
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
+.card{{width:480px;background:#1A2635;border-radius:16px;padding:28px;box-shadow:0 4px 24px rgba(0,0,0,.4);text-align:center}}
+.title{{font-size:26px;font-weight:700;color:#4CE5B1;margin-bottom:16px}}
+.row{{font-size:15px;color:#FFF;margin-bottom:8px}}
+.hint{{font-size:13px;color:#89A0B0;margin-top:20px}}
+.footer{{font-size:11px;color:#89A0B0;margin-top:16px}}
+</style></head><body>
+<div class="card">
+<div class="title">绑定成功</div>
+<div class="row">玩家　{_escape_html(name)}</div>
+<div class="row">平台　{_escape_html(platform)}</div>
+<div class="row">UID　　{_escape_html(uid)}</div>
+<div class="hint">现在可以使用 /stats 查询战绩</div>
+<div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
+</div></body></html>"""
+
+
+def _build_unbind_html() -> str:
+    return """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}
+.card{width:480px;background:#1A2635;border-radius:16px;padding:28px;box-shadow:0 4px 24px rgba(0,0,0,.4);text-align:center}
+.title{font-size:26px;font-weight:700;color:#4CE5B1;margin-bottom:12px}
+.msg{font-size:15px;color:#89A0B0}
+.footer{font-size:11px;color:#89A0B0;margin-top:20px}
+</style></head><body>
+<div class="card">
+<div class="title">已解绑</div>
+<div class="msg">Apex 账号已与本 QQ 解除绑定</div>
+<div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
+</div></body></html>"""
+
+
+def _build_team_html(team: dict) -> str:
+    name = _escape_html(team.get("name", ""))
+    owner = _escape_html(str(team.get("owner_qq", "")))
+    member_count = team.get("member_count", 0)
+    members = team.get("members", [])
+    ttl_hours = team.get("ttl_hours", 12)
+
+    members_html = ""
+    for m in members:
+        crown = " (队长)" if str(m) == str(team.get("owner_qq", "")) else ""
+        members_html += f'<div class="member">　{_escape_html(str(m))}{crown}</div>'
+    for _ in range(3 - member_count):
+        members_html += '<div class="member empty">　(空位)</div>'
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
+.card{{width:500px;background:#1A2635;border-radius:16px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.4)}}
+.team-name{{font-size:26px;font-weight:700;color:#FFF;margin-bottom:4px}}
+.owner{{font-size:12px;color:#89A0B0;margin-bottom:16px}}
+.section-title{{font-size:18px;font-weight:700;color:#FFF;margin-bottom:8px}}
+.member{{font-size:15px;color:#FFF;margin-bottom:4px}}
+.member.empty{{color:#89A0B0}}
+.ttl{{font-size:12px;color:#89A0B0;margin-top:16px}}
+.footer{{font-size:11px;color:#89A0B0;margin-top:16px;text-align:center}}
+</style></head><body>
+<div class="card">
+<div class="team-name">{name}</div>
+<div class="owner">队长: {owner}</div>
+<div class="section-title">成员 ({member_count}/3)</div>
+{members_html}
+<div class="ttl">{ttl_hours} 小时后自动解散</div>
+<div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
+</div></body></html>"""
+
+
+def _build_team_list_html(teams: list[dict]) -> str:
+    count = len(teams)
+    if count == 0:
+        items_html = '<div class="empty">暂无活跃队伍</div>'
+    else:
+        items = ""
+        for t in teams:
+            n = _escape_html(t.get("name", ""))
+            mc = t.get("member_count", 0)
+            o = _escape_html(str(t.get("owner_qq", "")))
+            items += f'<div class="team-row">{n}　{mc}/3　队长:{o}</div>'
+        items_html = items
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
+.card{{width:500px;background:#1A2635;border-radius:16px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.4)}}
+.title{{font-size:26px;font-weight:700;color:#FFF;margin-bottom:16px}}
+.team-row{{font-size:15px;color:#FFF;margin-bottom:12px;padding:8px 0;border-bottom:1px solid #2A3A4A}}
+.empty{{font-size:15px;color:#89A0B0}}
+.footer{{font-size:11px;color:#89A0B0;margin-top:16px;text-align:center}}
+</style></head><body>
+<div class="card">
+<div class="title">活跃队伍 ({count})</div>
+{items_html}
+<div class="footer">auth.赤羽真白 · Apex Chiyuchan</div>
+</div></body></html>"""
+
+
+def _build_stats_card_html(stats) -> str:
+    """Build stats card HTML from PlayerStats object."""
+    name = _escape_html(stats.name or "Unknown")
+    avatar_url = stats.avatar or ""
+    level = stats.level
+    level_pct = stats.to_next_level_pct
+    rank_name = stats.rank_name or "Unranked"
+    rank_score = stats.rank_score
+    rank_top_pct = stats.rank_top_pct
+    state = stats.state
+    kills = stats.kills
+    damage = stats.damage
+    kd = stats.kd
+    top_legends = stats.top_legends or []
+    selected_legend = stats.selected_legend or ""
+
+    rank_color = RANK_COLORS.get(rank_name.split(" ")[0], "#89A0B0")
+    status_color = "#4CE5B1" if state == "online" else "#89A0B0"
+    status_text = "在线" if state == "online" else "离线"
+    kd_str = f"{kd:.2f}" if kd is not None else "--"
+
+    legends_html = ""
+    if top_legends:
+        rows = ""
+        for leg in top_legends[:3]:
+            rows += (
+                f'<div style="display:flex;justify-content:space-between;padding:4px 0;">'
+                f'<span style="font-size:13px;color:#89A0B0;">{_escape_html(leg["name"])}</span>'
+                f'<span style="font-size:15px;font-weight:700;color:#FFF;">{leg["kills"]:,}</span>'
+                f"</div>"
+            )
+        legends_html = (
+            f'<div style="font-size:14px;font-weight:600;color:#89A0B0;'
+            f'text-transform:uppercase;letter-spacing:2px;padding:12px 0 6px;">常用英雄 TOP3</div>'
+            f"{rows}"
+        )
+
+    selected_html = ""
+    if selected_legend:
+        selected_html = (
+            f'<div style="font-size:12px;color:#89A0B0;margin-top:8px;">'
+            f"当前选用: {_escape_html(selected_legend)}</div>"
+        )
+
+    avatar_html = (
+        f'<img style="width:52px;height:52px;border-radius:50%;object-fit:cover;" '
+        f"src=\"{avatar_url}\" onerror=\"this.style.display='none'\">"
+        if avatar_url
+        else ""
+    )
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
+.card{{width:600px;background:#1A2635;border-radius:16px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.4)}}
+</style></head><body>
+<div class="card">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+{avatar_html}
+<div>
+<div style="font-size:26px;font-weight:700;color:#FFF;">{name}</div>
+<div style="font-size:12px;color:#89A0B0;margin-top:2px;">
+<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{status_color};margin-right:4px;vertical-align:middle;"></span>
+Lv.{level}　{level_pct}%　{status_text}</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:12px;padding:8px 0;margin-bottom:4px;">
+<div style="width:4px;height:64px;background:{rank_color};border-radius:2px;"></div>
+<div>
+<div style="font-size:18px;font-weight:700;color:{rank_color};">{_escape_html(rank_name)}</div>
+<div style="font-size:15px;color:#FFF;margin-top:2px;">RP {rank_score:,}</div>
+<div style="font-size:12px;color:#89A0B0;margin-top:2px;">全服 Top {rank_top_pct}%</div>
+</div>
+</div>
+<div style="border-top:1px solid #2A3A4A;margin:8px 0 16px;"></div>
+<div style="font-size:14px;font-weight:600;color:#89A0B0;text-transform:uppercase;letter-spacing:2px;padding-bottom:8px;">生涯数据总览</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin-bottom:16px;">
+<div><div style="font-size:28px;font-weight:700;color:#FFF;">{kills:,}</div><div style="font-size:13px;color:#89A0B0;">击杀</div></div>
+<div><div style="font-size:28px;font-weight:700;color:#FFF;">{damage:,}</div><div style="font-size:13px;color:#89A0B0;">伤害</div></div>
+<div><div style="font-size:28px;font-weight:700;color:#FFF;">{kd_str}</div><div style="font-size:13px;color:#89A0B0;">K/D</div></div>
+</div>
+{legends_html}
+{selected_html}
+<div style="font-size:11px;color:#89A0B0;margin-top:16px;text-align:center;">auth.赤羽真白 · Apex Chiyuchan</div>
+</div></body></html>"""
+
+
+async def draw_bind_card_pw(uid: str, name: str, platform: str) -> bytes:
+    html = _build_bind_html(uid, name, platform)
+    return await _render_card_sync(html, 520)
+
+
+async def draw_unbind_card_pw() -> bytes:
+    html = _build_unbind_html()
+    return await _render_card_sync(html, 520)
+
+
+async def draw_team_card_pw(team: dict) -> bytes:
+    html = _build_team_html(team)
+    return await _render_card_sync(html, 540)
+
+
+async def draw_team_list_card_pw(teams: list[dict]) -> bytes:
+    html = _build_team_list_html(teams)
+    return await _render_card_sync(html, 540)
+
+
+async def draw_stats_card_pw(stats) -> bytes:
+    html = _build_stats_card_html(stats)
+    return await _render_card_sync(html, 640)
 
 
 # ══════════════════════════════════════════

@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://apexlegendsstatus.com/lib/css/flag-icon.min.css">
 <style>
 :root {
   --md-primary: #1565C0;
@@ -205,8 +206,8 @@ body {
 .flag-icon {
   width: 16px;
   height: 12px;
-  border-radius: 2px;
   flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .attribution {
@@ -250,7 +251,7 @@ body {
         {%- for r in svc.regions %}
         <div class="region-row">
           <div class="region-name">
-            {%- if r.flag %}<img class="flag-icon" src="https://apexlegendsstatus.com/lib/flags/4x3/{{ r.flag }}.svg" alt="">{% endif -%}
+            {%- if r.flag_class %}<span class="{{ r.flag_class }} flag-icon"></span>{% endif -%}
             {{ r.name }}
           </div>
           <div class="region-state">

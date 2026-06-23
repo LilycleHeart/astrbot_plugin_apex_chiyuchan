@@ -22,6 +22,7 @@ class AlsServerEntry:
     name: str
     status: str  # UNSTABLE / UP / SLOW
     response_time: str  # "72 ms", "100% up", ""
+    flag_class: str = ""  # e.g. "flag-icon-eu", "flag-icon-us"
 
 
 @dataclass
@@ -124,10 +125,14 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
                     row_html,
                 )
                 if row_name_m:
+                    # Extract ALS flag class (e.g. "flag-icon-eu")
+                    flag_m = re.search(r'flag-icon-(\w+)', row_html)
+                    flag_cls = f"flag-icon-{flag_m.group(1)}" if flag_m else ""
                     section.entries.append(AlsServerEntry(
                         name=row_name_m.group(1).strip(),
                         status=row_status_m.group(1).strip() if row_status_m else "",
                         response_time=row_rt_m.group(1).strip() if row_rt_m else "",
+                        flag_class=flag_cls,
                     ))
 
             result.sections.append(section)
