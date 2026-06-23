@@ -169,6 +169,7 @@ class PlatformData:
     def __init__(self, data: dict):
         self.predator_cap = data.get("val", 0)
         self.masters_and_preds = data.get("totalMastersAndPreds", 0)
+        self.rp_change_24h: int | None = data.get("rp_change_24h")
 
 
 class PredatorData:
@@ -180,6 +181,52 @@ class PredatorData:
             "X1": PlatformData(rp.get("X1", {})),
             "SWITCH": PlatformData(rp.get("SWITCH", {})),
         }
+
+
+_PREDATOR_ALS_URL = "https://apexlegendsstatus.com/points-for-predator"
+
+
+async def _fill_predator_changes(pred: PredatorData, client) -> None:
+    """从 ALS 页面抓取各平台 24h 变动值并填入 PredatorData.platforms"""
+    import re
+    try:
+        resp = await client.get(_PREDATOR_ALS_URL, timeout=10)
+        resp.raise_for_status()
+        html = resp.text
+    except Exception:
+        return  # 静默失败，变动值保持 None
+
+    # ALS 页面平台顺序：PC, Playstation, Xbox, Switch
+    als_plat_names = ["PC", "Playstation", "Xbox", "Switch"]
+    api_keys = ["PC", "PS4", "X1", "SWITCH"]
+
+    for als_name, api_key in zip(als_plat_names, api_keys):
+        # 每个平台在一个 col-sm-3 容器里
+        # 查找 <p>平台名</p> 之后最近的 change span
+        pat = re.compile(
+            re.escape(als_name)
+            + r".*?<span[^>]*style=\"color:\s*(green|gray)\"[^>]*>.*?</span>\s*(?:&nbsp;)?([\d,]+)\s*in\s+24h",
+            re.DOTALL,
+        )
+        m = pat.search(html)
+        if m:
+            color = m.group(1)
+            if color == "green":
+                raw = m.group(2).replace(",", "")
+                change = int(raw)
+            else:
+                change = 0  # gray "=" 表示无变动
+        else:
+            # 试试只匹配 = （Switch 可能只有等号）
+            eq_pat = re.compile(re.escape(als_name) + r".*?<span[^>]*color:\s*gray\"[^>]*>=</span>", re.DOTALL)
+            if eq_pat.search(html):
+                change = 0
+            else:
+                continue
+
+        plat = pred.platforms.get(api_key)
+        if plat is not None and change is not None:
+            plat.rp_change_24h = change
 
 
 class ServerInfo:
@@ -355,7 +402,12 @@ class ApexClient:
             data = await self._get("/predator")
             if data:
                 await cache_set(cache_key, data, 600)
-            return PredatorData(data) if data else None
+
+            pred = PredatorData(data) if data else None
+            if pred:
+                # 从 ALS 页面抓取 24h 变动值
+                await _fill_predator_changes(pred, self._client if self._client else await self._get_client())
+            return pred
         except Exception:
             return None
 
