@@ -411,6 +411,11 @@ def _make_mock_predator():
             "SWITCH": {"val": 8901, "totalMastersAndPreds": 15678},
         }
     })
+    # 填充模拟变动值
+    for plat_key, chg in [("PC", 3374), ("PS4", 2324), ("X1", 1632), ("SWITCH", 0)]:
+        plat = pred.platforms.get(plat_key)
+        if plat:
+            plat.rp_change_24h = chg
     return pred
 
 

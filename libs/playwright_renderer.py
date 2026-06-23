@@ -581,7 +581,7 @@ def _render_moe_number_base64(number: int) -> str:
 
 def _render_moe_digits_list(number: int) -> list[str]:
     """Render each digit as individual base64 data URIs (Moe Counter style).
-    Returns a list of data URI strings, one per digit."""
+    Auto-crops transparent padding and centers each digit consistently."""
     from .image_renderer import _moe_digit_frames, _load_moe_digits
 
     _load_moe_digits()
@@ -599,8 +599,17 @@ def _render_moe_digits_list(number: int) -> list[str]:
             continue
         frame = frames[0]
         resized = frame.resize((dw, total_h), Image.LANCZOS)
-        canvas = Image.new("RGBA", (dw, total_h), (0, 0, 0, 0))
-        canvas.paste(resized, (0, 0), resized)
+        # 自动裁剪透明边缘，然后垂直居中到统一画布
+        bbox = resized.getbbox()
+        if bbox and bbox[3] - bbox[1] > 0 and bbox[2] - bbox[0] > 0:
+            cropped = resized.crop(bbox)
+            cw, ch = cropped.size
+            # 垂直居中
+            cy = (total_h - ch) // 2
+            canvas = Image.new("RGBA", (dw, total_h), (0, 0, 0, 0))
+            canvas.paste(cropped, ((dw - cw) // 2, cy), cropped)
+        else:
+            canvas = Image.new("RGBA", (dw, total_h), (0, 0, 0, 0))
         buf = io.BytesIO()
         canvas.save(buf, format="PNG")
         b64 = base64.b64encode(buf.getvalue()).decode()
@@ -930,6 +939,9 @@ _BR_DURATION = 5400  # 90 min — standard BR/ranked rotation
 def _build_map_rotation_html(rotation) -> str:
     import time as _time
     import datetime as _dt
+    from zoneinfo import ZoneInfo
+
+    _CST = ZoneInfo("Asia/Shanghai")
 
     modes = []
 
@@ -954,8 +966,8 @@ def _build_map_rotation_html(rotation) -> str:
         return {
             "image": _map_url(mode_data.map),
             "name": _MAP_ZH.get(mode_data.map, mode_data.map),
-            "start_fmt": _dt.datetime.fromtimestamp(start_ts).strftime("%H:%M"),
-            "end_fmt": _dt.datetime.fromtimestamp(end_ts).strftime("%H:%M"),
+            "start_fmt": _dt.datetime.fromtimestamp(start_ts, tz=_CST).strftime("%H:%M"),
+            "end_fmt": _dt.datetime.fromtimestamp(end_ts, tz=_CST).strftime("%H:%M"),
             "end": end_ts,
         }
 
@@ -1032,9 +1044,19 @@ def _build_predator_html(predator) -> str:
         if not pd:
             continue
         rp_imgs = _render_moe_digits_list(pd.predator_cap)
-        # No historical RP change data from API
-        change_class = "flat"
-        change_text = "— RP"
+
+        # 24h 变动值（从 ALS 页面抓取）
+        rp_change = getattr(pd, 'rp_change_24h', None)
+        if rp_change is not None and rp_change > 0:
+            change_class = "up"
+            change_text = f"\u25b2 +{rp_change:,} RP"
+        elif rp_change is not None and rp_change == 0:
+            change_class = "flat"
+            change_text = "\u2014 RP"
+        else:
+            change_class = "flat"
+            change_text = "\u2014 RP"
+
         count_fmt = f"{pd.masters_and_preds:,}"
 
         platforms.append({
