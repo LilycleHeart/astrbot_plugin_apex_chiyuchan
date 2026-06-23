@@ -128,6 +128,10 @@ class MapData:
         self.remaining_timer = data.get("remainingTimer", "")
         self.remaining_mins = data.get("remainingMins", 0)
         self.asset = data.get("asset", "")
+        self.start = data.get("start", 0)          # Unix timestamp
+        self.end = data.get("end", 0)              # Unix timestamp
+        self.readableDate_start = data.get("readableDate_start", "")
+        self.readableDate_end = data.get("readableDate_end", "")
 
 
 class LTMMode:
@@ -135,6 +139,10 @@ class LTMMode:
         self.event_name = data.get("eventName", "")
         self.map = data.get("map", "")
         self.remaining_timer = data.get("remainingTimer", "")
+        self.start = data.get("start", 0)
+        self.end = data.get("end", 0)
+        self.readableDate_start = data.get("readableDate_start", "")
+        self.readableDate_end = data.get("readableDate_end", "")
 
 
 class MapRotation:
@@ -142,6 +150,7 @@ class MapRotation:
         br = data.get("battle_royale", {})
         ranked = data.get("ranked", {})
         ltm = data.get("ltm", {})
+        wildcard = data.get("wildcard", {})
 
         self.br_current = MapData(br.get("current", {}))
         self.br_next = MapData(br.get("next", {}))
@@ -151,6 +160,9 @@ class MapRotation:
 
         self.ltm_current = LTMMode(ltm.get("current", {}))
         self.ltm_next = LTMMode(ltm.get("next", {}))
+
+        self.wildcard_current = MapData(wildcard.get("current", {}))
+        self.wildcard_next = MapData(wildcard.get("next", {}))
 
 
 class PlatformData:
