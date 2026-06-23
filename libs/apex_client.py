@@ -203,22 +203,25 @@ async def _fill_predator_changes(pred: PredatorData, client) -> None:
     for als_name, api_key in zip(als_plat_names, api_keys):
         # 每个平台在一个 col-sm-3 容器里
         # 查找 <p>平台名</p> 之后最近的 change span
+        # ALS 页面格式：<span style="color: red">▼</span>&nbsp;41,637 in 24h
+        #              <span style="color: green">▲</span>&nbsp;12,345 in 24h
+        #              <span style="color: gray">=</span>  (Switch 无变动)
         pat = re.compile(
             re.escape(als_name)
-            + r".*?<span[^>]*style=\"color:\s*(green|gray)\"[^>]*>.*?</span>\s*(?:&nbsp;)?([\d,]+)\s*in\s+24h",
+            + r'.*?<span[^>]*style="color:\s*(red|green|gray)"[^>]*>[^<]*</span>\s*(?:&nbsp;)?([\d,]+)\s*in\s+24h',
             re.DOTALL,
         )
         m = pat.search(html)
         if m:
             color = m.group(1)
-            if color == "green":
+            if color in ("green", "red"):
                 raw = m.group(2).replace(",", "")
-                change = int(raw)
+                change = int(raw) if color == "green" else -int(raw)
             else:
                 change = 0  # gray "=" 表示无变动
         else:
             # 试试只匹配 = （Switch 可能只有等号）
-            eq_pat = re.compile(re.escape(als_name) + r".*?<span[^>]*color:\s*gray\"[^>]*>=</span>", re.DOTALL)
+            eq_pat = re.compile(re.escape(als_name) + r'.*?<span[^>]*color:\s*gray"[^>]*>=</span>', re.DOTALL)
             if eq_pat.search(html):
                 change = 0
             else:

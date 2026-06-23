@@ -1052,6 +1052,9 @@ def _build_predator_html(predator) -> str:
         if rp_change is not None and rp_change > 0:
             change_class = "up"
             change_text = f"\u25b2 +{rp_change:,} RP"
+        elif rp_change is not None and rp_change < 0:
+            change_class = "down"
+            change_text = f"\u25bc {rp_change:,} RP"
         elif rp_change is not None and rp_change == 0:
             change_class = "flat"
             change_text = "\u2014 RP"
