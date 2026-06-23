@@ -182,9 +182,13 @@ class XiaoChiyu(Star):
         return badges
 
     async def _send_card(
-        self, event: AstrMessageEvent, img_bytes: bytes, suffix: str = ".png", **kwargs
+        self, event: AstrMessageEvent, img_bytes: bytes | None, suffix: str = ".png",
+        fallback_text: str = "渲染失败", **kwargs,
     ):
-        """直接发送图片消息"""
+        """发送图片消息；img_bytes 为 None 时降级为纯文本"""
+        if not img_bytes:
+            yield event.plain_result(fallback_text)
+            return
         path = await self._save_temp(img_bytes, suffix)
         yield event.image_result(path)
 
@@ -933,16 +937,17 @@ class XiaoChiyu(Star):
                         self._last_search[qq_id] = search_results
                         hint = f"共 {len(search_results)} 个结果，请使用 /stats 数字 选择"
                         img_bytes = await renderer.draw_player_list_card(search_results, hint)
-                        img_b64 = base64.b64encode(img_bytes).decode()
-                        return CallToolResult(
-                            content=[
-                                TextContent(
-                                    type="text",
-                                    text=f"找到 {len(search_results)} 个匹配玩家。请发送卡片图片，用户回复数字后，直接将该数字作为 player_name 参数再次调用 apex_stats 即可。",
-                                ),
-                                ImageContent(type="image", data=img_b64, mimeType="image/png"),
-                            ]
-                        )
+                        if img_bytes:
+                            img_b64 = base64.b64encode(img_bytes).decode()
+                            return CallToolResult(
+                                content=[
+                                    TextContent(
+                                        type="text",
+                                        text=f"找到 {len(search_results)} 个匹配玩家。请发送卡片图片，用户回复数字后，直接将该数字作为 player_name 参数再次调用 apex_stats 即可。",
+                                    ),
+                                    ImageContent(type="image", data=img_b64, mimeType="image/png"),
+                                ]
+                            )
                 else:
                     api_results = await self.apex.name_to_uid_all(player_name.strip())
                     if not api_results:
@@ -1029,7 +1034,7 @@ class XiaoChiyu(Star):
             "rank_dist_entries": rank_dist.entries if rank_dist else None,
         }
         img_bytes = await renderer.draw_profile_card(profile_data)
-        img_b64 = base64.b64encode(img_bytes).decode()
+        img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
 
         rank_zh = {
             "Rookie": "菜鸟",
@@ -1180,14 +1185,14 @@ class XiaoChiyu(Star):
                 )
             self._last_search[qq_id] = results
             img_bytes = await renderer.draw_player_list_card(results, f"共 {len(results)} 个结果，回复数字选择")
-            img_b64 = base64.b64encode(img_bytes).decode()
+            img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
             return CallToolResult(
                 content=[
                     TextContent(
                         type="text",
                         text=f"找到 {len(results)} 个匹配玩家。请发送卡片图片，用户回复数字后重新调用 apex_bind 传入该数字即可。",
                     ),
-                    ImageContent(type="image", data=img_b64, mimeType="image/png"),
+                    ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
                 ]
             )
 
@@ -1263,7 +1268,7 @@ class XiaoChiyu(Star):
                 content=[TextContent(type="text", text="获取地图轮换失败")]
             )
         img_bytes = await renderer.draw_map_card(rotation)
-        img_b64 = base64.b64encode(img_bytes).decode()
+        img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
         br = rotation.br_current.map if rotation.br_current else "?"
         br_timer = (
             f" (剩余{rotation.br_current.remaining_timer})"
@@ -1287,7 +1292,7 @@ class XiaoChiyu(Star):
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png"),
+                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
             ]
         )
 
@@ -1303,7 +1308,7 @@ class XiaoChiyu(Star):
                 content=[TextContent(type="text", text="获取服务器状态失败")]
             )
         img_bytes = await renderer.draw_server_status_card(server_status)
-        img_b64 = base64.b64encode(img_bytes).decode()
+        img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
         als = getattr(server_status, "als", None)
         if als and als.alert_banner:
             text = f"ALS 报告: {als.alert_banner[:100]}\n"
@@ -1316,7 +1321,7 @@ class XiaoChiyu(Star):
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png"),
+                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
             ]
         )
 
@@ -1333,7 +1338,7 @@ class XiaoChiyu(Star):
                 content=[TextContent(type="text", text="获取 Steam 日活数据失败，稍后再试")]
             )
         img_bytes = await renderer.draw_steamcharts_card(data)
-        img_b64 = base64.b64encode(img_bytes).decode()
+        img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
 
         recent_avg = data.months[0].avg_players if data.months else 0
         text = (
@@ -1347,7 +1352,7 @@ class XiaoChiyu(Star):
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png"),
+                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
             ]
         )
 
@@ -1363,17 +1368,17 @@ class XiaoChiyu(Star):
                 content=[TextContent(type="text", text="获取大师数据失败")]
             )
         img_bytes = await renderer.draw_master_card(predator)
-        img_b64 = base64.b64encode(img_bytes).decode()
+        img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
         text = "各平台大师/猎杀数据:\n"
-        for plat in ["PC", "PS4", "X1", "SWITCH"]:
+        for plat in ["PC", "PLAYSTATION", "XBOX", "SWITCH"]:
             pd = predator.platforms.get(plat)
             if pd:
-                text += f"{plat}: 猎杀线 {pd.predator_cap:,} RP | 大师/猎杀 {pd.masters_and_preds:,} 人\n"
+                text += f"{plat}: 猎杀分数线 {pd.predator_cap:,} RP | 大师/猎杀 {pd.masters_and_preds:,} 人\n"
         text += "\n请简单评论各平台数据，然后用 send_message_to_user 发送大师数据卡片图片。"
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png"),
+                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
             ]
         )
 
@@ -1491,10 +1496,10 @@ class XiaoChiyu(Star):
             txt = f"{e['qq_name'] or e['apex_name']} | {e['rank_name']} {e['rank_score']}RP | Lv{e['level']} | {e['kills']}杀 | {e['state']} | {'排位' if e['mode']=='ranked' else '娱乐'}"
             text_lines.append(txt)
         img_bytes = await renderer.draw_lfg_card(entries)
-        img_b64 = base64.b64encode(img_bytes).decode()
+        img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
         return CallToolResult(
             content=[
-                TextContent(type="text", text="\n".join(text_lines)),
-                ImageContent(type="image", data=img_b64, mimeType="image/png"),
+                TextContent(type="text", text=text),
+                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
             ]
         )

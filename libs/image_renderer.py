@@ -23,7 +23,6 @@ try:
     from .playwright_renderer import draw_lfg_card as _draw_lfg_card_pw
     from .playwright_renderer import draw_lfg_mode_card as _draw_lfg_mode_card_pw
     from .playwright_renderer import draw_steamcharts_card as _draw_steamcharts_card_pw
-    from .playwright_renderer import draw_text_card_pw as _draw_text_card_pw
     from .playwright_renderer import draw_bind_card_pw as _draw_bind_card_pw
     from .playwright_renderer import draw_unbind_card_pw as _draw_unbind_card_pw
     from .playwright_renderer import draw_team_card_pw as _draw_team_card_pw
@@ -37,97 +36,98 @@ except Exception as _e:
 
 # ══════════════════════════════════════════
 #  公开 draw_* 接口（全部走 Playwright）
+#  失败时返回 None，调用方降级为纯文本
 # ══════════════════════════════════════════
 
 
-async def draw_stats_card(stats) -> bytes:
-    """渲染战绩卡片 (Playwright)"""
+async def draw_stats_card(stats) -> bytes | None:
+    """渲染战绩卡片 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_stats_card_pw(stats)
     except Exception as e:
         logger.error(f"[StatsCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"stats_card 渲染失败: {e}", is_error=True)
+        return None
 
 
-async def draw_profile_card(data: dict) -> bytes:
-    """渲染玩家详情卡片 (Playwright)"""
+async def draw_profile_card(data: dict) -> bytes | None:
+    """渲染玩家详情卡片 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_profile_card_pw(data)
     except Exception as e:
         logger.error(f"[ProfileCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"profile_card 渲染失败: {e}", is_error=True)
+        return None
 
 
-async def draw_map_card(rotation) -> bytes:
-    """地图轮换 (Playwright)"""
+async def draw_map_card(rotation) -> bytes | None:
+    """地图轮换 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_map_rotation_card_pw(rotation)
     except Exception as e:
         logger.error(f"[MapCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"map_card 渲染失败: {e}", is_error=True)
+        return None
 
 
-async def draw_server_status_card(server_status) -> bytes:
-    """服务器状态 (Playwright)"""
+async def draw_server_status_card(server_status) -> bytes | None:
+    """服务器状态 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_server_status_card_pw(server_status)
     except Exception as e:
         logger.error(f"[ServerCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"server_card 渲染失败: {e}", is_error=True)
+        return None
 
 
-async def draw_master_card(predator) -> bytes:
-    """大师/猎杀 (Playwright)"""
+async def draw_master_card(predator) -> bytes | None:
+    """大师/猎杀 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_predator_card_pw(predator)
     except Exception as e:
         logger.error(f"[MasterCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"master_card 渲染失败: {e}", is_error=True)
+        return None
 
 
-async def draw_team_card(team: dict) -> bytes:
-    """队伍卡片 (Playwright)"""
+async def draw_team_card(team: dict) -> bytes | None:
+    """队伍卡片 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_team_card_pw(team)
     except Exception as e:
         logger.error(f"[TeamCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"team_card 渲染失败: {e}", is_error=True)
+        return None
 
 
-async def draw_team_list_card(teams: list[dict]) -> bytes:
-    """队伍列表卡片 (Playwright)"""
+async def draw_team_list_card(teams: list[dict]) -> bytes | None:
+    """队伍列表卡片 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_team_list_card_pw(teams)
     except Exception as e:
         logger.error(f"[TeamListCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"team_list_card 渲染失败: {e}", is_error=True)
+        return None
 
 
-async def draw_bind_card(uid: str, name: str, platform: str) -> bytes:
-    """绑定确认卡片 (Playwright)"""
+async def draw_bind_card(uid: str, name: str, platform: str) -> bytes | None:
+    """绑定确认卡片 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_bind_card_pw(uid, name, platform)
     except Exception as e:
         logger.error(f"[BindCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"bind_card 渲染失败: {e}", is_error=True)
+        return None
 
 
-async def draw_unbind_card() -> bytes:
-    """解绑确认卡片 (Playwright)"""
+async def draw_unbind_card() -> bytes | None:
+    """解绑确认卡片 (Playwright)。失败返回 None。"""
     from astrbot.api import logger
     try:
         return await _draw_unbind_card_pw()
     except Exception as e:
         logger.error(f"[UnbindCard] Playwright 渲染失败: {type(e).__name__}: {e}")
-        return await _draw_text_card_pw("渲染错误", f"unbind_card 渲染失败: {e}", is_error=True)
+        return None
 
 
 async def draw_player_list_card(
