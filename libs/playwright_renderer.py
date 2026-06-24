@@ -1311,8 +1311,12 @@ async def draw_lfg_mode_card() -> bytes:
 
 
 def _build_season_html(season_info, meta_top5: list) -> str:
-    """构建赛季信息卡片 HTML"""
+    """构建赛季信息卡片 HTML（北京时间 06:00-18:00 明亮，其余深色）"""
+    from datetime import datetime, timezone, timedelta
+    bj_hour = datetime.now(timezone(timedelta(hours=8))).hour
+    theme = "light" if 6 <= bj_hour < 18 else ""
     context = {
+        "theme": theme,
         "season_number": season_info.season_number,
         "season_name": season_info.season_name,
         "split_label": season_info.split_label,
