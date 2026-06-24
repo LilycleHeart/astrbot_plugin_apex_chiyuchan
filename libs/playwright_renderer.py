@@ -204,7 +204,7 @@ def _roman(n: int) -> str:
 def _build_rank_dist(
     player_rank: str, player_top_pct: float, rank_dist_entries: list = None, *, theme: dict = None
 ) -> str:
-    """段位分布 — 仅显示玩家所在段位附近4个段位，含人数"""
+    """段位分布 — 仅显示玩家所在段位附近4个段位，含人数（返回 HTML）"""
     card3 = theme["card3"] if theme else _C_CARD3
     muted = theme["muted"] if theme else _C_MUTED
     if rank_dist_entries:
@@ -269,9 +269,48 @@ def _build_rank_dist(
     return bars + footer
 
 
-def _build_stats_html(**d) -> str:
-    """根据数据 dict 构建内联 CSS 的 Material Design 卡片 HTML"""
+def _build_rank_dist_list(
+    player_rank: str, player_top_pct: float, rank_dist_entries: list = None, *, theme: dict = None
+) -> list[dict]:
+    """段位分布 — 返回 list[dict] 供 Jinja 模板渲染"""
+    if rank_dist_entries:
+        tiers = [(e.name, e.pct, e.color, e.count) for e in rank_dist_entries]
+    else:
+        tiers = [
+            ("Rookie", 2.40, "#484852", 0),
+            ("Bronze", 12.98, "#cd7f32", 0),
+            ("Silver", 27.59, "#c0c0c0", 0),
+            ("Gold", 35.54, "#ffd700", 0),
+            ("Platinum", 17.72, "#4ECDC4", 0),
+            ("Diamond", 3.36, "#358de6", 0),
+            ("Master", 0.09, "#9f35e6", 0),
+            ("Predator", 0.32, "#e31b39", 0),
+        ]
 
+    player_tier = player_rank.split(" ")[0] if player_rank else ""
+    player_idx = next(
+        (i for i, t in enumerate(tiers) if t[0].lower() == player_tier.lower()), 0
+    )
+    start = max(0, player_idx - 1)
+    end = min(len(tiers), start + 4)
+    if end - start < 4:
+        start = max(0, end - 4)
+    visible = tiers[start:end]
+
+    result = []
+    for name, pct, color, count in visible:
+        result.append({
+            "name": _rank_zh(name),
+            "pct": min(pct, 50),
+            "color": color,
+            "count_fmt": f"{count:,}" if count else "",
+            "is_player": name.lower() == player_tier.lower(),
+        })
+    return result
+
+
+def _build_stats_html(**d) -> str:
+    """根据数据 dict 构建 MD3 Jinja2 战绩卡片 HTML"""
     name = d.get("name", "Unknown")
     tag = d.get("tag", "")
     alias = d.get("alias", "")
@@ -291,281 +330,117 @@ def _build_stats_html(**d) -> str:
     rank_top_pct = d.get("rank_top_pct", 0)
     rank_top_pct_global = d.get("rank_top_pct_global", rank_top_pct)
     rank_ladder_pos = d.get("rank_ladder_pos", 0)
-
-    # ── 根据段位动态取色 ──
-    _theme = _theme_for_rank(rank_name)
-    _C_SURFACE = _theme["surface"]
-    _C_CARD = _theme["card"]
-    _C_CARD2 = _theme["card2"]
-    _C_CARD3 = _theme["card3"]
-    _C_TEXT = _theme["text"]
-    _C_MUTED = _theme["muted"]
-    _C_OUTLINE = _theme["outline"]
-
     rp_delta = d.get("rp_delta")
     kills = d.get("kills", 0)
     damage = d.get("damage", 0)
     wins = d.get("wins", 0)
-    wins_display = f"{wins:,}" if wins else "0"
     top_legends = d.get("top_legends", [])
     season_badges = d.get("season_badges", [])
     special_badges = d.get("special_badges", [])
     selected_legend = d.get("selected_legend")
     rank_dist_entries = d.get("rank_dist_entries", None)
 
+    # ── 段位主题色 ──
+    theme = _theme_for_rank(rank_name)
+    # 亮色主题：用段位 primary 降低饱和度
+    light_theme = {
+        "primary": theme["primary"],
+        "surface": "#F8FAFF",
+        "card": "#EFF2F9",
+        "card2": "#E9ECF4",
+        "card3": "#E3E6EE",
+        "text": "#181B20",
+        "muted": "#43474F",
+        "outline": "#C3C6CF",
+    }
+
     _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
     top_pct_label = "全平台" if rank_name.startswith(("Predator", "Master")) else _p
 
     display_name = f"{name} [{tag}]" if tag else name
-    _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
-    top_pct_label = "全平台" if rank_name.startswith(("Predator", "Master")) else _p
     online_map = {"online": "在线", "offline": "离线", "in_game": "游戏中"}
     state_text = online_map.get(online, online)
     state_dot = "#4CE5B1" if online in ("online", "in_game") else "#555"
-    prestige_str = ""  # level is now total level, no need to show prestige prefix
+
     rank_c = _rank_color(rank_name)
     top_global = f"{rank_top_pct_global}%"
+
     rp_delta_html = ""
     if rp_delta is not None:
         sign = "+" if rp_delta >= 0 else ""
-        delta_color = "#4CE5B1" if rp_delta >= 0 else "#DA292A"
-        rp_delta_html = f'<span style="font-size:13px;color:{delta_color};margin-left:8px;">{sign}{rp_delta} RP</span>'
+        delta_cls = "rp-up" if rp_delta >= 0 else "rp-down"
+        rp_delta_html = f'<span class="{delta_cls}" style="font-size:13px;margin-left:8px;">{sign}{rp_delta} RP</span>'
 
-    # ── 徽章 HTML ──
-    badge_rows = ""
-    if season_badges:
-        chips = []
-        for b in season_badges:
-            url = b.get("badge_url", "")
-            s = b.get("season", "")
-            tier = b.get("tier", "")
-            color = b.get("color") or "#666"
-            fw = "font-weight:700;" if tier == "master" else ""
-            chips.append(
-                f'<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;'
-                f"border-radius:20px;font-size:12px;font-weight:600;{fw}"
-                f"background:rgba({_hex_to_rgba(color, 0.15)});color:{color};"
-                f'border:1px solid rgba({_hex_to_rgba(color, 0.3)});">'
-                f'<img src="{url}" style="width:36px;height:36px;vertical-align:middle;" onerror="this.remove()">{s}</span>'
-            )
-        badge_rows += (
-            f'<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 12px;'
-            f'justify-content:center;">{"".join(chips)}</div>'
-        )
+    rank_display = _rank_zh(rank_name) + _rank_div_zh(rank_div, rank_name)
+    if rank_ladder_pos and rank_name.startswith(("Predator", "Master")):
+        rank_display += f" #{rank_ladder_pos}"
 
-    spec_rows = ""
-    if special_badges:
-        chips = []
-        for b in special_badges:
-            b_url = b.get("badge_url", "")
-            if not b_url:
-                continue
-            chips.append(
-                f'<span style="display:inline-flex;align-items:center;justify-content:center;'
-                f'width:40px;height:40px;border-radius:50%;'
-                f'background:rgba(177,244,250,0.12);'
-                f'border:1px solid rgba(177,244,250,0.25);">'
-                f'<img src="{b_url}" style="width:28px;height:28px;display:block;" onerror="this.remove()"></span>'
-            )
-        spec_rows += (
-            f'<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 16px;'
-            f'justify-content:center;">{"".join(chips)}</div>'
-        )
+    # ── 徽章 ──
+    season_badges_ctx = []
+    for b in season_badges:
+        color = b.get("color") or "#666"
+        season_badges_ctx.append({
+            "badge_url": b.get("badge_url", ""),
+            "season": b.get("season", ""),
+            "color": color,
+            "bg": f"rgba({_hex_to_rgba(color, 0.15)})",
+            "border": f"rgba({_hex_to_rgba(color, 0.3)})",
+        })
+
+    special_badges_ctx = [{"badge_url": b.get("badge_url", "")} for b in special_badges if b.get("badge_url")]
 
     # ── 英雄排行 ──
-    legends_html = ""
-    if top_legends:
-        rows = []
-        for i, leg in enumerate(top_legends[:4]):
-            icon_url = leg.get("icon_url", "") or leg.get("icon", "")
-            top = (
-                " background:linear-gradient(135deg,rgba(149,83,211,0.08),transparent);"
-                if i == 0
-                else ""
-            )
-            kc = "#9553d3" if i == 0 else _C_TEXT
-            bd = "border:2px solid #9553d3;" if i == 0 else "border:2px solid #3e414d;"
-            it = (
-                f'<img src="{icon_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;{bd}" onerror="this.remove()">'
-                if icon_url
-                else '<div style="width:36px;height:36px;border-radius:50%;background:#313542;"></div>'
-            )
-            rows.append(
-                f'<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;'
-                f'border-radius:8px;margin-bottom:2px;{top}">'
-                f'{it}<span style="flex:1;font-size:14px;font-weight:500;">{_legend_zh(leg["name"])}</span>'
-                f'<span style="font-size:16px;font-weight:700;color:{kc};">{leg.get("kills", 0):,}</span>'
-                f"</div>"
-            )
-        legends_html = f'<div style="padding:0 24px 16px;">{"".join(rows)}</div>'
+    legends_ctx = []
+    for leg in top_legends[:4]:
+        legends_ctx.append({
+            "icon_url": leg.get("icon_url", "") or leg.get("icon", ""),
+            "name_zh": _legend_zh(leg["name"]),
+            "kills_fmt": f"{leg.get('kills', 0):,}",
+        })
 
     # ── 当前选用 ──
-    selected_html = ""
+    selected_ctx = None
     if selected_legend:
-        sn = selected_legend.get("name", "")
         ss = selected_legend.get("stats", [])
-        si = selected_legend.get("icon_url", "")
-        st_html = ""
-        for s in ss:
-            st_html += (
-                f'<span style="margin-right:24px;">'
-                f'<span style="font-size:11px;color:{_C_MUTED};display:block;">{s.get("name", "")}</span>'
-                f'<span style="font-size:14px;font-weight:500;">{s.get("value", "")}</span>'
-                f"</span>"
-            )
-        ic = (
-            f'<img src="{si}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #3e414d;" onerror="this.remove()">'
-            if si
-            else ""
-        )
-        selected_html = f"""
-<div style="font-size:14px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:2px;padding:16px 24px 8px;">当前选用</div>
-<div style="padding:0 24px 8px;display:flex;align-items:center;gap:12px;">
-{ic}<span style="font-size:16px;font-weight:600;">{_legend_zh(sn)}</span>
-<span style="display:flex;gap:8px;margin-left:auto;">{st_html}</span>
-</div>"""
+        selected_ctx = {
+            "icon_url": selected_legend.get("icon_url", ""),
+            "name_zh": _legend_zh(selected_legend.get("name", "")),
+            "stats": [{"name": s.get("name", ""), "value": s.get("value", "")} for s in ss],
+        }
 
-    # ── 段位分布参考条 ──
-    rank_dist = _build_rank_dist(rank_name, rank_top_pct_global, rank_dist_entries, theme=_theme)
+    # ── 段位分布 ──
+    rank_dist_ctx = _build_rank_dist_list(rank_name, rank_top_pct_global, rank_dist_entries, theme=theme)
 
-    badge_section = ""
-    if badge_rows:
-        badge_section += f'<div style="font-size:14px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:2px;padding:16px 24px 8px;">Ranked 赛季徽章</div>{badge_rows}'
-    if spec_rows:
-        badge_section += f'<div style="font-size:14px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:2px;padding:16px 24px 8px;">特殊徽章</div>{spec_rows}'
-
-    # ══════ 完整 HTML（配色与原版卡片 ancallbelle_card.html 完全一致） ══════
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{
-  font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;
-  background:transparent;color:{_C_TEXT};
-  display:flex;justify-content:center;padding:24px
-}}
-.card{{
-  width:680px;background:{_C_CARD};border-radius:24px;overflow:hidden;
-  box-shadow:0 10px 20px rgba(0,0,0,.4)
-}}
-.header-bar{{
-  background:linear-gradient(135deg,{_C_CARD},{_C_CARD2});padding:20px 24px;
-  display:flex;align-items:center;gap:16px;
-  border-bottom:1px solid {_C_OUTLINE}
-}}
-.avatar{{
-  width:56px;height:56px;border-radius:50%;object-fit:cover;
-  border:3px solid {rank_c};box-shadow:0 0 16px {rank_c}44
-}}
-.player-name{{font-size:22px;font-weight:800;letter-spacing:1px}}
-.player-meta{{font-size:12px;color:{_C_MUTED};margin-top:2px}}
-.platform-tag{{
-  display:inline-flex;align-items:center;gap:6px;background:{_C_CARD};
-  border:1px solid {_C_OUTLINE};border-radius:20px;
-  padding:4px 12px;font-size:12px;margin-top:4px
-}}
-
-.rank-section{{
-  display:flex;align-items:center;padding:16px 24px;gap:16px;
-  background:{_C_CARD2};border-bottom:1px solid {_C_OUTLINE}
-}}
-.rank-img{{width:80px;height:80px;filter:drop-shadow(0 4px 8px {rank_c}44)}}
-.rank-tier{{font-size:28px;font-weight:800;color:{rank_c};line-height:1}}
-.rank-div{{font-size:16px;color:{rank_c};opacity:.9}}
-.rank-rp{{font-size:14px;color:{_C_MUTED};margin-top:4px}}
-.rank-stats{{display:flex;gap:24px;text-align:center;margin-left:auto}}
-.rank-stat-val{{font-size:18px;font-weight:700;color:{rank_c}}}
-.rank-stat-label{{font-size:11px;color:{_C_MUTED};text-transform:uppercase}}
-
-.level-row{{
-  display:flex;align-items:center;gap:14px;padding:14px 24px;
-  border-bottom:1px solid {_C_OUTLINE}
-}}
-.level-icon{{
-  width:64px;height:64px;object-fit:contain;flex-shrink:0;
-  filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))
-}}
-.level-text{{
-  font-size:20px;font-weight:700;
-  background:linear-gradient(135deg,{_C_PRED},#ff6b6b);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  white-space:nowrap
-}}
-.level-sub{{font-size:12px;color:{_C_MUTED};font-weight:400}}
-.level-bar{{flex:1;height:6px;background:{_C_CARD3};border-radius:3px;overflow:hidden}}
-.level-fill{{height:100%;width:{level_pct}%;background:linear-gradient(90deg,{_C_PRED},#ff6b6b);border-radius:3px}}
-
-.stat-grid{{
-  display:grid;grid-template-columns:repeat(3,1fr);
-  gap:1px;background:{_C_OUTLINE}
-}}
-.stat-chip{{
-  background:{_C_CARD};padding:16px;text-align:center;
-  display:flex;flex-direction:column;gap:4px
-}}
-.stat-val{{font-size:22px;font-weight:700;color:{_C_TEXT}}}
-.stat-val.highlight{{color:{_C_GOLD}}}
-.stat-lbl{{font-size:11px;color:{_C_MUTED};text-transform:uppercase;letter-spacing:.5px}}
-
-.footer{{
-  padding:12px 24px;border-top:1px solid {_C_OUTLINE};
-  font-size:11px;color:{_C_MUTED};display:flex;justify-content:space-between
-}}
-</style></head><body>
-<div class="card">
-
-<div class="header-bar">
-  <img class="avatar" src="{avatar_url}" onerror="this.style.display='none'">
-  <div>
-    <div class="player-name">{display_name}</div>
-    <div class="player-meta">{"aka " + alias + " · " if alias else ""}UID: {uid}</div>
-    <div class="platform-tag"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{state_dot};margin-right:4px;"></span>{platform} · {state_text}</div>
-  </div>
-</div>
-
-<div class="rank-section">
-  <img class="rank-img" src="{rank_img}" onerror="this.remove()">
-  <div>
-    <div class="rank-tier">{_rank_zh(rank_name)}{_rank_div_zh(rank_div, rank_name)}{' #' + str(rank_ladder_pos) if rank_ladder_pos and (rank_name.startswith('Predator') or rank_name.startswith('Master')) else ''}</div>
-    <div class="rank-rp">{rank_score:,} RP{rp_delta_html}</div>
-  </div>
-  <div class="rank-stats">
-    <div><div class="rank-stat-val">{top_global}</div><div class="rank-stat-label">Top ({top_pct_label})</div></div>
-  </div>
-</div>
-
-<div class="level-row">
-  <img class="level-icon" src="{level_icon}" onerror="this.style.display='none'">
-  <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
-    <div class="level-text">{level}</div>
-    <div class="level-bar"><div class="level-fill"></div></div>
-    <div class="level-sub">{level_pct}% to next level</div>
-  </div>
-</div>
-
-<div class="stat-grid">
-  <div class="stat-chip"><div class="stat-val highlight">{kills:,}</div><div class="stat-lbl">生涯击杀</div></div>
-  <div class="stat-chip"><div class="stat-val">{damage:,}</div><div class="stat-lbl">BR 总伤害</div></div>
-  <div class="stat-chip"><div class="stat-val">{wins_display}</div><div class="stat-lbl">BR 胜场</div></div>
-</div>
-
-{selected_html}
-
-<div style="font-size:14px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:2px;padding:16px 24px 8px;">段位分布参考 (全平台)</div>
-{rank_dist}
-
-<div style="font-size:14px;font-weight:600;color:{_C_MUTED};text-transform:uppercase;letter-spacing:2px;padding:16px 24px 8px;">常用英雄</div>
-{legends_html if legends_html else f'<div style="padding:0 24px 16px;color:{_C_MUTED};font-size:13px;">暂无英雄数据</div>'}
-
-{badge_section}
-
-<div class="footer">
-  <span>Data: <span style="color:{_C_PRED};">Apex Legends Status</span></span>
-  <span style="color:{_C_MUTED};">auth.赤羽真白 · Apex Chiyuchan</span>
-  <span>UID: {uid}</span>
-</div>
-
-</div>
-</body></html>"""
+    context = {
+        "theme": theme,
+        "light_theme": light_theme,
+        "theme_class": _beijing_theme(),
+        "avatar_url": avatar_url,
+        "display_name": display_name,
+        "alias": alias,
+        "uid": uid,
+        "platform": platform,
+        "state_text": state_text,
+        "state_dot": state_dot,
+        "rank_img": rank_img,
+        "rank_display": rank_display,
+        "rank_score_fmt": f"{rank_score:,}",
+        "rp_delta_html": rp_delta_html,
+        "top_global": top_global,
+        "top_pct_label": top_pct_label,
+        "level_icon": level_icon,
+        "level": level,
+        "level_pct": level_pct,
+        "kills_fmt": f"{kills:,}",
+        "damage_fmt": f"{damage:,}",
+        "wins_fmt": f"{wins:,}" if wins else "0",
+        "selected_legend": selected_ctx,
+        "rank_dist": rank_dist_ctx,
+        "top_legends": legends_ctx,
+        "season_badges": season_badges_ctx,
+        "special_badges": special_badges_ctx,
+    }
+    return _get_jinja_template("stats.html.jinja").render(**context)
 
 
 # ══════════════════════════════════════════
