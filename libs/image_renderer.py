@@ -151,14 +151,15 @@ async def draw_player_list_card(
         "Gold": "#FFD700", "Platinum": "#4ECDC4", "Diamond": "#74B9FF",
         "Master": "#A855F7", "Predator": "#DA292A",
     }
-    from .playwright_renderer import _parse_rank_name, _escape_html
+    from .playwright_renderer import _parse_rank_name, _escape_html, _beijing_theme
 
-    C_CARD = "#171A22"
-    C_CARD2 = "#1D222C"
-    C_OUTLINE = "#444C5C"
-    C_TEXT = "#DDE4F3"
-    C_MUTED = "#BFC7DA"
-    C_PRIMARY = "#6DA8FF"
+    _is_light = _beijing_theme() == "light"
+    C_CARD = "#171A22" if not _is_light else "#f0f2f5"
+    C_CARD2 = "#1D222C" if not _is_light else "#ffffff"
+    C_OUTLINE = "#444C5C" if not _is_light else "#e0e0e0"
+    C_TEXT = "#DDE4F3" if not _is_light else "#1a1a2e"
+    C_MUTED = "#BFC7DA" if not _is_light else "#666666"
+    C_PRIMARY = "#6DA8FF" if not _is_light else "#1565C0"
 
     cards_html = ""
     for i, r in enumerate(players):

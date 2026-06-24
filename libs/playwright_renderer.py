@@ -33,6 +33,13 @@ def _escape_html(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
+def _beijing_theme() -> str:
+    """北京时间 06:00-18:00 返回 'light'，其余返回空字符串（深色默认）"""
+    from datetime import datetime, timezone, timedelta
+    hour = datetime.now(timezone(timedelta(hours=8))).hour
+    return "light" if 6 <= hour < 18 else ""
+
+
 def _parse_rank_name(rank_img: str) -> str:
     """从段位图URL提取段位名，如 ranks/diamond4.png → Diamond 4"""
     import re
@@ -880,6 +887,7 @@ def _build_server_status_html(server_status) -> str:
         overall_text = "全部服务正常运行"
 
     context = {
+        "theme": _beijing_theme(),
         "overall_class": overall_class,
         "overall_text": overall_text,
         "services": services,
@@ -1075,6 +1083,7 @@ def _build_map_rotation_html(rotation) -> str:
             })
 
     context = {
+        "theme": _beijing_theme(),
         "modes": modes,
     }
     return _get_jinja_template("map_rotation.html.jinja").render(**context)
@@ -1126,6 +1135,7 @@ def _build_predator_html(predator) -> str:
         })
 
     context = {
+        "theme": _beijing_theme(),
         "platforms": platforms,
     }
     return _get_jinja_template("predator.html.jinja").render(**context)
@@ -1137,6 +1147,9 @@ async def draw_predator_card(predator) -> bytes:
 
 
 def _build_lfg_mode_card() -> str:
+    from datetime import datetime, timezone, timedelta
+    hour = datetime.now(timezone(timedelta(hours=8))).hour
+    is_light = 6 <= hour < 18
     ff = "sans-serif" if _USE_LOCAL_FONTS else "'Noto Sans SC','Roboto',sans-serif"
     fl = "" if _USE_LOCAL_FONTS else '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Roboto:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">'
     ml = ""
@@ -1149,16 +1162,25 @@ def _build_lfg_mode_card() -> str:
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent;color:#e6e1e5;font-family:{ff};display:flex;justify-content:center;padding:40px 20px}}
+body.light{{color:#1a1a2e}}
 .card{{width:420px;background:#2b2930;border-radius:28px;padding:24px}}
+body.light .card{{background:#f0f2f5}}
 .title{{font-size:1.5rem;font-weight:700;margin-bottom:8px}}
+body.light .title{{color:#1a1a2e}}
 .subtitle{{font-size:0.85rem;color:#938f99;margin-bottom:24px}}
+body.light .subtitle{{color:#666}}
 .options{{display:flex;flex-direction:column;gap:12px}}
 .opt{{padding:20px;border-radius:16px;background:#1c1b1f;border:1px solid #49454f;cursor:pointer;transition:all 0.2s ease}}
+body.light .opt{{background:#e8eaed;border-color:#c4c7cc}}
 .opt:hover{{background:#36343b;border-color:#4f378b}}
+body.light .opt:hover{{background:#dde0e3;border-color:#6750a4}}
 .opt-title{{font-size:1rem;font-weight:700;margin-bottom:4px}}
+body.light .opt-title{{color:#1a1a2e}}
 .opt-sub{{font-size:0.8rem;color:#938f99}}
+body.light .opt-sub{{color:#666}}
 .footer{{margin-top:24px;text-align:center;font-size:0.75rem;color:#938f99}}
-</style></head><body>
+body.light .footer{{color:#999}}
+</style></head><body class="{"light" if is_light else ""}">
 <div class="card">
     <div class="title">找队友</div>
     <div class="subtitle">选择你要玩的模式</div>
@@ -1255,33 +1277,46 @@ def _build_lfg_html(entries: list[dict]) -> str:
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent;color:#e6e1e5;font-family:{font_family};display:flex;justify-content:center;padding:32px 24px}}
+body.light{{color:#1a1a2e}}
 .lfg-list{{width:100%;max-width:1280px;display:flex;flex-direction:column;gap:12px;background:#1e1e2e;padding:8px 0}}
+body.light .lfg-list{{background:#f5f7fa}}
 .list-header{{display:grid;grid-template-columns:1.5fr 1fr 0.8fr 0.5fr 0.5fr;padding:0 32px 16px 32px;font-size:0.85rem;font-weight:500;color:#938f99;align-items:center;gap:16px}}
+body.light .list-header{{color:#666}}
 .list-header>div{{text-align:center}}
 .list-header>div:first-child{{text-align:left}}
 .list-header>div:nth-child(2){{text-align:left}}
 .list-header>div:nth-child(3){{text-align:left}}
 .player-row{{display:grid;grid-template-columns:1.5fr 1fr 0.8fr 0.5fr 0.5fr;align-items:center;background:#282838;padding:20px 32px;border-radius:20px;transition:all 0.2s ease;border:1px solid transparent;gap:16px}}
+body.light .player-row{{background:#ffffff;border:1px solid #e0e0e0}}
 .player-row:hover{{background:#303042;transform:translateY(-2px);border-color:#49454f}}
+body.light .player-row:hover{{background:#f0f2f5;transform:translateY(-2px);border-color:#c0c0c0}}
 .col-player{{display:flex;align-items:center;gap:18px}}
 .avatar{{width:52px;height:52px;border-radius:14px;object-fit:cover;flex-shrink:0}}
 .player-info{{display:flex;flex-direction:column;gap:4px}}
 .player-name{{font-weight:700;font-size:1rem}}
+body.light .player-name{{color:#1a1a2e}}
 .status-tag{{font-size:0.7rem;color:#938f99;display:flex;align-items:center;gap:4px}}
+body.light .status-tag{{color:#666}}
 .col-rank{{display:flex;align-items:center;gap:14px}}
 .rank-icon{{width:44px;height:44px;flex-shrink:0}}
 .rank-text{{display:flex;flex-direction:column;gap:2px;white-space:nowrap}}
 .rank-score{{font-weight:700;font-size:1.15rem}}
+body.light .rank-score{{color:#1a1a2e}}
 .rank-label{{font-size:0.78rem;color:#938f99}}
+body.light .rank-label{{color:#666}}
 .col-wants{{display:flex;gap:8px;flex-wrap:wrap}}
 .md3-chip{{background:#333537;color:#e3e2e6;padding:6px 14px;border-radius:10px;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap}}
+body.light .md3-chip{{background:#e8eaed;color:#333}}
 .chip-highlight{{background:#633b48;color:#ffd8e4}}
+body.light .chip-highlight{{background:#fce4ec;color:#c62828}}
 .col-data{{font-weight:700;font-size:1.1rem;text-align:center;white-space:nowrap}}
+body.light .col-data{{color:#1a1a2e}}
 .text-predator{{color:#ffb4ab}} .text-master{{color:#d0bcff}} .text-diamond{{color:#bac3ff}}
 .text-platinum{{color:#99f1ff}} .text-gold{{color:#ffd966}} .text-silver{{color:#c0c0c0}}
 .text-bronze{{color:#cd7f32}} .text-unranked{{color:#938f99}}
 .footer{{padding:16px 32px 0 32px;font-size:11px;color:#555;display:flex;justify-content:space-between;border-top:1px solid #383850;margin-top:8px}}
-</style></head><body>
+body.light .footer{{color:#999;border-top:1px solid #e0e0e0}}
+</style></head><body class="{"light" if _beijing_theme() else ""}">
 <div class="lfg-list">
     <div class="list-header">
         <div>玩家</div><div>段位 / 分数</div><div>寻找队友</div><div>等级</div><div>击杀数</div>
@@ -1289,6 +1324,10 @@ body{{background:transparent;color:#e6e1e5;font-family:{font_family};display:fle
     {rows}
     <div class="footer">
         <span>Data: apexlegendsstatus.com</span>
+        <span>auth.赤羽真白 · Apex Chiyuchan</span>
+    </div>
+</div>
+</body></html>"""</span>
         <span>auth.赤羽真白 · Apex Chiyuchan</span>
     </div>
 </div>
@@ -1347,6 +1386,7 @@ async def draw_season_card(season_info, meta_top5: list) -> bytes:
 async def draw_text_card_pw(title: str, message: str, is_error: bool = False) -> bytes:
     import html as _html
     color = "#DA292A" if is_error else "#4CE5B1"
+    light_color = "#B3261E" if is_error else "#2E7D32"
     msg_lines = "".join(f'<div class="msg-line">{_html.escape(line)}</div>' for line in message.split("\n"))
     html_str = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
@@ -1359,11 +1399,15 @@ body{{
   width:420px;background:#1A2635;border-radius:16px;overflow:hidden;
   box-shadow:0 4px 24px rgba(0,0,0,.4)
 }}
+body.light .card{{background:#f0f2f5;box-shadow:0 4px 24px rgba(0,0,0,.08)}}
 .header{{padding:24px 24px 0;font-size:20px;font-weight:800;color:{color}}}
+body.light .header{{color:{light_color}}}
 .body{{padding:16px 24px 24px;font-size:15px;color:#938f99;line-height:1.6}}
+body.light .body{{color:#444}}
 .msg-line{{margin-top:4px}}
 .footer{{padding:0 24px 20px;font-size:12px;color:#49454f;text-align:center}}
-</style></head><body>
+body.light .footer{{color:#999}}
+</style></head><body class="{"light" if _beijing_theme() else ""}">
 <div class="card">
   <div class="header">{_html.escape(title)}</div>
   <div class="body">{msg_lines}</div>
@@ -1379,16 +1423,22 @@ body{{
 
 
 def _build_bind_html(uid: str, name: str, platform: str) -> str:
+    _theme = _beijing_theme()
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
 .card{{width:480px;background:#1A2635;border-radius:16px;padding:28px;box-shadow:0 4px 24px rgba(0,0,0,.4);text-align:center}}
+body.light .card{{background:#f0f2f5;box-shadow:0 4px 24px rgba(0,0,0,.08)}}
 .title{{font-size:26px;font-weight:700;color:#4CE5B1;margin-bottom:16px}}
+body.light .title{{color:#2E7D32}}
 .row{{font-size:15px;color:#FFF;margin-bottom:8px}}
+body.light .row{{color:#1a1a2e}}
 .hint{{font-size:13px;color:#89A0B0;margin-top:20px}}
+body.light .hint{{color:#666}}
 .footer{{font-size:11px;color:#89A0B0;margin-top:16px}}
-</style></head><body>
+body.light .footer{{color:#999}}
+</style></head><body class="{_theme}">
 <div class="card">
 <div class="title">绑定成功</div>
 <div class="row">玩家　{_escape_html(name)}</div>
@@ -1400,15 +1450,20 @@ body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transpa
 
 
 def _build_unbind_html() -> str:
-    return """<!DOCTYPE html>
+    _theme = _beijing_theme()
+    return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}
-.card{width:480px;background:#1A2635;border-radius:16px;padding:28px;box-shadow:0 4px 24px rgba(0,0,0,.4);text-align:center}
-.title{font-size:26px;font-weight:700;color:#4CE5B1;margin-bottom:12px}
-.msg{font-size:15px;color:#89A0B0}
-.footer{font-size:11px;color:#89A0B0;margin-top:20px}
-</style></head><body>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
+.card{{width:480px;background:#1A2635;border-radius:16px;padding:28px;box-shadow:0 4px 24px rgba(0,0,0,.4);text-align:center}}
+body.light .card{{background:#f0f2f5;box-shadow:0 4px 24px rgba(0,0,0,.08)}}
+.title{{font-size:26px;font-weight:700;color:#4CE5B1;margin-bottom:12px}}
+body.light .title{{color:#2E7D32}}
+.msg{{font-size:15px;color:#89A0B0}}
+body.light .msg{{color:#666}}
+.footer{{font-size:11px;color:#89A0B0;margin-top:20px}}
+body.light .footer{{color:#999}}
+</style></head><body class="{_theme}">
 <div class="card">
 <div class="title">已解绑</div>
 <div class="msg">Apex 账号已与本 QQ 解除绑定</div>
@@ -1430,19 +1485,28 @@ def _build_team_html(team: dict) -> str:
     for _ in range(3 - member_count):
         members_html += '<div class="member empty">　(空位)</div>'
 
+    _theme = _beijing_theme()
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
 .card{{width:500px;background:#1A2635;border-radius:16px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.4)}}
+body.light .card{{background:#f0f2f5;box-shadow:0 4px 24px rgba(0,0,0,.08)}}
 .team-name{{font-size:26px;font-weight:700;color:#FFF;margin-bottom:4px}}
+body.light .team-name{{color:#1a1a2e}}
 .owner{{font-size:12px;color:#89A0B0;margin-bottom:16px}}
+body.light .owner{{color:#666}}
 .section-title{{font-size:18px;font-weight:700;color:#FFF;margin-bottom:8px}}
+body.light .section-title{{color:#1a1a2e}}
 .member{{font-size:15px;color:#FFF;margin-bottom:4px}}
+body.light .member{{color:#1a1a2e}}
 .member.empty{{color:#89A0B0}}
+body.light .member.empty{{color:#999}}
 .ttl{{font-size:12px;color:#89A0B0;margin-top:16px}}
+body.light .ttl{{color:#666}}
 .footer{{font-size:11px;color:#89A0B0;margin-top:16px;text-align:center}}
-</style></head><body>
+body.light .footer{{color:#999}}
+</style></head><body class="{_theme}">
 <div class="card">
 <div class="team-name">{name}</div>
 <div class="owner">队长: {owner}</div>
@@ -1466,16 +1530,22 @@ def _build_team_list_html(teams: list[dict]) -> str:
             items += f'<div class="team-row">{n}　{mc}/3　队长:{o}</div>'
         items_html = items
 
+    _theme = _beijing_theme()
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;background:transparent;display:flex;justify-content:center;padding:24px}}
 .card{{width:500px;background:#1A2635;border-radius:16px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.4)}}
+body.light .card{{background:#f0f2f5;box-shadow:0 4px 24px rgba(0,0,0,.08)}}
 .title{{font-size:26px;font-weight:700;color:#FFF;margin-bottom:16px}}
+body.light .title{{color:#1a1a2e}}
 .team-row{{font-size:15px;color:#FFF;margin-bottom:12px;padding:8px 0;border-bottom:1px solid #2A3A4A}}
+body.light .team-row{{color:#1a1a2e;border-bottom-color:#e0e0e0}}
 .empty{{font-size:15px;color:#89A0B0}}
+body.light .empty{{color:#999}}
 .footer{{font-size:11px;color:#89A0B0;margin-top:16px;text-align:center}}
-</style></head><body>
+body.light .footer{{color:#999}}
+</style></head><body class="{_theme}">
 <div class="card">
 <div class="title">活跃队伍 ({count})</div>
 {items_html}
@@ -1636,6 +1706,7 @@ def _render_steamcharts_html(data) -> str:
             raw_points.append([b.ts_ms, int(b.avg_players)])
 
     ctx = {
+        "theme": _beijing_theme(),
         "title": "Apex Legends",
         "current_formatted": f"{data.current_online:,}",
         "updated_local": updated,
@@ -1656,8 +1727,6 @@ async def draw_steamcharts_card(data) -> bytes:
     async with run_with_page(
         viewport={"width": 720, "height": 900}, device_scale_factor=3
     ) as page:
-        # 强制深色主题（与其他卡片统一）
-        await page.emulate_media(color_scheme="dark")
         # 允许外部 CDN 资源加载（Chart.js + Google Fonts）
         await page.set_content(html, wait_until="load", timeout=30000)
         # 等待 Chart.js 库加载完成

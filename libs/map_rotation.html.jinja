@@ -9,6 +9,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&display=swap" rel="stylesheet">
 <style>
 :root {
+  --md-primary: #A8C8FF;
+  --md-on-primary: #002F65;
+  --md-primary-container: #00458C;
+  --md-on-primary-container: #A8C8FF;
+  --md-secondary-container: #324560;
+  --md-on-secondary-container: #D4E3FC;
+  --md-surface: #101419;
+  --md-on-surface: #E0E2E9;
+  --md-surface-variant: #43474F;
+  --md-on-surface-variant: #C3C6CF;
+  --md-outline-variant: #43474F;
+  --md-surface-container-low: #1A1D24;
+  --md-surface-container: #1E2228;
+  --md-surface-container-high: #282C34;
+  --md-surface-container-highest: #32363E;
+  --md-success: #7DD87D;
+  --md-shadow-1: 0 1px 2px rgba(0,0,0,0.6), 0 1px 3px 1px rgba(0,0,0,0.4);
+  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.6), 0 2px 6px 2px rgba(0,0,0,0.4);
+}
+
+body.light {
   --md-primary: #1565C0;
   --md-on-primary: #FFFFFF;
   --md-primary-container: #D4E3FC;
@@ -27,29 +48,6 @@
   --md-success: #2E7D32;
   --md-shadow-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
   --md-shadow-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --md-primary: #A8C8FF;
-    --md-on-primary: #002F65;
-    --md-primary-container: #00458C;
-    --md-on-primary-container: #A8C8FF;
-  --md-secondary-container: #324560;
-  --md-on-secondary-container: #D4E3FC;
-  --md-surface: #101419;
-  --md-on-surface: #E0E2E9;
-  --md-surface-variant: #43474F;
-  --md-on-surface-variant: #C3C6CF;
-  --md-outline-variant: #43474F;
-  --md-surface-container-low: #1A1D24;
-  --md-surface-container: #1E2228;
-  --md-surface-container-high: #282C34;
-  --md-surface-container-highest: #32363E;
-    --md-success: #7DD87D;
-    --md-shadow-1: 0 1px 2px rgba(0,0,0,0.6), 0 1px 3px 1px rgba(0,0,0,0.4);
-    --md-shadow-2: 0 1px 2px rgba(0,0,0,0.6), 0 2px 6px 2px rgba(0,0,0,0.4);
-  }
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -316,7 +314,7 @@ body {
 .attribution a:hover { text-decoration: underline; }
 </style>
 </head>
-<body>
+<body class="{{ theme }}">
 <div class="card">
   {%- for mode in modes %}
   <section class="mode-section" data-mode="{{ mode.key }}">
