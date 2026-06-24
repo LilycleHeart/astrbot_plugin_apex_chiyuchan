@@ -19,6 +19,7 @@ from .libs.database import Database
 from .libs import image_renderer as renderer
 from .libs.als_scraper import fetch_badges, fetch_lfg_stats, search_players
 from .libs.steamcharts_scraper import fetch_steamcharts
+from .libs.season_scraper import fetch_season_info, fetch_meta_top5
 
 
 async def _send_status_card(context, sid: str, text: str, wrapper):
@@ -715,6 +716,18 @@ class XiaoChiyu(Star):
         async for r in self._send_card(event, img):
             yield r
 
+    @filter.command("season", alias={"赛季", "赛季信息"})
+    async def cmd_season(self, event: AstrMessageEvent):
+        """查询当前 Apex 赛季信息 / META 胜率"""
+        season_info = await fetch_season_info()
+        if not season_info:
+            yield event.plain_result("无法获取赛季信息，稍后再试")
+            return
+        meta_top5 = await fetch_meta_top5()
+        img = await renderer.draw_season_card(season_info, meta_top5)
+        async for r in self._send_card(event, img):
+            yield r
+
     @filter.command("monitor", alias={"监控", "服务器监控"})
     async def cmd_monitor(self, event: AstrMessageEvent, action: str = ""):
         session = event.unified_msg_origin
@@ -1375,6 +1388,41 @@ class XiaoChiyu(Star):
             if pd:
                 text += f"{plat}: 猎杀分数线 {pd.predator_cap:,} RP | 大师/猎杀 {pd.masters_and_preds:,} 人\n"
         text += "\n请简单评论各平台数据，然后用 send_message_to_user 发送大师数据卡片图片。"
+        return CallToolResult(
+            content=[
+                TextContent(type="text", text=text),
+                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
+            ]
+        )
+
+    @filter.llm_tool(name="apex_season")
+    async def llm_season(self, event: AstrMessageEvent):
+        """查询当前 Apex 赛季信息、META 英雄胜率 Top5。当用户说"赛季"、"当前赛季"、"赛季倒计时"、"META"、"胜率"时调用。"""
+        import base64
+        from mcp.types import CallToolResult, TextContent, ImageContent
+
+        season_info = await fetch_season_info()
+        if not season_info:
+            return CallToolResult(
+                content=[TextContent(type="text", text="获取赛季信息失败")]
+            )
+        meta_top5 = await fetch_meta_top5()
+        img_bytes = await renderer.draw_season_card(season_info, meta_top5)
+        img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
+
+        meta_text = ""
+        if meta_top5:
+            meta_text = "META Top 6:\n"
+            for i, m in enumerate(meta_top5[:6], 1):
+                meta_text += f"  #{i} {m.name}({m.en}) — 胜率 {m.win_rate} / 选取率 {m.pick_rate}\n"
+
+        text = (
+            f"当前为第{season_info.season_number}赛季「{season_info.season_name}」 {season_info.split_label}\n"
+            f"赛季结束: {season_info.season_end}\n"
+            f"倒计时: {season_info.days_left}天 {season_info.hours_left}小时 {season_info.minutes_left}分钟\n"
+            f"\n{meta_text}"
+            f"\n请简短评论一下当前赛季，然后用 send_message_to_user 发送赛季卡片图片。"
+        )
         return CallToolResult(
             content=[
                 TextContent(type="text", text=text),

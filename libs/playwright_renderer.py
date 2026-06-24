@@ -714,7 +714,7 @@ async def _embed_images(html: str) -> str:
 
 async def _render_card_sync(html: str, width: int) -> bytes:
     html = await _embed_images(html)
-    async with run_with_page(viewport={"width": width, "height": 100}, device_scale_factor=2) as page:
+    async with run_with_page(viewport={"width": width, "height": 100}, device_scale_factor=3) as page:
         await page.set_content(html, wait_until="load", timeout=20000)
         await page.wait_for_selector(".card, .lfg-list", timeout=10000)
         try:
@@ -1303,6 +1303,41 @@ async def draw_lfg_card(entries: list[dict]) -> bytes:
 async def draw_lfg_mode_card() -> bytes:
     html = _build_lfg_mode_card()
     return await _render_card_sync(html, 420)
+
+
+# ══════════════════════════════════════════
+#  赛季信息卡片
+# ══════════════════════════════════════════
+
+
+def _build_season_html(season_info, meta_top5: list) -> str:
+    """构建赛季信息卡片 HTML"""
+    context = {
+        "season_number": season_info.season_number,
+        "season_name": season_info.season_name,
+        "split_label": season_info.split_label,
+        "split": season_info.split,
+        "days_left": season_info.days_left,
+        "hours_left": season_info.hours_left,
+        "minutes_left": season_info.minutes_left,
+        "season_end": season_info.season_end,
+        "meta_top5": [
+            {
+                "name": m.name,
+                "en": m.en,
+                "icon": m.icon,
+                "win_rate": m.win_rate,
+                "pick_rate": m.pick_rate,
+            }
+            for m in meta_top5
+        ],
+    }
+    return _get_jinja_template("season.html.jinja").render(**context)
+
+
+async def draw_season_card(season_info, meta_top5: list) -> bytes:
+    html = _build_season_html(season_info, meta_top5)
+    return await _render_card_sync(html, 440)
 
 
 async def draw_text_card_pw(title: str, message: str, is_error: bool = False) -> bytes:

@@ -28,6 +28,7 @@ try:
     from .playwright_renderer import draw_team_card_pw as _draw_team_card_pw
     from .playwright_renderer import draw_team_list_card_pw as _draw_team_list_card_pw
     from .playwright_renderer import draw_stats_card_pw as _draw_stats_card_pw
+    from .playwright_renderer import draw_season_card as _draw_season_card_pw
 except Exception as _e:
     from astrbot.api import logger as _lg
     _lg.error(f"[ImageRenderer] Playwright 渲染器导入失败: {type(_e).__name__}: {_e}")
@@ -267,7 +268,7 @@ body {{
 
     t0 = time.time()
     try:
-        async with run_with_page(viewport={"width": 780, "height": 800}, device_scale_factor=1.5) as page:
+        async with run_with_page(viewport={"width": 780, "height": 800}, device_scale_factor=3) as page:
             await page.set_content(html, wait_until="domcontentloaded")
             card = await page.query_selector(".card-container")
             if card:
@@ -307,6 +308,16 @@ async def draw_steamcharts_card(data) -> bytes:
     if _draw_steamcharts_card_pw is None:
         raise RuntimeError("Playwright 渲染器未导入，无法渲染 Steamcharts 卡片")
     return await _draw_steamcharts_card_pw(data)
+
+
+async def draw_season_card(season_info, meta_top5: list) -> bytes | None:
+    """赛季信息卡片 (Playwright)。失败返回 None。"""
+    from astrbot.api import logger
+    try:
+        return await _draw_season_card_pw(season_info, meta_top5)
+    except Exception as e:
+        logger.error(f"[SeasonCard] Playwright 渲染失败: {type(e).__name__}: {e}")
+        return None
 
 
 # ══════════════════════════════════════════

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex Legends 赛季信息</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --md-primary: #1565C0;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #D4E3FC;
+  --md-on-primary-container: #0B1A30;
+  --md-secondary-container: #D4E3FC;
+  --md-on-secondary-container: #0B1A30;
+  --md-surface: #F8FAFF;
+  --md-on-surface: #181B20;
+  --md-surface-variant: #DDE3F0;
+  --md-on-surface-variant: #43474F;
+  --md-outline-variant: #C3C6CF;
+  --md-surface-container-low: #EFF2F9;
+  --md-surface-container: #E9ECF4;
+  --md-surface-container-high: #E3E6EE;
+  --md-success: #2E7D32;
+  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-primary: #A8C8FF;
+    --md-on-primary: #002F65;
+    --md-primary-container: #00458C;
+    --md-on-primary-container: #A8C8FF;
+    --md-secondary-container: #324560;
+    --md-on-secondary-container: #D4E3FC;
+    --md-surface: #101419;
+    --md-on-surface: #E0E2E9;
+    --md-surface-variant: #43474F;
+    --md-on-surface-variant: #C3C6CF;
+    --md-outline-variant: #43474F;
+    --md-surface-container-low: #1A1D24;
+    --md-surface-container: #1E2228;
+    --md-surface-container-high: #282C34;
+    --md-success: #7DD87D;
+    --md-shadow-2: 0 1px 2px rgba(0,0,0,0.6), 0 2px 6px 2px rgba(0,0,0,0.4);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  font-family: 'Roboto Flex', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: transparent;
+  color: var(--md-on-surface);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  background: var(--md-surface-container-low);
+  border-radius: 28px;
+  box-shadow: var(--md-shadow-2);
+  overflow: hidden;
+  max-width: 400px;
+  width: 100%;
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---- Header ---- */
+.card-header {
+  padding: 20px 20px 16px;
+  position: relative;
+  z-index: 2;
+}
+
+.card-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--md-primary);
+}
+
+.card-subtitle {
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+}
+
+/* ---- Season Info ---- */
+.season-info {
+  padding: 0 20px 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.season-badge {
+  display: none;
+}
+
+.season-badge-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- Split Info ---- */
+.split-section {
+  background: var(--md-surface-container);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.split-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.split-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--md-primary);
+  line-height: 1;
+}
+
+.split-value .split-num {
+  font-size: 32px;
+}
+
+.split-progress {
+  margin-top: 12px;
+  height: 4px;
+  background: var(--md-outline-variant);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.split-progress-bar {
+  height: 100%;
+  background: var(--md-primary);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* ---- Countdown ---- */
+.countdown-section {
+  background: var(--md-surface-container);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.countdown-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.countdown-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.countdown-item {
+  text-align: center;
+}
+
+.countdown-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--md-primary);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-unit {
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ---- End Date ---- */
+.end-date {
+  text-align: center;
+  padding: 12px 20px 16px;
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  position: relative;
+  z-index: 2;
+}
+
+.end-date strong {
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+
+.attribution {
+  padding: 10px 8px 12px;
+  font-size: 9px;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  line-height: 1.4;
+  position: relative;
+  z-index: 2;
+}
+
+.attribution a {
+  color: var(--md-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.attribution a:hover { text-decoration: underline; }
+
+/* ---- Meta Top 5 ---- */
+.meta-section {
+  padding: 0 20px 16px;
+  position: relative;
+  z-index: 2;
+}
+
+.meta-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* Center last row (items 4,5) */
+.meta-grid .meta-card:nth-child(4) {
+  grid-column: 1 / 2;
+  justify-self: center;
+}
+.meta-grid .meta-card:nth-child(5) {
+  grid-column: 2 / 3;
+  justify-self: center;
+}
+
+.meta-card {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  aspect-ratio: 1/1;
+  background: var(--md-surface-container-high);
+  width: 100%;
+}
+
+.meta-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.meta-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top,
+    rgba(0,0,0,0.85) 0%,
+    rgba(0,0,0,0.3) 40%,
+    rgba(0,0,0,0) 60%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px 5px 5px;
+}
+
+.meta-card-rank {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--md-primary);
+  border-radius: 6px;
+  padding: 1px 4px;
+  line-height: 1.4;
+}
+
+.meta-card-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.2;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  margin-bottom: 2px;
+}
+
+.meta-card-name-en {
+  font-size: 7px;
+  color: rgba(255,255,255,0.7);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.meta-card-stats {
+  display: flex;
+  gap: 4px;
+  font-size: 8px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta-card-winrate {
+  color: var(--md-primary);
+}
+
+.meta-card-pickrate {
+  color: rgba(255,255,255,0.65);
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">第{{ season_number }}赛季 · {{ season_name }}</div>
+  </div>
+
+  <div class="season-info">
+    <div class="season-badge">
+      <svg class="season-badge-icon" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+      </svg>
+      第{{ season_number }}赛季 · {{ season_name }}
+    </div>
+
+    <div class="split-section">
+      <div class="split-label">当前赛季分区</div>
+      <div class="split-value">
+        {{ split_label }}
+      </div>
+      <div class="split-progress">
+        <div class="split-progress-bar" style="width: {{ ((season_number * 7 + split * 3) % 100) }}%"></div>
+      </div>
+    </div>
+
+    <div class="countdown-section">
+      <div class="countdown-label">距{{ split_label }}结束</div>
+      <div class="countdown-grid">
+        <div class="countdown-item">
+          <div class="countdown-value">{{ days_left }}</div>
+          <div class="countdown-unit">天</div>
+        </div>
+        <div class="countdown-item">
+          <div class="countdown-value">{{ hours_left }}</div>
+          <div class="countdown-unit">小时</div>
+        </div>
+        <div class="countdown-item">
+          <div class="countdown-value">{{ minutes_left }}</div>
+          <div class="countdown-unit">分钟</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meta Top 5 — hidden when empty -->
+  {% if meta_top5 %}
+  <div class="meta-section">
+    <div class="meta-label">当前META · 胜率 Top 6</div>
+    <div class="meta-grid">
+      {% for m in meta_top5 %}
+      <div class="meta-card">
+        <img src="{{ m.icon }}" alt="{{ m.en }}" loading="lazy" />
+        <div class="meta-card-overlay">
+          <div class="meta-card-rank">#{{ loop.index }}</div>
+          <div class="meta-card-name">{{ m.name }}</div>
+          <div class="meta-card-name-en">{{ m.en }}</div>
+          <div class="meta-card-stats">
+            <span class="meta-card-winrate">胜{{ m.win_rate }}</span>
+            <span class="meta-card-pickrate">选{{ m.pick_rate }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="end-date">
+    赛季结束于 <strong>{{ season_end }}</strong>
+  </div>
+
+  <div class="attribution">
+    数据来源 <a href="https://apexlegendsstatus.com/meta" target="_blank" rel="noopener">apexlegendsstatus.com</a><br>
+    各平台前100名猎杀者数据
+  </div>
+</div>
+</body>
+</html>
