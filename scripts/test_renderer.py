@@ -316,7 +316,7 @@ async def screenshot_html(html: str, path: Path, width: int = 720):
     """Take a Playwright WebKit screenshot of rendered HTML."""
     from libs.playwright_renderer import _embed_images
     html = await _embed_images(html)
-    async with run_with_page(viewport={"width": width, "height": 100}, device_scale_factor=2) as page:
+    async with run_with_page(viewport={"width": width, "height": 100}, device_scale_factor=3) as page:
         await page.set_content(html, wait_until="load", timeout=20000)
         try:
             await page.wait_for_function("() => document.fonts.ready", timeout=8000)

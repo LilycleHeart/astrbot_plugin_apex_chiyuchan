@@ -81,19 +81,23 @@ async def close_browser():
         _playwright = None
 
 
-async def _get_context() -> BrowserContext:
-    try:
-        return _context_pool.get_nowait()
-    except asyncio.QueueEmpty:
-        browser = await get_browser()
-        t0 = time.perf_counter()
-        ctx = await browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            timezone_id=_TIMEZONE_ID,
-            color_scheme=_COLOR_SCHEME,
-        )
-        _log_stat("ctx_create", time.perf_counter() - t0)
-        return ctx
+async def _get_context(device_scale_factor: float = 1) -> BrowserContext:
+    # df=1 走连接池；df≠1 说明是截图场景，每次新建避免污染池内 context
+    if device_scale_factor == 1:
+        try:
+            return _context_pool.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+    browser = await get_browser()
+    t0 = time.perf_counter()
+    ctx = await browser.new_context(
+        viewport={"width": 1280, "height": 800},
+        timezone_id=_TIMEZONE_ID,
+        color_scheme=_COLOR_SCHEME,
+        device_scale_factor=device_scale_factor,
+    )
+    _log_stat("ctx_create", time.perf_counter() - t0)
+    return ctx
 
 
 async def _return_context(ctx: BrowserContext):
@@ -109,13 +113,10 @@ async def run_with_page(viewport: dict = None, device_scale_factor: float = 1):
     async with _semaphore:
         _log_stat("sem_wait", time.perf_counter() - t_wait)
 
-        ctx = await _get_context()
+        ctx = await _get_context(device_scale_factor=device_scale_factor)
         page = await ctx.new_page()
         if viewport:
             await page.set_viewport_size(viewport)
-        if device_scale_factor != 1:
-            # 已有 context 的 scale 不变，这里仅用于截图场景的特殊 viewport
-            pass
 
         t_use = time.perf_counter()
         try:

@@ -36,10 +36,12 @@
     <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="360" /></td>
   </tr>
   <tr>
-    <td align="center" colspan="2"><b>Steam 日活</b></td>
+    <td align="center"><b>赛季信息</b></td>
+    <td align="center"><b>Steam 日活</b></td>
   </tr>
   <tr>
-    <td colspan="2"><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/online.png" width="720" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/season.png" width="360" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/online.png" width="360" /></td>
   </tr>
   <tr>
     <td align="center" colspan="2"><b>找队友 (LFG)</b></td>
@@ -70,7 +72,8 @@
 ### 🗺️ 地图轮换
 
 - 当前匹配 / 排位地图
-- 限时模式地图
+- 混合模式（区域控制、团队死斗、枪械升级赛、移动据点争夺）
+- 外卡模式地图
 - 剩余轮换时间
 - 自动生成官方风格卡片
 
@@ -79,16 +82,24 @@
 ### 🌐 服务器状态
 
 - EA 服务器状态
-- 数据中心运行情况
+- 数据中心运行情况（含国旗图标）
 - 异常 / 炸服检测
 
 ---
 
 ### 👑 猎杀 / 大师数据
 
-- 四平台猎杀分数线
+- 四平台猎杀分数线 + 24 小时变动
 - 大师人数统计
 - Moe Counter 风格可视化
+
+---
+
+### 🏆 赛季信息
+
+- 当前赛季名称与分区
+- 倒计时（天/小时/分钟）
+- META 英雄胜率 Top 6
 
 ---
 
@@ -105,8 +116,16 @@
 
 - 当前在线人数 / 24 小时峰值 / 历史峰值
 - 近 7 天在线人数趋势图（Chart.js 折线图，约 169 个数据点）
-- MD3 风格卡片，支持深色主题
+- MD3 风格卡片，支持深色/浅色主题
 - LLM 触发词：在线人数 / 日活 / 活跃玩家数
+
+---
+
+### 🌓 北京时区明暗主题
+
+- 06:00 - 18:00（北京时间）自动切换亮色主题
+- 其余时间使用深色主题
+- 适用于除战绩/个人资料外的所有卡片
 
 ---
 
@@ -120,6 +139,7 @@
 服务器炸了吗
 大师多少分了
 现在多少人在线
+现在什么赛季
 ```
 
 自动识别并返回结构化结果 + 卡片展示
@@ -137,6 +157,7 @@
 | `/map` | 地图轮换 |
 | `/server` | 服务器状态 |
 | `/master` | 猎杀 / 大师数据 |
+| `/season` | 赛季信息 |
 | `/lfg <排位|娱乐|列表|退出>` | 找队友 |
 | `/online` | Steam 日活 / 在线人数 |
 
@@ -181,9 +202,8 @@ https://portal.apexlegendsapi.com
 |------|------|
 | httpx | API 请求 |
 | aiosqlite | 本地数据 |
-| Pillow | 图片渲染 |
-| playwright | 卡片渲染 |
-| jinja2 | Steam 日活卡片模板 |
+| playwright | 卡片渲染（必须） |
+| jinja2 | 卡片模板 |
 | mcp | LLM 工具返回 |
 
 安装浏览器内核：

@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.4.0 (2026-06-24)
+
+### ✨ 新功能
+- **赛季信息卡**: `/season` 命令，展示当前赛季名称、分区、倒计时、META 胜率 Top 6
+- **`apex_season` LLM 工具**: 用户询问赛季信息时自动触发
+- **赛季数据爬取**: `season_scraper.py` 从 esportstales 获取赛季日期，ALS 获取 META 英雄胜率/选取率
+- **北京时区明暗主题**: 所有卡片（除战绩/个人资料）根据北京时间 06:00-18:00 自动切换亮色/暗色主题
+- **混合模式（Mixtape）地图轮换**: 支持区域控制、团队死斗、枪械升级赛、移动据点争夺模式
+- **外卡（Wildcard）地图轮换**: 支持外卡模式地图显示
+
+### 🔧 优化
+- **Playwright 强制渲染**: 所有卡片通过 Playwright HTML→PNG 渲染，移除所有 Pillow 渲染器
+- **Playwright 失败降级**: 渲染失败时返回 `None`，调用方降级为纯文本消息
+- **`device_scale_factor=3`**: 所有卡片统一 3x DPR 渲染，文字更清晰
+- **ALS 国旗图标**: 服务器状态卡片使用 ALS 自带 `flag-icon.min.css` 显示国旗
+- **猎杀者分数线 24h 变动**: 展示各平台猎杀者分数线 24 小时内涨跌（▲/▼/—）
+- **混合模式地图名汉化**: 区域控制、团队死斗等模式名称使用官方简体中文翻译
+- **地图轮换时间戳**: 使用 API 返回的真实开始/结束时间，不再仅依赖倒计时估算
+
+### 🐛 修复
+- 修复 LFG 卡片 HTML 重复 footer 块导致 SyntaxError (`·` 字符)
+- 修复 `_latency_color()` 对 "100% up" 误判为高延迟
+- 修复 steamcharts 卡片 `emulate_media("dark")` 强制深色导致亮色主题失效
+- 修复 steamcharts JS `isDark` 变量从 `matchMedia` 改为 `body.classList` 检测
+- 修复 `draw_player_list_card` 硬编码深色配色，改为根据北京时间动态切换
+- 修复 `device_scale_factor` 参数被忽略：`run_with_page()` 传入的 df 值从未应用到浏览器 context，所有截图实际为 1x 分辨率
+
+### 🗑️ 移除
+- 移除所有 Pillow 渲染器（`draw_text_card` 等），保留仅 Moe Counter GIF 帧处理
+- 移除 `config.py` 中的字体加载逻辑（`preload_fonts` 改为空操作）
+- 移除 `emulate_media(color_scheme="dark")` 强制深色
+
+---
+
 ## v1.3.0 (2026-06-22)
 
 ### ✨ 新功能
