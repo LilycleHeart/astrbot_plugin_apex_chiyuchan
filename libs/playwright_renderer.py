@@ -1327,10 +1327,6 @@ body.light .footer{{color:#999;border-top:1px solid #e0e0e0}}
         <span>auth.赤羽真白 · Apex Chiyuchan</span>
     </div>
 </div>
-</body></html>"""</span>
-        <span>auth.赤羽真白 · Apex Chiyuchan</span>
-    </div>
-</div>
 </body></html>"""
 
 
