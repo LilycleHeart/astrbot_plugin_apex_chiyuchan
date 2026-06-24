@@ -18,30 +18,30 @@
 
 ## 🖼️ 卡片预览
 
-<table align="center">
+<table align="center" cellpadding="4">
   <tr>
     <td align="center"><b>战绩查询</b></td>
-    <td align="center"><b>服务器状态</b></td>
-  </tr>
-  <tr>
-    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/stats.png" width="360" /></td>
-    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/server.png" width="360" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>地图轮换</b></td>
-    <td align="center"><b>猎杀 / 大师</b></td>
-  </tr>
-  <tr>
-    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" width="360" /></td>
-    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" width="360" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>赛季信息</b></td>
     <td align="center"><b>Steam 日活</b></td>
   </tr>
   <tr>
-    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/season.png" width="360" /></td>
-    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/online.png" width="360" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/stats.png" height="400" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/online.png" height="400" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>猎杀 / 大师</b></td>
+    <td align="center"><b>赛季信息</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/master.png" height="400" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/season.png" height="400" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>服务器状态</b></td>
+    <td align="center"><b>地图轮换</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/server.png" height="440" /></td>
+    <td><img src="https://raw.githubusercontent.com/LilycleHeart/astrbot_plugin_apex_chiyuchan/master/preview/map.png" height="440" /></td>
   </tr>
   <tr>
     <td align="center" colspan="2"><b>找队友 (LFG)</b></td>
