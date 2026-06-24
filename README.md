@@ -32,14 +32,7 @@
 
 ## 🖼️ 卡片预览
 
-
 <table align="center" cellpadding="8">
-  <tr>
-    <td colspan="2" align="center">
-      <b>👥 找队友 / LFG</b><br />
-      <img src="./preview/lfg.png" alt="找队友预览" width="760" />
-    </td>
-  </tr>
   <tr>
     <td align="center" valign="top" width="50%">
       <b>📊 战绩查询</b><br />
@@ -68,6 +61,12 @@
     <td align="center" valign="top" width="50%">
       <b>👑 猎杀 / 大师</b><br />
       <img src="./preview/master.png" alt="猎杀大师预览" width="360" />
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <b>👥 找队友 / LFG</b><br />
+      <img src="./preview/lfg.png" alt="找队友预览" width="760" />
     </td>
   </tr>
 </table>
@@ -221,36 +220,11 @@ PC / PS4 / X1 / SWITCH
 
 ## 📦 安装
 
-### 方式一：插件市场安装
-
-在 AstrBot 插件市场中搜索：
+在 AstrBot 插件管理中，选择「安装插件」，输入以下链接即可：
 
 ```text
-小赤羽
+https://github.com/LilycleHeart/astrbot_plugin_apex_chiyuchan
 ```
-
-然后点击安装即可。
-
----
-
-### 方式二：手动上传 ZIP
-
-1. 下载本仓库 ZIP 压缩包
-2. 打开 AstrBot 管理面板
-3. 进入：`插件管理 → 上传插件`
-4. 上传 ZIP 并启用插件
-
----
-
-### 方式三：手动克隆
-
-如果你使用本地部署，可以将插件克隆到 AstrBot 插件目录：
-
-```bash
-git clone https://github.com/LilycleHeart/astrbot_plugin_apex_chiyuchan.git
-```
-
-> 不同部署方式的插件目录可能不同，请以你的 AstrBot 实际路径为准。
 
 ---
 
@@ -293,31 +267,6 @@ python -m playwright install webkit
 ```
 
 如果你的环境缺少系统依赖，可根据 Playwright 提示补充安装。
-
----
-
-## 📁 预览图目录约定
-
-如果使用本文档中的预览区写法，请将图片放在仓库的 `preview/` 目录：
-
-```text
-preview/
-├── lfg.png
-├── map.png
-├── master.png
-├── online.png
-├── season.png
-├── server.png
-└── stats.png
-```
-
-然后在 README 中使用相对路径：
-
-```html
-<img src="./preview/stats.png" width="360" />
-```
-
-不推荐在同仓库 README 中使用 `raw.githubusercontent.com` 长链接，除非你需要在外部平台展示图片。
 
 ---
 
