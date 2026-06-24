@@ -126,9 +126,7 @@ body {
 }
 
 .level-text {
-  font-size: 20px; font-weight: 700;
-  background: linear-gradient(135deg, var(--md-primary), #ff6b6b);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 20px; font-weight: 700; color: var(--md-primary);
   white-space: nowrap;
 }
 
@@ -141,7 +139,7 @@ body {
 
 .level-fill {
   height: 100%; width: {{ level_pct }}%;
-  background: linear-gradient(90deg, var(--md-primary), #ff6b6b);
+  background: var(--md-primary);
   border-radius: 3px;
 }
 
@@ -226,6 +224,7 @@ body {
 
 .dist-bar-fill { height: 100%; border-radius: 4px; }
 .dist-count { width: 60px; text-align: right; flex-shrink: 0; }
+.dist-pct { width: 48px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
 /* ---- Badges ---- */
 .badge-chip {
@@ -332,6 +331,7 @@ body {
         <div class="dist-bar-fill" style="width:{{ d.pct }}%;background:{{ d.color }};"></div>
       </div>
       <span class="dist-count">{{ d.count_fmt }}</span>
+      <span class="dist-pct">{{ d.pct_display }}%</span>
     </div>
     {% endfor %}
   </div>

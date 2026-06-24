@@ -302,6 +302,7 @@ def _build_rank_dist_list(
         result.append({
             "name": _rank_zh(name),
             "pct": min(pct, 50),
+            "pct_display": f"{pct:.2f}",
             "color": color,
             "count_fmt": f"{count:,}" if count else "",
             "is_player": name.lower() == player_tier.lower(),
