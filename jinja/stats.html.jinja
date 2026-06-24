@@ -30,9 +30,9 @@ body.light {
   --md-primary-container: {{ light_theme.primary }}22;
   --md-on-primary-container: {{ light_theme.primary }};
   --md-surface: #F8FAFF;
-  --md-on-surface: #181B20;
+  --md-on-surface: #111820;
   --md-surface-variant: #DDE3F0;
-  --md-on-surface-variant: #43474F;
+  --md-on-surface-variant: #3C414A;
   --md-outline-variant: #C3C6CF;
   --md-surface-container-low: #EFF2F9;
   --md-surface-container: #E9ECF4;
@@ -154,8 +154,8 @@ body {
   display: flex; flex-direction: column; gap: 4px;
 }
 
-.stat-val { font-size: 22px; font-weight: 700; color: var(--md-on-surface); }
-.stat-val.highlight { color: #FFD700; }
+.stat-val { font-size: 22px; font-weight: 700; color: var(--md-on-surface); font-variant-numeric: tabular-nums; }
+.stat-val.highlight { color: var(--md-primary); }
 .stat-lbl { font-size: 11px; color: var(--md-on-surface-variant); text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* ---- Sections ---- */
@@ -176,10 +176,10 @@ body {
 
 .selected-name { font-size: 16px; font-weight: 600; }
 
-.selected-stats { display: flex; gap: 8px; margin-left: auto; }
+.selected-stats { display: flex; gap: 16px; margin-left: auto; }
 
 .selected-stat {
-  margin-right: 24px;
+  text-align: right;
 }
 
 .selected-stat-label { font-size: 11px; color: var(--md-on-surface-variant); display: block; }
@@ -213,6 +213,7 @@ body {
   display: flex; align-items: center; gap: 8px;
   font-size: 11px; color: var(--md-on-surface-variant);
   margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
 }
 
 .dist-name { width: 60px; text-align: right; flex-shrink: 0; }

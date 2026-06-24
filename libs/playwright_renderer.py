@@ -304,7 +304,7 @@ def _build_rank_dist_list(
             "pct": min(pct, 50),
             "pct_display": f"{pct:.2f}",
             "color": color,
-            "count_fmt": f"{count:,}" if count else "",
+            "count_fmt": f"{count:,}",
             "is_player": name.lower() == player_tier.lower(),
         })
     return result
