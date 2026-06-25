@@ -83,6 +83,17 @@ class PlayerStats:
             return None
 
     @staticmethod
+    def _fix_legend_icon(url: str, name: str) -> str:
+        """Convert API icon URLs to working ALS URLs."""
+        if not url:
+            return f"https://apexlegendsstatus.com/assets/legends-select/{name.lower()}.png"
+        # api.mozambiquehe.re/assets/icons/ → apexlegendsstatus.com/assets/legends-select/
+        if "api.mozambiquehe.re/assets/icons/" in url:
+            filename = url.rsplit("/", 1)[-1]
+            return f"https://apexlegendsstatus.com/assets/legends-select/{filename}"
+        return url
+
+    @staticmethod
     def _extract_top_legends(legends: dict) -> list[dict]:
         result = []
         all_legends = legends.get("all", {})
@@ -97,7 +108,9 @@ class PlayerStats:
                 ):
                     kills = max(kills, tracker.get("value", 0))
             if kills > 0:
-                icon = info.get("ImgAssets", {}).get("icon", "")
+                icon = PlayerStats._fix_legend_icon(
+                    info.get("ImgAssets", {}).get("icon", ""), legend_name
+                )
                 result.append({"name": legend_name, "kills": kills, "icon": icon})
         result.sort(key=lambda x: x["kills"], reverse=True)
         return result[:3]
@@ -108,7 +121,9 @@ class PlayerStats:
         name = sel.get("LegendName", "")
         if not name:
             return None
-        icon = sel.get("ImgAssets", {}).get("icon", "")
+        icon = PlayerStats._fix_legend_icon(
+            sel.get("ImgAssets", {}).get("icon", ""), name
+        )
         stats = []
         for tracker in sel.get("data", []):
             if not tracker.get("global", False):
