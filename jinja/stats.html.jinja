@@ -326,6 +326,17 @@ body {
   margin-bottom: 12px;
 }
 
+.col-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.col-title-row .col-title {
+  margin-bottom: 0;
+}
+
 /* --- Legend column --- */
 .current-leg {
   display: flex;
@@ -595,10 +606,12 @@ body {
   <div class="body-grid">
     <!-- Left: Legends -->
     <div class="col">
-      <div class="col-title">英雄</div>
+      <div class="col-title-row">
+        <span class="col-title">英雄</span>
+        {% if selected_legend %}<span class="col-title">当前选用</span>{% endif %}
+      </div>
 
       {% if selected_legend %}
-      <div class="col-title">当前选用</div>
       <div class="current-leg">
         {% if selected_legend.icon_url %}
         <img class="current-leg-icon" src="{{ selected_legend.icon_url }}" onerror="this.style.display='none'">
