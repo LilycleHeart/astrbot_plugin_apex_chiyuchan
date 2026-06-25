@@ -539,6 +539,19 @@ body:not(.light) .rp-down { color: #DA292A; }
   <!-- ═══ HERO ═══ -->
   <div class="hero">
     <div class="hero-left">
+      <img class="avatar" src="{{ avatar_url }}" onerror="this.style.display='none'">
+      <div class="hero-info">
+        <div class="player-name">{{ display_name }}</div>
+        <div class="player-sub">
+          <span class="status-dot"></span>
+          <span>{{ state_text }}</span>
+          {% if alias %}<span>aka {{ alias }}</span>{% endif %}
+          <span>UID {{ uid }}</span>
+          <span class="platform-pill">{{ platform }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══ RANK STRIP ═══ -->
   <div class="rank-strip">
