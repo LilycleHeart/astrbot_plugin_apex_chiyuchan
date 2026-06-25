@@ -292,12 +292,19 @@ def _build_rank_dist_list(
     result = []
     for name, pct, color, count in tiers:
         is_player = name.lower() == player_tier.lower()
+        # 用 k 单位节省空间: 521→0.5k, 1000→1k, 1660→1.7k
+        if count >= 1000:
+            count_fmt = f"{count/1000:.1f}k"
+        elif count > 0:
+            count_fmt = f"{count/1000:.1f}k"
+        else:
+            count_fmt = "0"
         result.append({
             "name": _rank_zh(name),
             "pct": min(pct, 50),
             "pct_display": f"{pct:.2f}",
             "color": color,
-            "count_fmt": f"{count:,}",
+            "count_fmt": count_fmt,
             "is_player": is_player,
         })
     return result
