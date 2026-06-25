@@ -442,6 +442,14 @@ body {
   border-radius: 4px;
 }
 
+.dist-count {
+  width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--on-sv);
+}
+
 .dist-pct {
   width: 48px;
   text-align: right;
@@ -590,6 +598,7 @@ body {
       <div class="col-title">英雄</div>
 
       {% if selected_legend %}
+      <div class="col-title">当前选用</div>
       <div class="current-leg">
         {% if selected_legend.icon_url %}
         <img class="current-leg-icon" src="{{ selected_legend.icon_url }}" onerror="this.style.display='none'">
@@ -630,6 +639,7 @@ body {
         <div class="dist-track">
           <div class="dist-fill" style="width:{{ d.pct }}%;background:{{ d.color }};"></div>
         </div>
+        <span class="dist-count">{{ d.count_fmt }}</span>
         <span class="dist-pct">{{ d.pct_display }}%</span>
       </div>
       {% endfor %}
