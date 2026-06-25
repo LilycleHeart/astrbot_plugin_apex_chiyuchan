@@ -352,16 +352,16 @@ def _build_stats_html(**d) -> str:
 
     # ── 段位主题色 ──
     theme = _theme_for_rank(rank_name)
-    # 亮色主题：用段位 primary 降低饱和度
+    # MD3 亮色主题：primary 用 Tone 40 等效（比暗色 Tone 80 更深）
     light_theme = {
         "primary": theme["primary"],
         "surface": "#F8FAFF",
-        "card": "#EFF2F9",
-        "card2": "#E9ECF4",
-        "card3": "#E3E6EE",
-        "text": "#181B20",
-        "muted": "#43474F",
-        "outline": "#C3C6CF",
+        "card": "#FFFFFF",
+        "card2": "#F0F3F8",
+        "card3": "#E1E5EC",
+        "text": "#11161F",
+        "muted": "#44474F",
+        "outline": "#BCC3D0",
     }
 
     _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())

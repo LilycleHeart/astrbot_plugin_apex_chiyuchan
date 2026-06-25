@@ -33,22 +33,31 @@
 }
 
 body.light {
-  --p: {{ light_theme.primary }};
+  /* MD3 Light Theme: Primary=Tone40(darker), Surface=Tone98(near-white) */
+  --p: color-mix(in srgb, {{ light_theme.primary }} 65%, #000 35%);
   --p-text: color-mix(in srgb, {{ light_theme.primary }} 75%, #000 25%);
   --on-p: #FFF;
-  --p-container: color-mix(in srgb, var(--p) 12%, transparent);
-  --s: color-mix(in srgb, var(--p) 4%, #F5F7FA);
+  --p-container: color-mix(in srgb, {{ light_theme.primary }} 12%, #F0F4F8);
+
+  /* MD3 Surface hierarchy: Surface→SC Low→SC→SC High */
+  --s: #FAFAFA;
   --on-s: #11161F;
-  --sv: color-mix(in srgb, var(--p) 12%, #E2E6EE);
-  --on-sv: color-mix(in srgb, var(--p) 45%, #4C5564);
-  --outline: color-mix(in srgb, var(--p) 20%, #BCC3D0);
-  --outline-v: color-mix(in srgb, var(--p) 10%, rgba(0,0,0,0.08));
-  --sc-low: #FFFFFF;
-  --sc: color-mix(in srgb, var(--p) 6%, #F0F3F8);
-  --sc-high: color-mix(in srgb, var(--p) 15%, #E4E8F1);
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
-  --avatar-glow: 0 8px 24px color-mix(in srgb, var(--p) 20%, rgba(0,0,0,0.12));
-  --rank-shadow: drop-shadow(0 4px 10px color-mix(in srgb, var(--p) 15%, rgba(0,0,0,0.08)));
+  --sv: #C3C8D0;
+  --on-sv: #44474F;
+
+  /* MD3 Outline: Tone50(主) + Tone80(轻) */
+  --outline: {{ light_theme.outline }};
+  --outline-v: color-mix(in srgb, {{ light_theme.primary }} 8%, rgba(0,0,0,0.08));
+
+  /* MD3 Surface Container: Lowest→Low→Default→High */
+  --sc-low: {{ light_theme.card }};
+  --sc: {{ light_theme.card2 }};
+  --sc-high: {{ light_theme.card3 }};
+
+  /* MD3 Elevation: 物理阴影替代发光 */
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+  --avatar-glow: 0 4px 16px color-mix(in srgb, {{ light_theme.primary }} 15%, rgba(0,0,0,0.10));
+  --rank-shadow: drop-shadow(0 3px 8px color-mix(in srgb, {{ light_theme.primary }} 12%, rgba(0,0,0,0.08)));
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
