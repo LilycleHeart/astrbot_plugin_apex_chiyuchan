@@ -315,6 +315,8 @@ body {
 .col {
   background: var(--sc-low);
   padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .col-title {
@@ -606,7 +608,7 @@ body {
   <!-- ═══ TWO-COLUMN BODY ═══ -->
   <div class="body-grid">
     <!-- Left: Legends -->
-    <div class="col">
+    <div class="col" style="justify-content:space-between;">
       <div class="col-title-row">
         <span class="col-title">英雄</span>
         {% if selected_legend %}<span class="col-title">当前选用</span>{% endif %}
