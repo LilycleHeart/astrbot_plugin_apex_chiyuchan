@@ -495,6 +495,9 @@ class RankDistribution:
             if not raw_name:
                 continue
             major = raw_name.split(" ")[0]
+            # API 返回 "Apex Predator"，映射为 "Predator"
+            if major == "Apex":
+                major = "Predator"
             if major in major_map:
                 prev_color, prev_pct, prev_count = major_map[major]
                 major_map[major] = (color, prev_pct + pct, prev_count + count)
