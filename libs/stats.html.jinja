@@ -13,6 +13,7 @@
    ══════════════════════════════════════════ */
 :root {
   --p: {{ theme.primary }};
+  --p-text: {{ theme.primary }};
   --on-p: #FFF;
   --p-container: {{ theme.primary }}22;
   --s: {{ theme.surface }};
@@ -34,18 +35,19 @@
 
 body.light {
   --p: {{ light_theme.primary }};
+  --p-text: color-mix(in srgb, {{ light_theme.primary }} 70%, #000 30%);
   --on-p: #FFF;
   --p-container: {{ light_theme.primary }}22;
   --s: #F8FAFF;
-  --on-s: #111820;
+  --on-s: #1A1C1E;
   --sv: #DDE3F0;
-  --on-sv: #3C414A;
+  --on-sv: #44474F;
   --outline: #C3C6CF;
-  --outline-v: #C3C6CF66;
+  --outline-v: #C3C6CF88;
   --sc-low: #FFFFFF;
-  --sc: #EFF2F9;
-  --sc-high: #E3E6EE;
-  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --sc: #F0F4F8;
+  --sc-high: #E1E5EC;
+  --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -186,7 +188,7 @@ body {
 .rank-tier {
   font-size: 22px;
   font-weight: 800;
-  color: var(--p);
+  color: var(--p-text);
   line-height: 1;
 }
 
@@ -213,7 +215,7 @@ body {
 .rank-badge-val {
   font-size: 18px;
   font-weight: 800;
-  color: var(--p);
+  color: var(--p-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -249,7 +251,7 @@ body {
   line-height: 1;
 }
 
-.chip-val.accent { color: var(--p); }
+.chip-val.accent { color: var(--p-text); }
 
 .chip-lbl {
   font-size: 10px;
@@ -274,7 +276,7 @@ body {
 .level-num {
   font-size: 16px;
   font-weight: 800;
-  color: var(--p);
+  color: var(--p-text);
   min-width: 48px;
   font-variant-numeric: tabular-nums;
 }
@@ -421,7 +423,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.top-leg-kills.gold { color: var(--p); }
+.top-leg-kills.gold { color: var(--p-text); }
 
 /* --- Distribution column --- */
 .dist-row {
@@ -482,7 +484,7 @@ body {
 
 .dist-current .dist-name,
 .dist-current .dist-pct {
-  color: var(--p);
+  color: var(--p-text);
   font-weight: 700;
 }
 
