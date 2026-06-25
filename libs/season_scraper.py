@@ -147,8 +147,8 @@ async def fetch_meta_top5() -> list[SeasonMetaLegend]:
     """从 ALS meta 页面抓取 Top 5 英雄胜率 (TTL 缓存 30 分钟)
     
     页面数据为 DataTables 动态渲染，innerText 格式：
-    '#1 Seer 100% 50% 1'
-    '#2 Axle 100% 50% 1'
+    '#1 Axle 55.1% 32.2% 1,660'
+    '#2 Seer 55.2% 25.2% 1,300'
     """
     cache_key = "meta_top5"
     cached = await cache_get(cache_key)
@@ -178,15 +178,16 @@ async def fetch_meta_top5() -> list[SeasonMetaLegend]:
             # 获取 innerText 然后用正则解析
             text = await page.evaluate("() => document.body.innerText")
 
-            # 格式: "#1 Seer 100% 50% 1"
+            # 格式: "#1 Axle 55.1% 32.2% 1,660"
+            # 胜率/选取率可含小数点, 总场次可含逗号
             import re as _re
-            pattern = _re.compile(r"#(\d+)\s+(\S+(?:\s+\S+)?)\s+(\d+%)\s+(\d+%)\s+(\d+)")
+            pattern = _re.compile(r"#(\d+)\s+(\S+(?:\s+\S+)?)\s+(\d+\.?\d*%)\s+(\d+\.?\d*%)\s+([\d,]+)")
 
             for m in pattern.finditer(text):
                 name_en = m.group(2).strip()
                 win_rate = m.group(3)
                 pick_rate = m.group(4)
-                total_games = int(m.group(5))
+                total_games = int(m.group(5).replace(",", ""))
 
                 # 跳过完全没有数据的条目
                 if total_games < 1:
