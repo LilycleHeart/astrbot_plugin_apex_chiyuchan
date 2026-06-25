@@ -272,7 +272,7 @@ def _build_rank_dist(
 def _build_rank_dist_list(
     player_rank: str, player_top_pct: float, rank_dist_entries: list = None, *, theme: dict = None
 ) -> list[dict]:
-    """段位分布 — 返回 list[dict] 供 Jinja 模板渲染"""
+    """段位分布 — 返回 list[dict] 供 Jinja 模板渲染（全段位显示，高亮当前段位）"""
     if rank_dist_entries:
         tiers = [(e.name, e.pct, e.color, e.count) for e in rank_dist_entries]
     else:
@@ -288,24 +288,17 @@ def _build_rank_dist_list(
         ]
 
     player_tier = player_rank.split(" ")[0] if player_rank else ""
-    player_idx = next(
-        (i for i, t in enumerate(tiers) if t[0].lower() == player_tier.lower()), 0
-    )
-    start = max(0, player_idx - 1)
-    end = min(len(tiers), start + 4)
-    if end - start < 4:
-        start = max(0, end - 4)
-    visible = tiers[start:end]
 
     result = []
-    for name, pct, color, count in visible:
+    for name, pct, color, count in tiers:
+        is_player = name.lower() == player_tier.lower()
         result.append({
             "name": _rank_zh(name),
             "pct": min(pct, 50),
             "pct_display": f"{pct:.2f}",
             "color": color,
             "count_fmt": f"{count:,}",
-            "is_player": name.lower() == player_tier.lower(),
+            "is_player": is_player,
         })
     return result
 

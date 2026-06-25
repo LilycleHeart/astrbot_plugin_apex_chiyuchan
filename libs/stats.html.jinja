@@ -173,8 +173,8 @@ body {
 }
 
 .rank-icon {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
   flex-shrink: 0;
   filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--p) 25%, transparent));
 }
@@ -450,6 +450,20 @@ body {
   font-size: 11px;
 }
 
+.dist-current {
+  background: color-mix(in srgb, var(--p) 10%, transparent);
+  border-radius: var(--r-xs);
+  padding: 4px 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+}
+
+.dist-current .dist-name,
+.dist-current .dist-pct {
+  color: var(--p);
+  font-weight: 700;
+}
+
 /* ══════════════════════════════════════════
    BADGES STRIP
    ══════════════════════════════════════════ */
@@ -515,7 +529,6 @@ body {
 
   <!-- ═══ HERO ═══ -->
   <div class="hero">
-    <img class="hero-rank-img" src="{{ rank_img }}" onerror="this.style.display='none'">
     <div class="hero-left">
       <img class="avatar" src="{{ avatar_url }}" onerror="this.style.display='none'">
       <div class="hero-info">
@@ -610,9 +623,9 @@ body {
 
     <!-- Right: Distribution -->
     <div class="col">
-      <div class="col-title">段位分布</div>
+      <div class="col-title">段位分布（全平台）</div>
       {% for d in rank_dist %}
-      <div class="dist-row">
+      <div class="dist-row{% if d.is_player %} dist-current{% endif %}">
         <span class="dist-name">{{ d.name }}</span>
         <div class="dist-track">
           <div class="dist-fill" style="width:{{ d.pct }}%;background:{{ d.color }};"></div>
@@ -641,7 +654,7 @@ body {
 
   <!-- ═══ FOOTER ═══ -->
   <div class="footer">
-    <span>Data: <a href="https://apexlegendsstatus.com" target="_blank">Apex Legends Status</a></span>
+    <span>Data: <a href="https://apexlegendsstatus.com" target="_blank">Apex Legends Status</a> · 由于游戏限制数据仅供参考</span>
     <span>auth.赤羽真白 · Apex Chiyuchan</span>
   </div>
 
