@@ -8,20 +8,31 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+/* ══════════════════════════════════════════
+   MD3 Design Tokens
+   ══════════════════════════════════════════ */
 :root {
   --md-primary: {{ theme.primary }};
   --md-on-primary: #FFFFFF;
-  --md-primary-container: {{ theme.primary }}33;
+  --md-primary-container: {{ theme.primary }}22;
   --md-on-primary-container: {{ theme.primary }};
   --md-surface: {{ theme.surface }};
   --md-on-surface: {{ theme.text }};
   --md-surface-variant: {{ theme.outline }};
   --md-on-surface-variant: {{ theme.muted }};
-  --md-outline-variant: {{ theme.outline }};
+  --md-outline: {{ theme.outline }};
+  --md-outline-variant: {{ theme.outline }}88;
+  --md-surface-container-lowest: {{ theme.card }};
   --md-surface-container-low: {{ theme.card }};
   --md-surface-container: {{ theme.card2 }};
   --md-surface-container-high: {{ theme.card3 }};
-  --md-shadow-2: 0 10px 20px rgba(0,0,0,0.4);
+  --md-surface-container-highest: {{ theme.card3 }};
+  --md-shadow: 0 10px 20px rgba(0,0,0,0.4);
+  --md-radius-xl: 28px;
+  --md-radius-lg: 20px;
+  --md-radius-md: 16px;
+  --md-radius-sm: 12px;
+  --md-radius-xs: 8px;
 }
 
 body.light {
@@ -33,13 +44,19 @@ body.light {
   --md-on-surface: #111820;
   --md-surface-variant: #DDE3F0;
   --md-on-surface-variant: #3C414A;
-  --md-outline-variant: #C3C6CF;
+  --md-outline: #C3C6CF;
+  --md-outline-variant: #C3C6CF88;
+  --md-surface-container-lowest: #FFFFFF;
   --md-surface-container-low: #EFF2F9;
   --md-surface-container: #E9ECF4;
   --md-surface-container-high: #E3E6EE;
-  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-surface-container-highest: #DDE1E9;
+  --md-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
 }
 
+/* ══════════════════════════════════════════
+   Base Reset
+   ══════════════════════════════════════════ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -50,281 +67,601 @@ body {
   justify-content: center;
   padding: 24px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* ══════════════════════════════════════════
+   Card Container
+   ══════════════════════════════════════════ */
 .card {
   width: 680px;
   background: var(--md-surface-container-low);
-  border-radius: 24px;
+  border-radius: var(--md-radius-xl);
   overflow: hidden;
-  box-shadow: var(--md-shadow-2);
+  box-shadow: var(--md-shadow);
   border: 1px solid color-mix(in srgb, var(--md-on-surface) 8%, transparent);
 }
 
-/* ---- Header ---- */
-.header-bar {
+/* ══════════════════════════════════════════
+   Section: Header
+   ══════════════════════════════════════════ */
+.header {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
   background: linear-gradient(135deg, var(--md-surface-container-low), var(--md-surface-container));
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--md-primary);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--md-primary) 30%, transparent);
+  flex-shrink: 0;
+}
+
+.player-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-name {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+  color: var(--md-on-surface);
+}
+
+.player-meta {
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: {{ state_dot }};
+  display: inline-block;
+}
+
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+}
+
+/* ══════════════════════════════════════════
+   Section: Rank
+   ══════════════════════════════════════════ */
+.rank-section {
   padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--md-surface-container);
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.rank-icon {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--md-primary) 30%, transparent));
+}
+
+.rank-info {
+  flex: 1;
+}
+
+.rank-tier {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--md-primary);
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+
+.rank-rp {
+  font-size: 14px;
+  color: var(--md-on-surface-variant);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rp-up { color: #4CE5B1; font-weight: 600; }
+.rp-down { color: #DA292A; font-weight: 600; }
+
+.rank-stats {
+  display: flex;
+  gap: 24px;
+  margin-left: auto;
+}
+
+.rank-stat {
+  text-align: center;
+}
+
+.rank-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--md-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-stat-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+/* ══════════════════════════════════════════
+   Section: Level
+   ══════════════════════════════════════════ */
+.level-section {
+  padding: 16px 24px;
   display: flex;
   align-items: center;
   gap: 16px;
   border-bottom: 1px solid var(--md-outline-variant);
 }
 
-.avatar {
-  width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
-  border: 3px solid var(--md-primary);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--md-primary) 25%, transparent);
-}
-
-.player-name { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
-.player-meta { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 2px; }
-
-.platform-tag {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--md-surface-container-low);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 20px; padding: 4px 12px; font-size: 12px; margin-top: 4px;
-}
-
-.platform-tag .dot {
-  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-  background: {{ state_dot }};
-}
-
-/* ---- Rank ---- */
-.rank-section {
-  display: flex; align-items: center; padding: 16px 24px; gap: 16px;
-  background: var(--md-surface-container);
-  border-bottom: 1px solid var(--md-outline-variant);
-}
-
-.rank-img {
-  width: 80px; height: 80px;
-  filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--md-primary) 25%, transparent));
-}
-
-.rank-tier { font-size: 28px; font-weight: 800; color: var(--md-primary); line-height: 1; }
-.rank-rp { font-size: 14px; color: var(--md-on-surface-variant); margin-top: 4px; }
-
-.rank-stats { display: flex; gap: 24px; text-align: center; margin-left: auto; }
-.rank-stat-val { font-size: 18px; font-weight: 700; color: var(--md-primary); }
-.rank-stat-label { font-size: 11px; color: var(--md-on-surface-variant); text-transform: uppercase; }
-
-.rp-up { color: #4CE5B1; }
-.rp-down { color: #DA292A; }
-
-/* ---- Level ---- */
-.level-row {
-  display: flex; align-items: center; gap: 14px; padding: 14px 24px;
-  border-bottom: 1px solid var(--md-outline-variant);
-}
-
 .level-icon {
-  width: 64px; height: 64px; object-fit: contain; flex-shrink: 0;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
 }
 
-.level-text {
-  font-size: 20px; font-weight: 700; color: var(--md-primary);
-  white-space: nowrap;
+.level-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.level-sub { font-size: 12px; color: var(--md-on-surface-variant); }
+.level-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.level-number {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--md-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.level-label {
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+}
 
 .level-bar {
-  flex: 1; height: 6px;
-  background: var(--md-surface-container-high); border-radius: 3px; overflow: hidden;
+  height: 8px;
+  background: var(--md-surface-container-high);
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .level-fill {
-  height: 100%; width: {{ level_pct }}%;
+  height: 100%;
+  width: {{ level_pct }}%;
   background: var(--md-primary);
-  border-radius: 3px;
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
-/* ---- Stat Grid ---- */
-.stat-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 1px; background: var(--md-outline-variant);
-}
-
-.stat-chip {
-  background: var(--md-surface-container-low); padding: 16px; text-align: center;
-  display: flex; flex-direction: column; gap: 4px;
-}
-
-.stat-val { font-size: 22px; font-weight: 700; color: var(--md-on-surface); font-variant-numeric: tabular-nums; }
-.stat-val.highlight { color: var(--md-primary); }
-.stat-lbl { font-size: 11px; color: var(--md-on-surface-variant); text-transform: uppercase; letter-spacing: 0.5px; }
-
-/* ---- Sections ---- */
-.section-title {
-  font-size: 14px; font-weight: 600; color: var(--md-on-surface-variant);
-  text-transform: uppercase; letter-spacing: 2px; padding: 16px 24px 8px;
-}
-
-/* ---- Selected Legend ---- */
-.selected-row {
-  padding: 0 24px 8px; display: flex; align-items: center; gap: 12px;
-}
-
-.selected-icon {
-  width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
-  border: 2px solid var(--md-outline-variant);
-}
-
-.selected-name { font-size: 16px; font-weight: 600; }
-
-.selected-stats { display: flex; gap: 16px; margin-left: auto; }
-
-.selected-stat {
+.level-pct {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
   text-align: right;
 }
 
-.selected-stat-label { font-size: 11px; color: var(--md-on-surface-variant); display: block; }
-.selected-stat-value { font-size: 14px; font-weight: 500; }
-
-/* ---- Legend List ---- */
-.legend-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px; border-radius: 8px; margin-bottom: 2px;
+/* ══════════════════════════════════════════
+   Section: Stats Grid
+   ══════════════════════════════════════════ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--md-outline-variant);
+  border-bottom: 1px solid var(--md-outline-variant);
 }
 
-.legend-row.top1 {
+.stat-item {
+  background: var(--md-surface-container-low);
+  padding: 20px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--md-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value.primary {
+  color: var(--md-primary);
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ══════════════════════════════════════════
+   Section: Current Legend
+   ══════════════════════════════════════════ */
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 16px 24px 8px;
+}
+
+.current-legend {
+  padding: 0 24px 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.legend-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--md-outline-variant);
+  flex-shrink: 0;
+}
+
+.legend-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  flex: 1;
+}
+
+.legend-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.legend-stat {
+  text-align: right;
+}
+
+.legend-stat-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  display: block;
+}
+
+.legend-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ══════════════════════════════════════════
+   Section: Top Legends
+   ══════════════════════════════════════════ */
+.legends-list {
+  padding: 0 24px 12px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--md-radius-sm);
+  margin-bottom: 4px;
+  transition: background 0.2s ease;
+}
+
+.legend-row:first-child {
   background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 8%, transparent), transparent);
 }
 
 .legend-icon {
-  width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
-.legend-icon.top1 { border: 2px solid var(--md-primary); }
-.legend-icon.normal { border: 2px solid var(--md-outline-variant); }
+.legend-icon.top {
+  border: 2px solid var(--md-primary);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--md-primary) 25%, transparent);
+}
 
-.legend-name { flex: 1; font-size: 14px; font-weight: 500; }
-.legend-kills { font-size: 16px; font-weight: 700; }
-.legend-kills.top1 { color: var(--md-primary); }
+.legend-icon.normal {
+  border: 2px solid var(--md-outline-variant);
+}
 
-/* ---- Rank Distribution ---- */
-.dist-bar-container { padding: 0 24px 16px; }
+.legend-row-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
 
-.dist-row {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 11px; color: var(--md-on-surface-variant);
-  margin-bottom: 4px;
+.legend-kills {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--md-on-surface);
   font-variant-numeric: tabular-nums;
 }
 
-.dist-name { width: 60px; text-align: right; flex-shrink: 0; }
+.legend-kills.top {
+  color: var(--md-primary);
+}
+
+/* ══════════════════════════════════════════
+   Section: Rank Distribution
+   ══════════════════════════════════════════ */
+.dist-container {
+  padding: 0 24px 16px;
+}
+
+.dist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+.dist-name {
+  width: 56px;
+  text-align: right;
+  flex-shrink: 0;
+  font-weight: 500;
+}
 
 .dist-bar-track {
-  flex: 1; height: 8px; border-radius: 4px;
-  background: var(--md-surface-container-high); overflow: hidden;
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--md-surface-container-high);
+  overflow: hidden;
 }
 
-.dist-bar-fill { height: 100%; border-radius: 4px; }
-.dist-count { width: 60px; text-align: right; flex-shrink: 0; }
-.dist-pct { width: 48px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.dist-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
 
-/* ---- Badges ---- */
+.dist-count {
+  width: 56px;
+  text-align: right;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.dist-pct {
+  width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* ══════════════════════════════════════════
+   Section: Badges
+   ══════════════════════════════════════════ */
+.badges-container {
+  padding: 0 24px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
 .badge-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.badge-chip img { width: 36px; height: 36px; vertical-align: middle; }
+.badge-chip img {
+  width: 32px;
+  height: 32px;
+}
 
 .spec-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   background: color-mix(in srgb, var(--md-primary) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--md-primary) 25%, transparent);
+  transition: transform 0.2s ease;
 }
 
-.spec-badge img { width: 28px; height: 28px; display: block; }
+.spec-badge:hover {
+  transform: scale(1.1);
+}
 
-/* ---- Footer ---- */
+.spec-badge img {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+/* ══════════════════════════════════════════
+   Section: Footer
+   ══════════════════════════════════════════ */
 .footer {
-  padding: 12px 24px;
+  padding: 14px 24px;
   border-top: 1px solid var(--md-outline-variant);
-  font-size: 11px; color: var(--md-on-surface-variant);
-  display: flex; justify-content: space-between;
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.footer a { color: var(--md-primary); text-decoration: none; font-weight: 600; }
+.footer a {
+  color: var(--md-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
 </style>
 </head>
 <body class="{{ theme_class }}">
 <div class="card">
 
-  <div class="header-bar">
+  <!-- ═══ Header ═══ -->
+  <div class="header">
     <img class="avatar" src="{{ avatar_url }}" onerror="this.style.display='none'">
-    <div>
+    <div class="player-info">
       <div class="player-name">{{ display_name }}</div>
-      <div class="player-meta">{% if alias %}aka {{ alias }} · {% endif %}UID: {{ uid }}</div>
-      <div class="platform-tag"><span class="dot"></span>{{ platform }} · {{ state_text }}</div>
+      <div class="player-meta">
+        <span class="status-dot"></span>
+        <span>{{ state_text }}</span>
+        {% if alias %}<span>· aka {{ alias }}</span>{% endif %}
+        <span>· UID: {{ uid }}</span>
+      </div>
     </div>
+    <div class="platform-badge">{{ platform }}</div>
   </div>
 
+  <!-- ═══ Rank ═══ -->
   <div class="rank-section">
-    <img class="rank-img" src="{{ rank_img }}" onerror="this.remove()">
-    <div>
+    <img class="rank-icon" src="{{ rank_img }}" onerror="this.style.display='none'">
+    <div class="rank-info">
       <div class="rank-tier">{{ rank_display }}</div>
-      <div class="rank-rp">{{ rank_score_fmt }} RP{{ rp_delta_html }}</div>
+      <div class="rank-rp">
+        <span>{{ rank_score_fmt }} RP</span>
+        {{ rp_delta_html }}
+      </div>
     </div>
     <div class="rank-stats">
-      <div>
-        <div class="rank-stat-val">{{ top_global }}</div>
+      <div class="rank-stat">
+        <div class="rank-stat-value">{{ top_global }}</div>
         <div class="rank-stat-label">Top ({{ top_pct_label }})</div>
       </div>
     </div>
   </div>
 
-  <div class="level-row">
+  <!-- ═══ Level ═══ -->
+  <div class="level-section">
     <img class="level-icon" src="{{ level_icon }}" onerror="this.style.display='none'">
-    <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
-      <div class="level-text">{{ level }}</div>
+    <div class="level-info">
+      <div class="level-header">
+        <span class="level-number">{{ level }}</span>
+        <span class="level-label">等级</span>
+      </div>
       <div class="level-bar"><div class="level-fill"></div></div>
-      <div class="level-sub">{{ level_pct }}% to next level</div>
+      <div class="level-pct">{{ level_pct }}%</div>
     </div>
   </div>
 
-  <div class="stat-grid">
-    <div class="stat-chip">
-      <div class="stat-val highlight">{{ kills_fmt }}</div>
-      <div class="stat-lbl">生涯击杀</div>
+  <!-- ═══ Stats Grid ═══ -->
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-value primary">{{ kills_fmt }}</div>
+      <div class="stat-label">生涯击杀</div>
     </div>
-    <div class="stat-chip">
-      <div class="stat-val">{{ damage_fmt }}</div>
-      <div class="stat-lbl">BR 总伤害</div>
+    <div class="stat-item">
+      <div class="stat-value">{{ damage_fmt }}</div>
+      <div class="stat-label">BR 总伤害</div>
     </div>
-    <div class="stat-chip">
-      <div class="stat-val">{{ wins_fmt }}</div>
-      <div class="stat-lbl">BR 胜场</div>
+    <div class="stat-item">
+      <div class="stat-value">{{ wins_fmt }}</div>
+      <div class="stat-label">BR 胜场</div>
     </div>
   </div>
 
+  <!-- ═══ Current Legend ═══ -->
   {% if selected_legend %}
   <div class="section-title">当前选用</div>
-  <div class="selected-row">
+  <div class="current-legend">
     {% if selected_legend.icon_url %}
-    <img class="selected-icon" src="{{ selected_legend.icon_url }}" onerror="this.remove()">
+    <img class="legend-avatar" src="{{ selected_legend.icon_url }}" onerror="this.style.display='none'">
     {% endif %}
-    <span class="selected-name">{{ selected_legend.name_zh }}</span>
-    <div class="selected-stats">
+    <span class="legend-name">{{ selected_legend.name_zh }}</span>
+    <div class="legend-stats">
       {% for s in selected_legend.stats %}
-      <div class="selected-stat">
-        <span class="selected-stat-label">{{ s.name }}</span>
-        <span class="selected-stat-value">{{ s.value }}</span>
+      <div class="legend-stat">
+        <span class="legend-stat-label">{{ s.name }}</span>
+        <span class="legend-stat-value">{{ s.value }}</span>
       </div>
       {% endfor %}
     </div>
   </div>
   {% endif %}
 
+  <!-- ═══ Top Legends ═══ -->
+  <div class="section-title">常用英雄</div>
+  <div class="legends-list">
+    {% if top_legends %}
+      {% for leg in top_legends %}
+      <div class="legend-row">
+        {% if leg.icon_url %}
+        <img class="legend-icon {{ 'top' if loop.first else 'normal' }}" src="{{ leg.icon_url }}" onerror="this.style.display='none'">
+        {% else %}
+        <div class="legend-icon normal" style="background:var(--md-surface-container-high);"></div>
+        {% endif %}
+        <span class="legend-row-name">{{ leg.name_zh }}</span>
+        <span class="legend-kills {{ 'top' if loop.first else '' }}">{{ leg.kills_fmt }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="color:var(--md-on-surface-variant);font-size:13px;padding:8px 0;">暂无英雄数据</div>
+    {% endif %}
+  </div>
+
+  <!-- ═══ Rank Distribution ═══ -->
   <div class="section-title">段位分布参考 (全平台)</div>
-  <div class="dist-bar-container">
+  <div class="dist-container">
     {% for d in rank_dist %}
     <div class="dist-row">
       <span class="dist-name">{{ d.name }}</span>
@@ -337,28 +674,10 @@ body {
     {% endfor %}
   </div>
 
-  <div class="section-title">常用英雄</div>
-  <div style="padding:0 24px 16px;">
-    {% if top_legends %}
-      {% for leg in top_legends %}
-      <div class="legend-row {{ 'top1' if loop.first else '' }}">
-        {% if leg.icon_url %}
-        <img class="legend-icon {{ 'top1' if loop.first else 'normal' }}" src="{{ leg.icon_url }}" onerror="this.remove()">
-        {% else %}
-        <div class="legend-icon" style="background:var(--md-surface-container-high);"></div>
-        {% endif %}
-        <span class="legend-name">{{ leg.name_zh }}</span>
-        <span class="legend-kills {{ 'top1' if loop.first else '' }}">{{ leg.kills_fmt }}</span>
-      </div>
-      {% endfor %}
-    {% else %}
-      <div style="color:var(--md-on-surface-variant);font-size:13px;">暂无英雄数据</div>
-    {% endif %}
-  </div>
-
+  <!-- ═══ Badges ═══ -->
   {% if season_badges %}
   <div class="section-title">Ranked 赛季徽章</div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 12px;justify-content:center;">
+  <div class="badges-container">
     {% for b in season_badges %}
     <span class="badge-chip" style="background:{{ b.bg }};color:{{ b.color }};border:1px solid {{ b.border }};">
       {% if b.badge_url %}<img src="{{ b.badge_url }}" onerror="this.remove()">{% endif %}{{ b.season }}
@@ -369,7 +688,7 @@ body {
 
   {% if special_badges %}
   <div class="section-title">特殊徽章</div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 16px;justify-content:center;">
+  <div class="badges-container">
     {% for b in special_badges %}
     <span class="spec-badge">
       {% if b.badge_url %}<img src="{{ b.badge_url }}" onerror="this.remove()">{% endif %}
@@ -378,6 +697,7 @@ body {
   </div>
   {% endif %}
 
+  <!-- ═══ Footer ═══ -->
   <div class="footer">
     <span>Data: <a href="https://apexlegendsstatus.com" target="_blank">Apex Legends Status</a></span>
     <span>auth.赤羽真白 · Apex Chiyuchan</span>
