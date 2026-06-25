@@ -608,7 +608,7 @@ body {
   <!-- ═══ TWO-COLUMN BODY ═══ -->
   <div class="body-grid">
     <!-- Left: Legends -->
-    <div class="col" style="justify-content:space-between;">
+    <div class="col">
       <div class="col-title-row">
         <span class="col-title">英雄</span>
         {% if selected_legend %}<span class="col-title">当前选用</span>{% endif %}
@@ -644,10 +644,11 @@ body {
       {% else %}
         <div style="color:var(--on-sv);font-size:12px;">暂无英雄数据</div>
       {% endif %}
+      <div style="flex:1;"></div>
     </div>
 
     <!-- Right: Distribution -->
-    <div class="col">
+    <div class="col" style="justify-content:space-between;">
       <div class="col-title">段位分布（全平台）</div>
       {% for d in rank_dist %}
       <div class="dist-row{% if d.is_player %} dist-current{% endif %}">
