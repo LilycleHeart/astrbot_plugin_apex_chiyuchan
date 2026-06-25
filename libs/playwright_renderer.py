@@ -272,20 +272,27 @@ def _build_rank_dist(
 def _build_rank_dist_list(
     player_rank: str, player_top_pct: float, rank_dist_entries: list = None, *, theme: dict = None
 ) -> list[dict]:
-    """段位分布 — 返回 list[dict] 供 Jinja 模板渲染（全段位显示，高亮当前段位）"""
+    """段位分布 — 返回 list[dict] 供 Jinja 模板渲染（全8段位显示，高亮当前段位）"""
+    # 默认全8段位
+    default_ranks = [
+        ("Rookie", 2.40, "#484852", 0),
+        ("Bronze", 12.98, "#cd7f32", 0),
+        ("Silver", 27.59, "#c0c0c0", 0),
+        ("Gold", 35.54, "#ffd700", 0),
+        ("Platinum", 17.72, "#4ECDC4", 0),
+        ("Diamond", 3.36, "#358de6", 0),
+        ("Master", 0.09, "#9f35e6", 0),
+        ("Predator", 0.32, "#e31b39", 0),
+    ]
+
     if rank_dist_entries:
-        tiers = [(e.name, e.pct, e.color, e.count) for e in rank_dist_entries]
+        # 用 API 数据覆盖默认值，但保证全8段位都在
+        api_map = {e.name: (e.name, e.pct, e.color, e.count) for e in rank_dist_entries}
+        tiers = []
+        for default in default_ranks:
+            tiers.append(api_map.get(default[0], default))
     else:
-        tiers = [
-            ("Rookie", 2.40, "#484852", 0),
-            ("Bronze", 12.98, "#cd7f32", 0),
-            ("Silver", 27.59, "#c0c0c0", 0),
-            ("Gold", 35.54, "#ffd700", 0),
-            ("Platinum", 17.72, "#4ECDC4", 0),
-            ("Diamond", 3.36, "#358de6", 0),
-            ("Master", 0.09, "#9f35e6", 0),
-            ("Predator", 0.32, "#e31b39", 0),
-        ]
+        tiers = default_ranks
 
     player_tier = player_rank.split(" ")[0] if player_rank else ""
 
