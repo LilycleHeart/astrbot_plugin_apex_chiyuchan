@@ -35,7 +35,13 @@ def _escape_html(s: str) -> str:
 
 
 def _beijing_theme() -> str:
-    """北京时间 06:00-18:00 返回 'light'，其余返回空字符串（深色默认）"""
+    """根据配置返回主题：dark/light/auto(北京时间 06:00-18:00 亮色)"""
+    from .playwright_manager import _COLOR_SCHEME
+    if _COLOR_SCHEME == "light":
+        return "light"
+    if _COLOR_SCHEME == "dark":
+        return ""
+    # auto: 北京时间 06:00-18:00 亮色
     from datetime import datetime, timezone, timedelta
     hour = datetime.now(timezone(timedelta(hours=8))).hour
     return "light" if 6 <= hour < 18 else ""
