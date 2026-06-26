@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex Legends 战绩</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700;8..144,900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --p: #64C3D3;
+  --p-text: #64C3D3;
+  --on-p: #FFF;
+  --p-container: #64C3D322;
+  --s: #0E1213;
+  --on-s: #DBE5E8;
+  --sv: #434D52;
+  --on-sv: #BEC9CE;
+  --outline: #434D52;
+  --outline-v: #434D5266;
+  --sc-low: #161B1D;
+  --sc: #1C2326;
+  --sc-high: #262E32;
+  --shadow: 0 10px 20px rgba(0,0,0,0.4);
+  --r-xl: 28px;
+  --r-lg: 20px;
+  --r-md: 16px;
+  --r-sm: 12px;
+  --r-xs: 8px;
+  --avatar-glow: 0 0 24px color-mix(in srgb, var(--p) 35%, transparent);
+  --rank-shadow: drop-shadow(0 2px 8px color-mix(in srgb, var(--p) 25%, transparent));
+}
+
+body.light {
+  /* MD3 Light Theme: Primary=Tone40(darker), Surface=Tone98(near-white) */
+  --p: color-mix(in srgb, #64C3D3 65%, #000 35%);
+  --p-text: color-mix(in srgb, #64C3D3 75%, #000 25%);
+  --on-p: #FFF;
+  --p-container: color-mix(in srgb, #64C3D3 12%, #F0F4F8);
+
+  /* MD3 Surface hierarchy: Surface→SC Low→SC→SC High */
+  --s: #FAFAFA;
+  --on-s: #11161F;
+  --sv: #C3C8D0;
+  --on-sv: #44474F;
+
+  /* MD3 Outline: Tone50(主) + Tone80(轻) */
+  --outline: #BCC3D0;
+  --outline-v: color-mix(in srgb, #64C3D3 8%, rgba(0,0,0,0.08));
+
+  /* MD3 Surface Container: Lowest→Low→Default→High */
+  --sc-low: #FFFFFF;
+  --sc: #F0F3F8;
+  --sc-high: #E1E5EC;
+
+  /* MD3 Elevation: 物理阴影替代发光 */
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+  --avatar-glow: 0 4px 16px color-mix(in srgb, #64C3D3 15%, rgba(0,0,0,0.10));
+  --rank-shadow: drop-shadow(0 3px 8px color-mix(in srgb, #64C3D3 12%, rgba(0,0,0,0.08)));
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Roboto Flex', 'Noto Sans SC', system-ui, sans-serif;
+  background: transparent;
+  color: var(--on-s);
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  width: 720px;
+  background: var(--sc-low);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  border: 1px solid color-mix(in srgb, var(--on-s) 8%, transparent);
+  transition: background 0.3s ease;
+}
+
+.hero {
+  position: relative;
+  padding: 32px 28px 28px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--p) 14%, var(--sc)) 0%, var(--sc-low) 100%);
+  border-bottom: 1px solid var(--outline-v);
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  min-height: 140px;
+}
+
+.hero-rank-img {
+  position: absolute;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100px;
+  height: 100px;
+  opacity: 0.12;
+  filter: var(--rank-shadow);
+  pointer-events: none;
+}
+
+.hero-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--p);
+  box-shadow: var(--avatar-glow);
+  flex-shrink: 0;
+}
+
+.hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-name {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  color: var(--on-s);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-sub {
+  font-size: 12px;
+  color: var(--on-sv);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #555;
+  display: inline-block;
+  border: 2px solid var(--sc-low);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.platform-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--sc);
+  border: 1px solid var(--outline-v);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--on-sv);
+}
+
+.rank-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 28px;
+  background: var(--sc);
+  border-bottom: 1px solid var(--outline-v);
+}
+
+.rank-icon {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  filter: var(--rank-shadow);
+}
+
+.rank-main {
+  flex: 1;
+}
+
+.rank-tier {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--p-text);
+  line-height: 1;
+}
+
+.rank-rp-line {
+  font-size: 13px;
+  color: var(--on-sv);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rp-up { color: #2AA881; font-weight: 700; }
+.rp-down { color: #D11A2A; font-weight: 700; }
+
+body:not(.light) .rp-up { color: #4CE5B1; }
+body:not(.light) .rp-down { color: #DA292A; }
+
+.rank-badge {
+  text-align: center;
+  padding: 8px 16px;
+  background: var(--sc-high);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--outline-v);
+}
+
+.rank-badge-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--p-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-badge-lbl {
+  font-size: 10px;
+  color: var(--on-sv);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+.stat-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--outline-v);
+}
+
+.chip {
+  background: var(--sc-low);
+  padding: 18px 12px;
+  text-align: center;
+}
+
+.chip-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--on-s);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.chip-val.accent { color: var(--p-text); }
+
+.chip-lbl {
+  font-size: 10px;
+  color: var(--on-sv);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-top: 6px;
+}
+
+.level-strip {
+  padding: 12px 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--sc-low);
+  border-bottom: 1px solid var(--outline-v);
+}
+
+.level-num {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--p-text);
+  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+}
+
+.level-track {
+  flex: 1;
+  height: 6px;
+  background: var(--sc-high);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.level-fill {
+  height: 100%;
+  width: 46%;
+  background: var(--p);
+  border-radius: 3px;
+}
+
+.level-pct {
+  font-size: 11px;
+  color: var(--on-sv);
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.body-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--outline-v);
+}
+
+.col {
+  background: var(--sc-low);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.col-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--on-sv);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.col-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.col-title-row .col-title {
+  margin-bottom: 0;
+}
+
+.current-leg {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px;
+  background: var(--sc);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--outline-v);
+}
+
+.current-leg-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--p);
+  flex-shrink: 0;
+}
+
+.current-leg-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-s);
+  flex: 1;
+}
+
+.current-leg-stats {
+  display: flex;
+  gap: 12px;
+}
+
+.current-leg-stat {
+  text-align: right;
+}
+
+.current-leg-stat-lbl {
+  font-size: 10px;
+  color: var(--on-sv);
+  display: block;
+}
+
+.current-leg-stat-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-s);
+}
+
+.top-leg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--outline-v);
+}
+
+.top-leg-row:last-child { border-bottom: none; }
+
+.top-leg-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.top-leg-icon.gold { border: 2px solid var(--p); }
+.top-leg-icon.silver { border: 2px solid var(--outline); }
+
+.top-leg-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--on-s);
+}
+
+.top-leg-kills {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-leg-kills.gold { color: var(--p-text); }
+
+.dist-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--on-sv);
+  font-variant-numeric: tabular-nums;
+}
+
+.dist-name {
+  width: 24px;
+  text-align: left;
+  flex-shrink: 0;
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.dist-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--sc-high);
+  overflow: hidden;
+}
+
+.dist-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.dist-count {
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--on-sv);
+}
+
+.dist-pct {
+  width: 44px;
+  text-align: right;
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.dist-current {
+  background: color-mix(in srgb, var(--p) 10%, transparent);
+  border-radius: var(--r-xs);
+  padding: 4px 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+}
+
+.dist-current .dist-name,
+.dist-current .dist-pct {
+  color: var(--p-text);
+  font-weight: 700;
+}
+
+.badges-strip {
+  padding: 12px 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  border-top: 1px solid var(--outline-v);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge img {
+  width: 28px;
+  height: 28px;
+}
+
+.spec {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--p) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--p) 20%, transparent);
+}
+
+.spec img {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.footer {
+  padding: 10px 28px;
+  font-size: 10px;
+  color: var(--on-sv);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0.85;
+}
+
+.footer a { color: var(--p-text); text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body class="">
+<div class="card">
+
+  <!-- ═══ HERO ═══ -->
+  <div class="hero">
+    <div class="hero-left">
+      <img class="avatar" src="https://secure.download.dm.origin.com/production/avatar/prod/1/599/208x208.JPEG" onerror="this.style.display='none'">
+      <div class="hero-info">
+        <div class="player-name">Liliumcordis [YURI]</div>
+        <div class="player-sub">
+          <span class="status-dot"></span>
+          <span>离线</span>
+          
+          <span>UID 1000392976892</span>
+          <span class="platform-pill">PC</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RANK STRIP ═══ -->
+  <div class="rank-strip">
+    <img class="rank-icon" src="https://api.mozambiquehe.re/assets/ranks/platinum1.png" onerror="this.style.display='none'">
+    <div class="rank-main">
+      <div class="rank-tier">白金1</div>
+      <div class="rank-rp-line">
+        <span>11,000 RP</span>
+        <span class="rp-up" style="font-size:13px;margin-left:8px;">+0 RP</span>
+      </div>
+    </div>
+    <div class="rank-badge">
+      <div class="rank-badge-val">16.84%</div>
+      <div class="rank-badge-lbl">Top PC</div>
+    </div>
+  </div>
+
+  <!-- ═══ STAT CHIPS ═══ -->
+  <div class="stat-chips">
+    <div class="chip">
+      <div class="chip-val accent">12,429</div>
+      <div class="chip-lbl">生涯击杀</div>
+    </div>
+    <div class="chip">
+      <div class="chip-val">3,613,494</div>
+      <div class="chip-lbl">BR 总伤害</div>
+    </div>
+    <div class="chip">
+      <div class="chip-val">419</div>
+      <div class="chip-lbl">BR 胜场</div>
+    </div>
+  </div>
+
+  <!-- ═══ LEVEL BAR ═══ -->
+  <div class="level-strip">
+    <span class="level-num">Lv.1601</span>
+    <div class="level-track"><div class="level-fill"></div></div>
+    <span class="level-pct">46%</span>
+  </div>
+
+  <!-- ═══ TWO-COLUMN BODY ═══ -->
+  <div class="body-grid">
+    <!-- Left: Legends -->
+    <div class="col">
+      <div class="col-title-row">
+        <span class="col-title">英雄</span>
+        <span class="col-title">当前选用</span>
+      </div>
+
+      
+      <div class="current-leg">
+        
+        <img class="current-leg-icon" src="https://apexlegendsstatus.com/assets/legends-select/ballistic.png" onerror="this.style.display='none'">
+        
+        <span class="current-leg-name">弹道</span>
+        <div class="current-leg-stats">
+          
+        </div>
+      </div>
+      
+
+      
+        
+        <div class="top-leg-row">
+          
+          <img class="top-leg-icon gold" src="https://apexlegendsstatus.com/assets/legends-select/wraith.png" onerror="this.style.display='none'">
+          
+          <span class="top-leg-name">恶灵</span>
+          <span class="top-leg-kills gold">8,950</span>
+        </div>
+        
+        <div class="top-leg-row">
+          
+          <img class="top-leg-icon silver" src="https://apexlegendsstatus.com/assets/legends-select/horizon.png" onerror="this.style.display='none'">
+          
+          <span class="top-leg-name">地平线</span>
+          <span class="top-leg-kills ">1,972</span>
+        </div>
+        
+        <div class="top-leg-row">
+          
+          <img class="top-leg-icon silver" src="https://apexlegendsstatus.com/assets/legends-select/valkyrie.png" onerror="this.style.display='none'">
+          
+          <span class="top-leg-name">瓦尔基里</span>
+          <span class="top-leg-kills ">766</span>
+        </div>
+        
+      
+      <div style="flex:1;"></div>
+    </div>
+
+    <!-- Right: Distribution -->
+    <div class="col" style="justify-content:space-between;">
+      <div class="col-title">段位分布（全平台）</div>
+      
+      <div class="dist-row">
+        <span class="dist-name">菜鸟</span>
+        <div class="dist-track">
+          <div class="dist-fill" style="width:1.14%;background:#484852;"></div>
+        </div>
+        <span class="dist-count">6.2k</span>
+        <span class="dist-pct">1.14%</span>
+      </div>
+      
+      <div class="dist-row">
+        <span class="dist-name">青铜</span>
+        <div class="dist-track">
+          <div class="dist-fill" style="width:6.95%;background:#cd7f32;"></div>
+        </div>
+        <span class="dist-count">38k</span>
+        <span class="dist-pct">6.95%</span>
+      </div>
+      
+      <div class="dist-row">
+        <span class="dist-name">白银</span>
+        <div class="dist-track">
+          <div class="dist-fill" style="width:12.4%;background:#C0C0C0;"></div>
+        </div>
+        <span class="dist-count">68k</span>
+        <span class="dist-pct">12.40%</span>
+      </div>
+      
+      <div class="dist-row">
+        <span class="dist-name">黄金</span>
+        <div class="dist-track">
+          <div class="dist-fill" style="width:19.84%;background:#FFD700;"></div>
+        </div>
+        <span class="dist-count">109k</span>
+        <span class="dist-pct">19.84%</span>
+      </div>
+      
+      <div class="dist-row dist-current">
+        <span class="dist-name">白金</span>
+        <div class="dist-track">
+          <div class="dist-fill" style="width:37.04%;background:#b1f4fa;"></div>
+        </div>
+        <span class="dist-count">204k</span>
+        <span class="dist-pct">37.04%</span>
+      </div>
+      
+      <div class="dist-row">
+        <span class="dist-name">钻石</span>
+        <div class="dist-track">
+          <div class="dist-fill" style="width:22.45%;background:#358de6;"></div>
+        </div>
+        <span class="dist-count">123k</span>
+        <span class="dist-pct">22.45%</span>
+      </div>
+      
+      <div class="dist-row">
+        <span class="dist-name">大师</span>
+        <div class="dist-track">
+          <div class="dist-fill" style="width:0.0%;background:#9f35e6;"></div>
+        </div>
+        <span class="dist-count">0</span>
+        <span class="dist-pct">0.00%</span>
+      </div>
+      
+      <div class="dist-row">
+        <span class="dist-name">猎杀</span>
+        <div class="dist-track">
+          <div class="dist-fill" style="width:0.18%;background:#e31b39;"></div>
+        </div>
+        <span class="dist-count">990</span>
+        <span class="dist-pct">0.18%</span>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- ═══ BADGES ═══ -->
+  
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="footer">
+    <span>Data: <a href="https://apexlegendsstatus.com" target="_blank">Apex Legends Status</a> · 由于游戏限制数据仅供参考</span>
+    <span>auth.赤羽真白 · Apex Chiyuchan</span>
+  </div>
+
+</div>
+</body>
+</html>
