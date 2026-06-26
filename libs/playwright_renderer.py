@@ -581,9 +581,9 @@ def _download_sync(url: str) -> str | None:
             if not raw:
                 return None
             
-            # 写入磁盘缓存（7天过期）
+            # 写入磁盘缓存（永久保存）
             try:
-                loop.run_until_complete(disk_cache.set(url, raw, 7 * 24 * 3600))
+                loop.run_until_complete(disk_cache.set(url, raw))
             except Exception:
                 pass
             

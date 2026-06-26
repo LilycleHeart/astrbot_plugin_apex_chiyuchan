@@ -1,4 +1,4 @@
-"""磁盘缓存模块 — 用于持久化远程图片"""
+"""磁盘缓存模块 — 用于永久持久化远程图片"""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Optional
 
 # 默认配置
-DEFAULT_TTL = 7 * 24 * 3600  # 7 天
 DEFAULT_MAX_SIZE = 500 * 1024 * 1024  # 500MB
 CACHE_DIR_NAME = "image_cache"
 
@@ -43,7 +42,7 @@ async def get(key: str) -> Optional[bytes]:
         key: 缓存键（通常是图片 URL）
 
     Returns:
-        图片二进制数据，如果不存在或已过期则返回 None
+        图片二进制数据，如果不存在则返回 None
     """
     key_hash = _hash_key(key)
     meta_path = _get_meta_path(key_hash)
@@ -54,17 +53,6 @@ async def get(key: str) -> Optional[bytes]:
         return None
 
     try:
-        # 读取元数据
-        with open(meta_path, 'r', encoding='utf-8') as f:
-            meta = json.load(f)
-
-        # 检查是否过期
-        expires_at = meta.get('expires_at', 0)
-        if time.time() > expires_at:
-            # 过期了，删除文件
-            _delete_files(meta_path, data_path)
-            return None
-
         # 读取数据
         with open(data_path, 'rb') as f:
             return f.read()
@@ -74,13 +62,12 @@ async def get(key: str) -> Optional[bytes]:
         return None
 
 
-async def set(key: str, value: bytes, ttl_seconds: int = DEFAULT_TTL) -> bool:
-    """将图片数据写入磁盘缓存
+async def set(key: str, value: bytes) -> bool:
+    """将图片数据写入磁盘缓存（永久保存）
 
     Args:
         key: 缓存键（通常是图片 URL）
         value: 图片二进制数据
-        ttl_seconds: 缓存过期时间（秒）
 
     Returns:
         是否写入成功
@@ -88,6 +75,10 @@ async def set(key: str, value: bytes, ttl_seconds: int = DEFAULT_TTL) -> bool:
     key_hash = _hash_key(key)
     meta_path = _get_meta_path(key_hash)
     data_path = _get_data_path(key_hash)
+
+    # 已存在则跳过
+    if meta_path.exists() and data_path.exists():
+        return True
 
     try:
         # 写入数据
@@ -98,7 +89,6 @@ async def set(key: str, value: bytes, ttl_seconds: int = DEFAULT_TTL) -> bool:
         meta = {
             'key': key,
             'created_at': time.time(),
-            'expires_at': time.time() + ttl_seconds,
             'size': len(value),
         }
         with open(meta_path, 'w', encoding='utf-8') as f:
@@ -133,7 +123,7 @@ async def clear() -> None:
 
 
 async def cleanup(max_size: int = DEFAULT_MAX_SIZE) -> int:
-    """清理过期和超限的缓存
+    """清理超限的缓存（LRU 策略）
 
     Args:
         max_size: 最大缓存大小（字节）
@@ -142,25 +132,9 @@ async def cleanup(max_size: int = DEFAULT_MAX_SIZE) -> int:
         清理的文件数量
     """
     cache_dir = _get_cache_dir()
-    now = time.time()
     cleaned = 0
 
-    # 第一步：删除过期文件
-    for meta_path in cache_dir.glob("*.meta"):
-        try:
-            with open(meta_path, 'r', encoding='utf-8') as f:
-                meta = json.load(f)
-
-            if now > meta.get('expires_at', 0):
-                key_hash = meta_path.stem
-                _delete_files(meta_path, _get_data_path(key_hash))
-                cleaned += 1
-        except Exception:
-            # 元数据损坏，删除
-            meta_path.unlink(missing_ok=True)
-            cleaned += 1
-
-    # 第二步：如果超过大小限制，按 LRU 策略删除最旧的文件
+    # 如果超过大小限制，按 LRU 策略删除最旧的文件
     total_size = _get_total_cache_size()
     if total_size > max_size:
         # 收集所有缓存项的元数据
