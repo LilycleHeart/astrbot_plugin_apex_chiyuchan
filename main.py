@@ -93,6 +93,15 @@ class XiaoChiyu(Star):
         from .libs.image_renderer import _download_moe_digits_async
         from .libs.ttl_cache import start_cleaner
         from .libs.playwright_manager import get_browser
+        from .libs import disk_cache
+
+        # 启动时清理过期缓存
+        try:
+            cleaned = await disk_cache.cleanup()
+            if cleaned > 0:
+                logger.info(f"[小赤羽] 启动时清理了 {cleaned} 个过期缓存文件")
+        except Exception as e:
+            logger.warning(f"[小赤羽] 缓存清理失败: {e}")
 
         asyncio.create_task(get_browser())
         asyncio.create_task(_download_moe_digits_async())
