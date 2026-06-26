@@ -856,6 +856,34 @@ class XiaoChiyu(Star):
             )
         yield event.plain_result("\n".join(lines))
 
+    @filter.command("cache", alias={"缓存"})
+    async def cmd_cache(self, event: AstrMessageEvent, action: str = "stats"):
+        """管理图片磁盘缓存 — /cache [stats|clear|cleanup]"""
+        from .libs import disk_cache
+
+        action = action.strip().lower()
+
+        if action in ("stats", ""):
+            stats = disk_cache.get_cache_stats()
+            msg = (
+                f"📊 图片缓存统计\n"
+                f"缓存目录: {stats['cache_dir']}\n"
+                f"文件数量: {stats['file_count']}\n"
+                f"总大小: {stats['total_size_mb']:.1f} MB"
+            )
+            yield event.plain_result(msg)
+
+        elif action == "clear":
+            await disk_cache.clear()
+            yield event.plain_result("✅ 图片缓存已清空")
+
+        elif action in ("cleanup", "clean"):
+            cleaned = await disk_cache.cleanup()
+            yield event.plain_result(f"✅ 缓存清理完成，清理了 {cleaned} 个文件")
+
+        else:
+            yield event.plain_result("❌ 未知操作，可用: stats, clear, cleanup")
+
     # ═══════════════════════════════════════════════
     #  队伍系统
     # ═══════════════════════════════════════════════
