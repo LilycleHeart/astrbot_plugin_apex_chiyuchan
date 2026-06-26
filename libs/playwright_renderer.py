@@ -9,6 +9,7 @@ from PIL import Image
 
 from .config import RANK_COLORS
 from .playwright_manager import run_with_page
+from . import disk_cache
 
 # ── MD3 深色主题配色 (默认: 钻石冰蓝) ──
 _C_SURFACE = "#0F1218"
@@ -536,9 +537,6 @@ import asyncio
 import re
 from functools import lru_cache as _unused_lru_cache  # kept for reference only
 
-_image_cache: dict[str, str] = {}
-
-
 _MIME_MAP = {
     b'\x89PNG': 'image/png',
     b'\xff\xd8\xff': 'image/jpeg',
@@ -549,8 +547,27 @@ _MIME_MAP = {
 }
 
 def _download_sync(url: str) -> str | None:
-    """同步下载图片转base64 (无lru_cache，避免永久缓存失败值)"""
+    """同步下载图片转base64，优先从磁盘缓存加载"""
     import httpx
+    import asyncio
+    
+    # 尝试从磁盘缓存获取
+    loop = asyncio.get_event_loop()
+    try:
+        cached_data = loop.run_until_complete(disk_cache.get(url))
+        if cached_data:
+            stripped = cached_data.lstrip()
+            mime = 'image/png'
+            for prefix, m in _MIME_MAP.items():
+                if stripped[:4].startswith(prefix) or stripped[:5].startswith(prefix):
+                    mime = m
+                    break
+            b64 = base64.b64encode(cached_data).decode()
+            return f"data:{mime};base64,{b64}"
+    except Exception:
+        pass
+    
+    # 缓存未命中，从网络下载
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -563,6 +580,13 @@ def _download_sync(url: str) -> str | None:
             raw = r.content
             if not raw:
                 return None
+            
+            # 写入磁盘缓存（7天过期）
+            try:
+                loop.run_until_complete(disk_cache.set(url, raw, 7 * 24 * 3600))
+            except Exception:
+                pass
+            
             stripped = raw.lstrip()
             mime = 'image/png'
             for prefix, m in _MIME_MAP.items():
@@ -578,26 +602,35 @@ def _download_sync(url: str) -> str | None:
 
 
 async def _embed_images(html: str) -> str:
-    """将远程图片URL替换为base64 data URI"""
+    """将远程图片URL替换为base64 data URI（使用磁盘缓存）"""
     urls = set()
     urls.update(re.findall(r'src="(https?://[^"]+)"', html))
     urls.update(re.findall(r'url\((https?://[^)]+)\)', html))
 
-    new_urls = [u for u in urls if u not in _image_cache]
-    if new_urls:
+    if not urls:
+        return html
 
-        async def _fetch(url):
-            loop = asyncio.get_running_loop()
-            b64 = await loop.run_in_executor(None, _download_sync, url)
-            if b64:
-                _image_cache[url] = b64
-            return b64
+    # 并发下载所有图片（磁盘缓存会自动处理缓存命中）
+    async def _fetch(url):
+        loop = asyncio.get_running_loop()
+        b64 = await loop.run_in_executor(None, _download_sync, url)
+        return url, b64
 
-        await asyncio.gather(*[_fetch(u) for u in new_urls], return_exceptions=True)
+    results = await asyncio.gather(*[_fetch(u) for u in urls], return_exceptions=True)
+    
+    # 构建替换映射
+    replacements = {}
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+        url, b64 = result
+        if b64:
+            replacements[url] = b64
 
+    # 执行替换
     def _replace(m):
         url = m.group(1)
-        return m.group(0).replace(url, _image_cache.get(url, url))
+        return m.group(0).replace(url, replacements.get(url, url))
 
     html = re.sub(r'src="(https?://[^"]+)"', _replace, html)
     html = re.sub(r'url\((https?://[^)]+)\)', _replace, html)
