@@ -935,16 +935,14 @@ class XiaoChiyu(Star):
             target_qq(string): 要查询的 QQ 号（@某人查战绩时使用，从绑定记录取 UID，避免同名搜索错误）
         """
         import base64
-        from mcp.types import CallToolResult, TextContent, ImageContent
 
         qq_id = event.get_sender_id()
         # 优先 target_qq：从绑定记录取 UID，避免同名搜索错误
         if target_qq.strip():
             target_user = await self.db.get_user(target_qq.strip())
             if not target_user:
-                return CallToolResult(
-                    content=[TextContent(type="text", text=f"对方 (QQ {target_qq}) 未绑定 Apex 账号")]
-                )
+                yield event.plain_result(f"对方 (QQ {target_qq}) 未绑定 Apex 账号")
+                return
             uid = target_user["uid"]
             platform = target_user.get("platform", "PC")
         elif uid.strip():
@@ -963,9 +961,8 @@ class XiaoChiyu(Star):
                 target_qq = at_match.group(1)
                 target_user = await self.db.get_user(target_qq)
                 if not target_user:
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=f"对方 (QQ {target_qq}) 未绑定 Apex 账号")]
-                    )
+                    yield event.plain_result(f"对方 (QQ {target_qq}) 未绑定 Apex 账号")
+                    return
                 uid = target_user["uid"]
                 platform = target_user.get("platform", "PC")
             elif player_name.strip().isdigit():
@@ -989,43 +986,27 @@ class XiaoChiyu(Star):
                         img_bytes = await renderer.draw_player_list_card(search_results, hint)
                         if img_bytes:
                             img_b64 = base64.b64encode(img_bytes).decode()
-                            return CallToolResult(
-                                content=[
-                                    TextContent(
-                                        type="text",
-                                        text=f"找到 {len(search_results)} 个匹配玩家。请发送卡片图片，用户回复数字后，直接将该数字作为 player_name 参数再次调用 apex_stats 即可。",
-                                    ),
-                                    ImageContent(type="image", data=img_b64, mimeType="image/png"),
-                                ]
-                            )
+                            yield event.plain_result(f"找到 {len(search_results)} 个匹配玩家。请发送卡片图片，用户回复数字后，直接将该数字作为 player_name 参数再次调用 apex_stats 即可。")
+                            yield event.image_result(f"data:image/png;base64,{img_b64}")
+                            return
                 else:
                     api_results = await self.apex.name_to_uid_all(player_name.strip())
                     if not api_results:
-                        return CallToolResult(
-                            content=[
-                                TextContent(type="text", text=f"找不到玩家 '{player_name}'")
-                            ]
-                        )
+                        yield event.plain_result(f"找不到玩家 '{player_name}'")
+                        return
                     if len(api_results) > 1:
                         lines = [f"找到 {len(api_results)} 个匹配玩家:"]
                         for r in api_results:
                             lines.append(f"{r.name} — UID {r.uid}")
                         lines.append("请让用户选择一个 UID，然后用 UID 直接查询。")
-                        return CallToolResult(
-                            content=[TextContent(type="text", text="\n".join(lines))]
-                        )
+                        yield event.plain_result("\n".join(lines))
+                        return
                     uid, platform = api_results[0].uid, "PC"
         else:
             user = await self.db.get_user(qq_id)
             if not user:
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text="用户还没有绑定 Apex 账号，提示用户使用 /bind 命令绑定",
-                        )
-                    ]
-                )
+                yield event.plain_result("用户还没有绑定 Apex 账号，提示用户使用 /bind 命令绑定")
+                return
             uid, platform = user["uid"], user["platform"]
 
         stats_task = self.apex.get_stats(uid, platform)
@@ -1035,9 +1016,8 @@ class XiaoChiyu(Star):
             stats_task, badges_task, rankdist_task
         )
         if not stats:
-            return CallToolResult(
-                content=[TextContent(type="text", text="无法获取战绩数据")]
-            )
+            yield event.plain_result("无法获取战绩数据")
+            return
 
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
@@ -1126,12 +1106,9 @@ class XiaoChiyu(Star):
             )
         text += "\n请根据以上数据评论一下用户的战绩，然后用 send_message_to_user 发送战绩卡片图片。"
 
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png"),
-            ]
-        )
+        yield event.plain_result(text)
+        if img_b64:
+            yield event.image_result(f"data:image/png;base64,{img_b64}")
 
     @filter.llm_tool(name="apex_bind")
     async def llm_bind(
@@ -1147,56 +1124,33 @@ class XiaoChiyu(Star):
             target_qq(string): 要绑定到的QQ号，不填则绑定给自己（仅管理员可用）
         """
         import base64
-        from mcp.types import CallToolResult, TextContent, ImageContent
 
         if platform.upper() not in ("PC", "PS4", "X1"):
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text", text="平台仅支持 PC / PS / XBOX ，请提示用户"
-                    )
-                ]
-            )
+            yield event.plain_result("平台仅支持 PC / PS / XBOX ，请提示用户")
+            return
         platform = platform.upper()
         qq_id = event.get_sender_id()
 
         # admin 可为他人绑定
         if target_qq:
             if not event.is_admin():
-                return CallToolResult(
-                    content=[TextContent(type="text", text="只有管理员才能为他人绑定账号")]
-                )
+                yield event.plain_result("只有管理员才能为他人绑定账号")
+                return
             qq_id = target_qq
 
         # 优先 UID 直接绑定，避免同名搜索错误
         if uid.strip():
             stats = await self.apex.get_stats(uid.strip(), platform)
             if not stats:
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text", text=f"找不到 UID '{uid}'，请提示用户检查 UID"
-                        )
-                    ]
-                )
+                yield event.plain_result(f"找不到 UID '{uid}'，请提示用户检查 UID")
+                return
             await self.db.upsert_user(qq_id, uid.strip(), stats.name, platform)
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=f"已成功绑定 {stats.name} (UID {uid.strip()}, {platform})。请告知用户绑定成功。",
-                    )
-                ]
-            )
+            yield event.plain_result(f"已成功绑定 {stats.name} (UID {uid.strip()}, {platform})。请告知用户绑定成功。")
+            return
 
         if not player_name.strip():
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text", text="请提供玩家名或 UID 来绑定账号"
-                    )
-                ]
-            )
+            yield event.plain_result("请提供玩家名或 UID 来绑定账号")
+            return
 
         if player_name.strip().isdigit():
             idx = int(player_name.strip())
@@ -1205,19 +1159,10 @@ class XiaoChiyu(Star):
                 r = cached[idx - 1]
                 plat = r.get("platform", platform)
                 await self.db.upsert_user(qq_id, r["uid"], r["name"], plat)
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text=f"已成功绑定 {r['name']} (UID {r['uid']}, {plat})。请告知用户绑定成功。",
-                        )
-                    ]
-                )
-            return CallToolResult(
-                content=[
-                    TextContent(type="text", text=f"序号 {idx} 无效，请先搜索玩家名后再用数字选择。")
-                ]
-            )
+                yield event.plain_result(f"已成功绑定 {r['name']} (UID {r['uid']}, {plat})。请告知用户绑定成功。")
+                return
+            yield event.plain_result(f"序号 {idx} 无效，请先搜索玩家名后再用数字选择。")
+            return
 
         results = await search_players(player_name.strip(), platform)
         if results:
@@ -1225,55 +1170,30 @@ class XiaoChiyu(Star):
                 r = results[0]
                 plat = r.get("platform", platform)
                 await self.db.upsert_user(qq_id, r["uid"], r["name"], plat)
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text=f"已成功绑定 {r['name']} (UID {r['uid']}, {plat})。请告知用户绑定成功。",
-                        )
-                    ]
-                )
+                yield event.plain_result(f"已成功绑定 {r['name']} (UID {r['uid']}, {plat})。请告知用户绑定成功。")
+                return
             self._last_search[qq_id] = results
             img_bytes = await renderer.draw_player_list_card(results, f"共 {len(results)} 个结果，回复数字选择")
             img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=f"找到 {len(results)} 个匹配玩家。请发送卡片图片，用户回复数字后重新调用 apex_bind 传入该数字即可。",
-                    ),
-                    ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
-                ]
-            )
+            yield event.plain_result(f"找到 {len(results)} 个匹配玩家。请发送卡片图片，用户回复数字后重新调用 apex_bind 传入该数字即可。")
+            if img_b64:
+                yield event.image_result(f"data:image/png;base64,{img_b64}")
+            return
 
         api_results = await self.apex.name_to_uid_all(player_name, platform)
         if not api_results:
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=f"找不到玩家 '{player_name}'，请提示用户检查名字",
-                    )
-                ]
-            )
+            yield event.plain_result(f"找不到玩家 '{player_name}'，请提示用户检查名字")
+            return
         if len(api_results) > 1:
             lines = [f"找到 {len(api_results)} 个匹配玩家:"]
             for r in api_results:
                 lines.append(f"{r.name} — UID {r.uid}")
             lines.append("请让用户选择一个 UID，用 /bind_uid <UID> 绑定。")
-            return CallToolResult(
-                content=[TextContent(type="text", text="\n".join(lines))]
-            )
+            yield event.plain_result("\n".join(lines))
+            return
         result = api_results[0]
         await self.db.upsert_user(qq_id, result.uid, result.name, platform)
-        return CallToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text=f"已成功绑定 {result.name} (UID {result.uid}, {platform})。请告知用户绑定成功。",
-                )
-            ]
-        )
+        yield event.plain_result(f"已成功绑定 {result.name} (UID {result.uid}, {platform})。请告知用户绑定成功。")
 
     @filter.llm_tool(name="apex_unbind")
     async def llm_unbind(self, event: AstrMessageEvent, target_qq: str = ""):
@@ -1281,42 +1201,28 @@ class XiaoChiyu(Star):
         Args:
             target_qq(string): 要解绑的QQ号，不填则解绑自己（仅管理员可用）
         """
-        from mcp.types import CallToolResult, TextContent
-
         qq_id = event.get_sender_id()
         if target_qq:
             if not event.is_admin():
-                return CallToolResult(
-                    content=[TextContent(type="text", text="只有管理员才能解绑他人的账号")]
-                )
+                yield event.plain_result("只有管理员才能解绑他人的账号")
+                return
             qq_id = target_qq
         user = await self.db.get_user(qq_id)
         if not user:
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text", text="用户还没有绑定 Apex 账号，请提示用户先绑定"
-                    )
-                ]
-            )
+            yield event.plain_result("用户还没有绑定 Apex 账号，请提示用户先绑定")
+            return
         await self.db.delete_user(qq_id)
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=f"已解绑 {user['name']}，请告知用户。")
-            ]
-        )
+        yield event.plain_result(f"已解绑 {user['name']}，请告知用户。")
 
     @filter.llm_tool(name="apex_map")
     async def llm_map(self, event: AstrMessageEvent):
         """查询当前 Apex 地图轮换，生成卡片。"""
         import base64
-        from mcp.types import CallToolResult, TextContent, ImageContent
 
         rotation = await self.apex.get_map_rotation()
         if not rotation:
-            return CallToolResult(
-                content=[TextContent(type="text", text="获取地图轮换失败")]
-            )
+            yield event.plain_result("获取地图轮换失败")
+            return
         img_bytes = await renderer.draw_map_card(rotation)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
         br = rotation.br_current.map if rotation.br_current else "?"
@@ -1339,24 +1245,19 @@ class XiaoChiyu(Star):
         if r_next:
             text += f"下一张排位: {r_next}\n"
         text += "\n请简单介绍一下地图，然后用 send_message_to_user 发送地图卡片图片。"
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
-            ]
-        )
+        yield event.plain_result(text)
+        if img_b64:
+            yield event.image_result(f"data:image/png;base64,{img_b64}")
 
     @filter.llm_tool(name="apex_server")
     async def llm_server(self, event: AstrMessageEvent):
         """查询 Apex 服务器状态，生成卡片。"""
         import base64
-        from mcp.types import CallToolResult, TextContent, ImageContent
 
         server_status = await self.apex.get_server_status()
         if not server_status or not getattr(server_status, "als", None):
-            return CallToolResult(
-                content=[TextContent(type="text", text="获取服务器状态失败")]
-            )
+            yield event.plain_result("获取服务器状态失败")
+            return
         img_bytes = await renderer.draw_server_status_card(server_status)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
         als = getattr(server_status, "als", None)
@@ -1368,25 +1269,20 @@ class XiaoChiyu(Star):
         else:
             text = "服务器状态数据获取成功\n"
         text += "\n请根据服务器状态评论一下，然后用 send_message_to_user 发送服务器状态卡片图片。"
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
-            ]
-        )
+        yield event.plain_result(text)
+        if img_b64:
+            yield event.image_result(f"data:image/png;base64,{img_b64}")
 
     @filter.llm_tool(name="apex_online")
     async def llm_online(self, event: AstrMessageEvent):
         """查询 Apex Legends Steam 当前在线人数和月度日活趋势，生成卡片。当用户询问在线人数、日活、活跃玩家数、有多少人在玩 Apex 等问题时调用。
         """
         import base64
-        from mcp.types import CallToolResult, TextContent, ImageContent
 
         data = await fetch_steamcharts()
         if not data:
-            return CallToolResult(
-                content=[TextContent(type="text", text="获取 Steam 日活数据失败，稍后再试")]
-            )
+            yield event.plain_result("获取 Steam 日活数据失败，稍后再试")
+            return
         img_bytes = await renderer.draw_steamcharts_card(data)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
 
@@ -1399,24 +1295,19 @@ class XiaoChiyu(Star):
             f"近 30 天日均: {int(recent_avg):,}\n"
             f"\n请简短评论一下 Apex 当前的人气，然后用 send_message_to_user 发送日活卡片图片。"
         )
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
-            ]
-        )
+        yield event.plain_result(text)
+        if img_b64:
+            yield event.image_result(f"data:image/png;base64,{img_b64}")
 
     @filter.llm_tool(name="apex_master")
     async def llm_master(self, event: AstrMessageEvent):
         """查询各平台大师人数和猎杀线分数，生成卡片。"""
         import base64
-        from mcp.types import CallToolResult, TextContent, ImageContent
 
         predator = await self.apex.get_predator()
         if not predator:
-            return CallToolResult(
-                content=[TextContent(type="text", text="获取大师数据失败")]
-            )
+            yield event.plain_result("获取大师数据失败")
+            return
         img_bytes = await renderer.draw_master_card(predator)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
         text = "各平台大师/猎杀数据:\n"
@@ -1425,24 +1316,19 @@ class XiaoChiyu(Star):
             if pd:
                 text += f"{plat}: 猎杀分数线 {pd.predator_cap:,} RP | 大师/猎杀 {pd.masters_and_preds:,} 人\n"
         text += "\n请简单评论各平台数据，然后用 send_message_to_user 发送大师数据卡片图片。"
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
-            ]
-        )
+        yield event.plain_result(text)
+        if img_b64:
+            yield event.image_result(f"data:image/png;base64,{img_b64}")
 
     @filter.llm_tool(name="apex_season")
     async def llm_season(self, event: AstrMessageEvent):
         """查询当前 Apex 赛季信息、META 英雄胜率 Top5。当用户说"赛季"、"当前赛季"、"赛季倒计时"、"META"、"胜率"时调用。"""
         import base64
-        from mcp.types import CallToolResult, TextContent, ImageContent
 
         season_info = await fetch_season_info()
         if not season_info:
-            return CallToolResult(
-                content=[TextContent(type="text", text="获取赛季信息失败")]
-            )
+            yield event.plain_result("获取赛季信息失败")
+            return
         meta_top5 = await fetch_meta_top5()
         img_bytes = await renderer.draw_season_card(season_info, meta_top5)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
@@ -1460,12 +1346,9 @@ class XiaoChiyu(Star):
             f"\n{meta_text}"
             f"\n请简短评论一下当前赛季，然后用 send_message_to_user 发送赛季卡片图片。"
         )
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
-            ]
-        )
+        yield event.plain_result(text)
+        if img_b64:
+            yield event.image_result(f"data:image/png;base64,{img_b64}")
 
     @filter.llm_tool(name="apex_lfg")
     async def llm_lfg(self, event: AstrMessageEvent, action: str = "list", target_qq: str = ""):
@@ -1475,14 +1358,12 @@ class XiaoChiyu(Star):
             target_qq(string): 要操作的QQ号，不填则操作自己（仅管理员可用）
         """
         import base64
-        from mcp.types import CallToolResult, TextContent, ImageContent
 
         qq_id = event.get_sender_id()
         if target_qq:
             if not event.is_admin():
-                return CallToolResult(
-                    content=[TextContent(type="text", text="只有管理员才能为他人操作")]
-                )
+                yield event.plain_result("只有管理员才能为他人操作")
+                return
             qq_id = target_qq
         group_id = event.unified_msg_origin
         action = action.strip().lower()
@@ -1491,12 +1372,10 @@ class XiaoChiyu(Star):
             existing = await self.db.get_lfg_user(qq_id, group_id)
             if existing:
                 await self.db.remove_lfg_user(qq_id, group_id)
-                return CallToolResult(
-                    content=[TextContent(type="text", text="已退出找队友列表")]
-                )
-            return CallToolResult(
-                content=[TextContent(type="text", text="你不在找队友列表中")]
-            )
+                yield event.plain_result("已退出找队友列表")
+                return
+            yield event.plain_result("你不在找队友列表中")
+            return
 
         if action in ("ranked", "排位", "casual", "娱乐"):
             mode = "ranked" if action in ("ranked", "排位") else "casual"
@@ -1522,9 +1401,8 @@ class XiaoChiyu(Star):
                         }
                         self._profile_cache[qq_id] = cached
             if not cached:
-                return CallToolResult(
-                    content=[TextContent(type="text", text="请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友")]
-                )
+                yield event.plain_result("请先使用 /bind 绑定账号或 /stats 查询战绩后再找队友")
+                return
             # 注册时一并爬取 ALS 数据存入 DB
             bind_user = await self.db.get_user(qq_id)
             als_lookup = bind_user["uid"] if bind_user else cached["uid"]
@@ -1553,16 +1431,14 @@ class XiaoChiyu(Star):
                 kills=kills, level=lvl_raw, prestige=pr_raw,
                 rank_pos=rp_pos, rank_name=rn, rank_score=rp, rank_img=ri, state=st,
             )
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})")]
-            )
+            yield event.plain_result(f"已注册找队友 ({'排位' if mode == 'ranked' else '娱乐'})")
+            return
 
         # list
         lfg_users = await self.db.list_lfg_users(group_id)
         if not lfg_users:
-            return CallToolResult(
-                content=[TextContent(type="text", text="当前没有人在找队友")]
-            )
+            yield event.plain_result("当前没有人在找队友")
+            return
 
         entries = []
         rank_dist = await self.apex.get_rank_distribution()
@@ -1572,9 +1448,8 @@ class XiaoChiyu(Star):
                 entries.append(entry)
 
         if not entries:
-            return CallToolResult(
-                content=[TextContent(type="text", text="没有有效的战绩数据")]
-            )
+            yield event.plain_result("没有有效的战绩数据")
+            return
 
         text_lines = [f"当前找队友列表 ({len(entries)} 人):"]
         for e in entries:
@@ -1582,9 +1457,6 @@ class XiaoChiyu(Star):
             text_lines.append(txt)
         img_bytes = await renderer.draw_lfg_card(entries)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=text),
-                ImageContent(type="image", data=img_b64, mimeType="image/png") if img_b64 else TextContent(type="text", text="（卡片渲染失败）"),
-            ]
-        )
+        yield event.plain_result(text)
+        if img_b64:
+            yield event.image_result(f"data:image/png;base64,{img_b64}")
