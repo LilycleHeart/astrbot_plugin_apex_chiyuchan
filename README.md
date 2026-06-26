@@ -36,37 +36,37 @@
   <tr>
     <td align="center" valign="top" width="50%">
       <b>📊 战绩查询</b><br />
-      <img src="./preview/stats.png" alt="战绩查询预览" width="360" />
+      <img src="./preview/stats.png" alt="战绩查询预览" height="360" />
     </td>
     <td align="center" valign="top" width="50%">
       <b>🌐 服务器状态</b><br />
-      <img src="./preview/server.png" alt="服务器状态预览" width="360" />
+      <img src="./preview/server.png" alt="服务器状态预览" height="360" />
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="50%">
       <b>🗺️ 地图轮换</b><br />
-      <img src="./preview/map.png" alt="地图轮换预览" width="360" />
+      <img src="./preview/map.png" alt="地图轮换预览" height="360" />
     </td>
     <td align="center" valign="top" width="50%">
       <b>🏆 赛季信息</b><br />
-      <img src="./preview/season.png" alt="赛季信息预览" width="360" />
+      <img src="./preview/season.png" alt="赛季信息预览" height="360" />
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="50%">
       <b>📈 Steam 日活</b><br />
-      <img src="./preview/online.png" alt="Steam 日活预览" width="360" />
+      <img src="./preview/online.png" alt="Steam 日活预览" height="360" />
     </td>
     <td align="center" valign="top" width="50%">
       <b>👑 猎杀 / 大师</b><br />
-      <img src="./preview/master.png" alt="猎杀大师预览" width="360" />
+      <img src="./preview/master.png" alt="猎杀大师预览" height="360" />
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
       <b>👥 找队友 / LFG</b><br />
-      <img src="./preview/lfg.png" alt="找队友预览" width="760" />
+      <img src="./preview/lfg.png" alt="找队友预览" height="360" />
     </td>
   </tr>
 </table>
