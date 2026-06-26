@@ -88,6 +88,13 @@ class XiaoChiyu(Star):
 
         asyncio.create_task(_wrapper())
 
+    @staticmethod
+    def _unwrap_event(ctx):
+        """兼容 v4.26.0 ContextWrapper 和旧版 AstrMessageEvent"""
+        if hasattr(ctx, 'context') and hasattr(ctx.context, 'event'):
+            return ctx.context.event
+        return ctx
+
     async def _on_init(self):
         await self.db.init()
         from .libs.image_renderer import _download_moe_digits_async
@@ -934,6 +941,7 @@ class XiaoChiyu(Star):
             uid(string): Apex 数字 UID，有 UID 时优先使用
             target_qq(string): 要查询的 QQ 号（@某人查战绩时使用，从绑定记录取 UID，避免同名搜索错误）
         """
+        event = self._unwrap_event(event)
         import base64
 
         qq_id = event.get_sender_id()
@@ -1123,6 +1131,7 @@ class XiaoChiyu(Star):
             platform(string): 平台，PC/PS4/X1，默认PC
             target_qq(string): 要绑定到的QQ号，不填则绑定给自己（仅管理员可用）
         """
+        event = self._unwrap_event(event)
         import base64
 
         if platform.upper() not in ("PC", "PS4", "X1"):
@@ -1201,6 +1210,7 @@ class XiaoChiyu(Star):
         Args:
             target_qq(string): 要解绑的QQ号，不填则解绑自己（仅管理员可用）
         """
+        event = self._unwrap_event(event)
         qq_id = event.get_sender_id()
         if target_qq:
             if not event.is_admin():
@@ -1217,6 +1227,7 @@ class XiaoChiyu(Star):
     @filter.llm_tool(name="apex_map")
     async def llm_map(self, event: AstrMessageEvent):
         """查询当前 Apex 地图轮换，生成卡片。"""
+        event = self._unwrap_event(event)
         import base64
 
         rotation = await self.apex.get_map_rotation()
@@ -1252,6 +1263,7 @@ class XiaoChiyu(Star):
     @filter.llm_tool(name="apex_server")
     async def llm_server(self, event: AstrMessageEvent):
         """查询 Apex 服务器状态，生成卡片。"""
+        event = self._unwrap_event(event)
         import base64
 
         server_status = await self.apex.get_server_status()
@@ -1277,6 +1289,7 @@ class XiaoChiyu(Star):
     async def llm_online(self, event: AstrMessageEvent):
         """查询 Apex Legends Steam 当前在线人数和月度日活趋势，生成卡片。当用户询问在线人数、日活、活跃玩家数、有多少人在玩 Apex 等问题时调用。
         """
+        event = self._unwrap_event(event)
         import base64
 
         data = await fetch_steamcharts()
@@ -1302,6 +1315,7 @@ class XiaoChiyu(Star):
     @filter.llm_tool(name="apex_master")
     async def llm_master(self, event: AstrMessageEvent):
         """查询各平台大师人数和猎杀线分数，生成卡片。"""
+        event = self._unwrap_event(event)
         import base64
 
         predator = await self.apex.get_predator()
@@ -1323,6 +1337,7 @@ class XiaoChiyu(Star):
     @filter.llm_tool(name="apex_season")
     async def llm_season(self, event: AstrMessageEvent):
         """查询当前 Apex 赛季信息、META 英雄胜率 Top5。当用户说"赛季"、"当前赛季"、"赛季倒计时"、"META"、"胜率"时调用。"""
+        event = self._unwrap_event(event)
         import base64
 
         season_info = await fetch_season_info()
@@ -1357,6 +1372,7 @@ class XiaoChiyu(Star):
             action(string): 操作类型: list/ranked/casual/leave
             target_qq(string): 要操作的QQ号，不填则操作自己（仅管理员可用）
         """
+        event = self._unwrap_event(event)
         import base64
 
         qq_id = event.get_sender_id()
