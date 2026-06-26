@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import uuid
 from pathlib import Path
@@ -94,6 +95,18 @@ class XiaoChiyu(Star):
         if hasattr(ctx, 'context') and hasattr(ctx.context, 'event'):
             return ctx.context.event
         return ctx
+
+    @staticmethod
+    def _save_temp_image(img_bytes: bytes) -> str | None:
+        """将图片字节保存为临时文件，返回文件路径"""
+        import tempfile
+        try:
+            fd, path = tempfile.mkstemp(suffix=".png", dir=str(Path(get_astrbot_data_path()) / "temp"))
+            with os.fdopen(fd, 'wb') as f:
+                f.write(img_bytes)
+            return path
+        except Exception:
+            return None
 
     async def _on_init(self):
         await self.db.init()
@@ -993,9 +1006,10 @@ class XiaoChiyu(Star):
                         hint = f"共 {len(search_results)} 个结果，请使用 /stats 数字 选择"
                         img_bytes = await renderer.draw_player_list_card(search_results, hint)
                         if img_bytes:
-                            img_b64 = base64.b64encode(img_bytes).decode()
                             yield event.plain_result(f"找到 {len(search_results)} 个匹配玩家。请发送卡片图片，用户回复数字后，直接将该数字作为 player_name 参数再次调用 apex_stats 即可。")
-                            yield event.image_result(f"data:image/png;base64,{img_b64}")
+                            img_path = self._save_temp_image(img_bytes)
+                            if img_path:
+                                yield event.image_result(img_path)
                             return
                 else:
                     api_results = await self.apex.name_to_uid_all(player_name.strip())
@@ -1115,8 +1129,10 @@ class XiaoChiyu(Star):
         text += "\n请根据以上数据评论一下用户的战绩，然后用 send_message_to_user 发送战绩卡片图片。"
 
         yield event.plain_result(text)
-        if img_b64:
-            yield event.image_result(f"data:image/png;base64,{img_b64}")
+        if img_bytes:
+            img_path = self._save_temp_image(img_bytes)
+            if img_path:
+                yield event.image_result(img_path)
 
     @filter.llm_tool(name="apex_bind")
     async def llm_bind(
@@ -1183,10 +1199,11 @@ class XiaoChiyu(Star):
                 return
             self._last_search[qq_id] = results
             img_bytes = await renderer.draw_player_list_card(results, f"共 {len(results)} 个结果，回复数字选择")
-            img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
             yield event.plain_result(f"找到 {len(results)} 个匹配玩家。请发送卡片图片，用户回复数字后重新调用 apex_bind 传入该数字即可。")
-            if img_b64:
-                yield event.image_result(f"data:image/png;base64,{img_b64}")
+            if img_bytes:
+                img_path = self._save_temp_image(img_bytes)
+                if img_path:
+                    yield event.image_result(img_path)
             return
 
         api_results = await self.apex.name_to_uid_all(player_name, platform)
@@ -1257,8 +1274,10 @@ class XiaoChiyu(Star):
             text += f"下一张排位: {r_next}\n"
         text += "\n请简单介绍一下地图，然后用 send_message_to_user 发送地图卡片图片。"
         yield event.plain_result(text)
-        if img_b64:
-            yield event.image_result(f"data:image/png;base64,{img_b64}")
+        if img_bytes:
+            img_path = self._save_temp_image(img_bytes)
+            if img_path:
+                yield event.image_result(img_path)
 
     @filter.llm_tool(name="apex_server")
     async def llm_server(self, event: AstrMessageEvent):
@@ -1282,8 +1301,10 @@ class XiaoChiyu(Star):
             text = "服务器状态数据获取成功\n"
         text += "\n请根据服务器状态评论一下，然后用 send_message_to_user 发送服务器状态卡片图片。"
         yield event.plain_result(text)
-        if img_b64:
-            yield event.image_result(f"data:image/png;base64,{img_b64}")
+        if img_bytes:
+            img_path = self._save_temp_image(img_bytes)
+            if img_path:
+                yield event.image_result(img_path)
 
     @filter.llm_tool(name="apex_online")
     async def llm_online(self, event: AstrMessageEvent):
@@ -1309,8 +1330,10 @@ class XiaoChiyu(Star):
             f"\n请简短评论一下 Apex 当前的人气，然后用 send_message_to_user 发送日活卡片图片。"
         )
         yield event.plain_result(text)
-        if img_b64:
-            yield event.image_result(f"data:image/png;base64,{img_b64}")
+        if img_bytes:
+            img_path = self._save_temp_image(img_bytes)
+            if img_path:
+                yield event.image_result(img_path)
 
     @filter.llm_tool(name="apex_master")
     async def llm_master(self, event: AstrMessageEvent):
@@ -1331,8 +1354,10 @@ class XiaoChiyu(Star):
                 text += f"{plat}: 猎杀分数线 {pd.predator_cap:,} RP | 大师/猎杀 {pd.masters_and_preds:,} 人\n"
         text += "\n请简单评论各平台数据，然后用 send_message_to_user 发送大师数据卡片图片。"
         yield event.plain_result(text)
-        if img_b64:
-            yield event.image_result(f"data:image/png;base64,{img_b64}")
+        if img_bytes:
+            img_path = self._save_temp_image(img_bytes)
+            if img_path:
+                yield event.image_result(img_path)
 
     @filter.llm_tool(name="apex_season")
     async def llm_season(self, event: AstrMessageEvent):
@@ -1362,8 +1387,10 @@ class XiaoChiyu(Star):
             f"\n请简短评论一下当前赛季，然后用 send_message_to_user 发送赛季卡片图片。"
         )
         yield event.plain_result(text)
-        if img_b64:
-            yield event.image_result(f"data:image/png;base64,{img_b64}")
+        if img_bytes:
+            img_path = self._save_temp_image(img_bytes)
+            if img_path:
+                yield event.image_result(img_path)
 
     @filter.llm_tool(name="apex_lfg")
     async def llm_lfg(self, event: AstrMessageEvent, action: str = "list", target_qq: str = ""):
@@ -1474,5 +1501,7 @@ class XiaoChiyu(Star):
         img_bytes = await renderer.draw_lfg_card(entries)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
         yield event.plain_result(text)
-        if img_b64:
-            yield event.image_result(f"data:image/png;base64,{img_b64}")
+        if img_bytes:
+            img_path = self._save_temp_image(img_bytes)
+            if img_path:
+                yield event.image_result(img_path)
