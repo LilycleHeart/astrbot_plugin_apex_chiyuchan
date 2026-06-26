@@ -194,7 +194,7 @@ async def fetch_meta_top5() -> list[SeasonMetaLegend]:
                     continue
 
                 name_zh = LEGEND_ZH.get(name_en, name_en)
-                icon = f"https://apexlegendsstatus.com/assets/legends-select/{name_en.lower().replace(' ', '-')}.png"
+                icon = f"https://apexlegendsstatus.com/assets/legends-select/{name_en.lower()}.png"
 
                 results.append(SeasonMetaLegend(
                     name=name_zh,
