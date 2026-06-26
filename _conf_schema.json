@@ -15,7 +15,12 @@
     "description": "卡片主题色调",
     "type": "string",
     "default": "auto",
-    "hint": "dark=深色, light=亮色, auto=按北京时间自动切换(06:00-18:00亮色)"
+    "options": [
+      {"label": "自动（按北京时间切换）", "value": "auto"},
+      {"label": "深色", "value": "dark"},
+      {"label": "亮色", "value": "light"}
+    ],
+    "hint": "auto=06:00-18:00亮色其余深色"
   },
   "monitor_interval": {
     "description": "服务器状态监控检查间隔（秒）",

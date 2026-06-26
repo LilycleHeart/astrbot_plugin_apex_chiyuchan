@@ -90,10 +90,19 @@ async def _get_context(device_scale_factor: float = 1) -> BrowserContext:
             pass
     browser = await get_browser()
     t0 = time.perf_counter()
+    # Playwright 只支持 dark|light|no-preference|no-override
+    # auto 模式根据北京时间决定
+    scheme = _COLOR_SCHEME
+    if scheme == "auto":
+        from datetime import datetime, timezone, timedelta
+        hour = datetime.now(timezone(timedelta(hours=8))).hour
+        scheme = "light" if 6 <= hour < 18 else "dark"
+    elif scheme not in ("dark", "light"):
+        scheme = "dark"
     ctx = await browser.new_context(
         viewport={"width": 1280, "height": 800},
         timezone_id=_TIMEZONE_ID,
-        color_scheme=_COLOR_SCHEME,
+        color_scheme=scheme,
         device_scale_factor=device_scale_factor,
     )
     _log_stat("ctx_create", time.perf_counter() - t0)
