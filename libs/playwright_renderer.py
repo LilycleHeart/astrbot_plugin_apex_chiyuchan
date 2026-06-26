@@ -839,6 +839,9 @@ _MAP_VARIANTS = {
     "Encore": "Arena_Encore",
     "Party Crasher": "Arena_Party_Crasher",
     "Drop-Off": "Arena_Drop_Off",
+    "Zeus Station": "No_Map_Data",
+    "Wattson's Pylon": "No_Map_Data",
+    "Barometer": "No_Map_Data",
 }
 
 
