@@ -546,15 +546,13 @@ _MIME_MAP = {
     b'<?xml': 'image/svg+xml',
 }
 
-def _download_sync(url: str) -> str | None:
-    """同步下载图片转base64，优先从磁盘缓存加载"""
+async def _download_and_cache(url: str) -> str | None:
+    """异步下载图片转base64，优先从磁盘缓存加载"""
     import httpx
-    import asyncio
     
     # 尝试从磁盘缓存获取
-    loop = asyncio.get_event_loop()
     try:
-        cached_data = loop.run_until_complete(disk_cache.get(url))
+        cached_data = await disk_cache.get(url)
         if cached_data:
             stripped = cached_data.lstrip()
             mime = 'image/png'
@@ -574,8 +572,8 @@ def _download_sync(url: str) -> str | None:
             "Referer": "https://apexlegendsstatus.com/",
             "Accept": "image/svg+xml,image/png,image/*,*/*;q=0.8",
         }
-        with httpx.Client(timeout=10.0, follow_redirects=True, headers=headers) as c:
-            r = c.get(url)
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=headers) as c:
+            r = await c.get(url)
             r.raise_for_status()
             raw = r.content
             if not raw:
@@ -583,7 +581,7 @@ def _download_sync(url: str) -> str | None:
             
             # 写入磁盘缓存（永久保存）
             try:
-                loop.run_until_complete(disk_cache.set(url, raw))
+                await disk_cache.set(url, raw)
             except Exception:
                 pass
             
@@ -612,8 +610,7 @@ async def _embed_images(html: str) -> str:
 
     # 并发下载所有图片（磁盘缓存会自动处理缓存命中）
     async def _fetch(url):
-        loop = asyncio.get_running_loop()
-        b64 = await loop.run_in_executor(None, _download_sync, url)
+        b64 = await _download_and_cache(url)
         return url, b64
 
     results = await asyncio.gather(*[_fetch(u) for u in urls], return_exceptions=True)
