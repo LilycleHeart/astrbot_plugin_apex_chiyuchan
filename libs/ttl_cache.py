@@ -8,6 +8,7 @@ from typing import Any
 
 _cache: dict[str, tuple[float, Any]] = {}
 _lock = asyncio.Lock()
+_cleaner_started = False
 
 
 async def get(key: str) -> Any | None:
@@ -30,3 +31,20 @@ async def set(key: str, value: Any, ttl_seconds: int):
 async def delete(key: str):
     async with _lock:
         _cache.pop(key, None)
+
+
+async def _auto_clean():
+    while True:
+        await asyncio.sleep(300)
+        async with _lock:
+            now = time.time()
+            expired = [k for k, v in _cache.items() if now > v[0]]
+            for k in expired:
+                del _cache[k]
+
+
+def start_cleaner():
+    global _cleaner_started
+    if not _cleaner_started:
+        _cleaner_started = True
+        asyncio.create_task(_auto_clean())

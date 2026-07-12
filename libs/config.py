@@ -1,8 +1,6 @@
-"""Material Design 颜色常量、布局尺寸、字体加载"""
+"""Material Design 颜色常量 — 无 Pillow 依赖"""
 
 from __future__ import annotations
-
-from pathlib import Path
 
 # ── Material Design 配色 ──
 SURFACE = "#0F1923"
@@ -34,61 +32,10 @@ PLATFORM_COLORS = {
     "SWITCH": "#DA292A",
 }
 
-# ── 卡片布局尺寸 ──
-PADDING = 24
-RADIUS = 16
-CARD_GAP = 16
 
-STATS_CARD_W = 600
-STATS_CARD_H = 520
-
-MAP_CARD_W = 600
-MAP_CARD_H = 480
-
-MASTER_CARD_W = 640
-MASTER_CARD_H = 560
-
-TEAM_CARD_W = 500
-TEAM_CARD_H = 280
-
-BIND_CARD_W = 480
-BIND_CARD_H = 200
-
-PROFILE_CARD_W = 680
-PROFILE_CARD_H = 860
-
-# ── 字体 ──
-FONT_PATHS = [
-    str(Path(__file__).parent.parent / "assets" / "fonts" / "NotoSansSC-Regular.ttf"),
-    str(Path(__file__).parent.parent / "assets" / "fonts" / "NotoSansSC-Bold.ttf"),
-    "C:/Windows/Fonts/msyh.ttc",
-    "C:/Windows/Fonts/msyhbd.ttc",
-]
-
-FONT_SIZES = {
-    "title": 26,
-    "subtitle": 18,
-    "body": 15,
-    "caption": 12,
-    "metric": 28,
-    "metric_label": 13,
-    "small": 11,
-}
-
-def load_font(size: int, bold: bool = False) -> "ImageFont.FreeTypeFont":
-    from PIL import ImageFont
-
-    candidates = list(FONT_PATHS)
-    if bold:
-        bold_path = str(Path(__file__).parent.parent / "assets" / "fonts" / "NotoSansSC-Bold.ttf")
-        candidates = [bold_path, "C:/Windows/Fonts/msyhbd.ttc"] + candidates
-
-    for path in candidates:
-        try:
-            return ImageFont.truetype(path, size)
-        except (OSError, IOError, AttributeError):
-            continue
-    return ImageFont.load_default()
+def preload_fonts() -> None:
+    """已废弃 — Playwright 渲染不再需要字体预加载"""
+    pass
 
 
 def get_rank_color(rank_name: str) -> str:

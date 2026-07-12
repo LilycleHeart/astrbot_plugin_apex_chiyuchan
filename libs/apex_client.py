@@ -14,6 +14,11 @@ class NameToUIDResult:
         self.name = data.get("name", "")
         self.uid = str(data.get("uid", ""))
         self.avatar = data.get("avatar", "")
+        self.platform = data.get("platform", "")
+
+    @property
+    def display(self) -> str:
+        return f"{self.name} (UID: {self.uid})"
 
 
 class PlayerStats:
@@ -37,6 +42,7 @@ class PlayerStats:
         self.rank_score = rank.get("rankScore", 0)
         self.rank_img = rank.get("rankImg", "")
         self.rank_top_pct = rank.get("ALStopPercent", 0)
+        self.rank_ladder_pos = rank.get("ladderPos", 0)
 
         self.state = realtime.get("currentState", "offline")
         self.selected_legend = realtime.get("selectedLegend", "")
@@ -77,6 +83,17 @@ class PlayerStats:
             return None
 
     @staticmethod
+    def _fix_legend_icon(url: str, name: str) -> str:
+        """Convert API icon URLs to working ALS URLs."""
+        if not url:
+            return f"https://apexlegendsstatus.com/assets/legends-select/{name.lower()}.png"
+        # api.mozambiquehe.re/assets/icons/ → apexlegendsstatus.com/assets/legends-select/
+        if "api.mozambiquehe.re/assets/icons/" in url:
+            filename = url.rsplit("/", 1)[-1]
+            return f"https://apexlegendsstatus.com/assets/legends-select/{filename}"
+        return url
+
+    @staticmethod
     def _extract_top_legends(legends: dict) -> list[dict]:
         result = []
         all_legends = legends.get("all", {})
@@ -85,14 +102,18 @@ class PlayerStats:
                 continue
             kills = 0
             for tracker in info.get("data", []):
-                if "kills" in tracker.get("key", "").lower() and "season" not in tracker.get("key", "").lower():
+                if (
+                    "kills" in tracker.get("key", "").lower()
+                    and "season" not in tracker.get("key", "").lower()
+                ):
                     kills = max(kills, tracker.get("value", 0))
             if kills > 0:
-                icon = info.get("ImgAssets", {}).get("icon", "")
+                icon = PlayerStats._fix_legend_icon(
+                    info.get("ImgAssets", {}).get("icon", ""), legend_name
+                )
                 result.append({"name": legend_name, "kills": kills, "icon": icon})
         result.sort(key=lambda x: x["kills"], reverse=True)
         return result[:3]
-
 
     @staticmethod
     def _extract_selected_legend(legends: dict) -> dict | None:
@@ -100,14 +121,18 @@ class PlayerStats:
         name = sel.get("LegendName", "")
         if not name:
             return None
-        icon = sel.get("ImgAssets", {}).get("icon", "")
+        icon = PlayerStats._fix_legend_icon(
+            sel.get("ImgAssets", {}).get("icon", ""), name
+        )
         stats = []
         for tracker in sel.get("data", []):
             if not tracker.get("global", False):
-                stats.append({
-                    "name": tracker.get("name", ""),
-                    "value": tracker.get("value", 0),
-                })
+                stats.append(
+                    {
+                        "name": tracker.get("name", ""),
+                        "value": tracker.get("value", 0),
+                    }
+                )
         return {"name": name, "icon_url": icon, "stats": stats}
 
 
@@ -118,6 +143,10 @@ class MapData:
         self.remaining_timer = data.get("remainingTimer", "")
         self.remaining_mins = data.get("remainingMins", 0)
         self.asset = data.get("asset", "")
+        self.start = data.get("start", 0)          # Unix timestamp
+        self.end = data.get("end", 0)              # Unix timestamp
+        self.readableDate_start = data.get("readableDate_start", "")
+        self.readableDate_end = data.get("readableDate_end", "")
 
 
 class LTMMode:
@@ -125,6 +154,10 @@ class LTMMode:
         self.event_name = data.get("eventName", "")
         self.map = data.get("map", "")
         self.remaining_timer = data.get("remainingTimer", "")
+        self.start = data.get("start", 0)
+        self.end = data.get("end", 0)
+        self.readableDate_start = data.get("readableDate_start", "")
+        self.readableDate_end = data.get("readableDate_end", "")
 
 
 class MapRotation:
@@ -132,6 +165,7 @@ class MapRotation:
         br = data.get("battle_royale", {})
         ranked = data.get("ranked", {})
         ltm = data.get("ltm", {})
+        wildcard = data.get("wildcard", {})
 
         self.br_current = MapData(br.get("current", {}))
         self.br_next = MapData(br.get("next", {}))
@@ -142,11 +176,15 @@ class MapRotation:
         self.ltm_current = LTMMode(ltm.get("current", {}))
         self.ltm_next = LTMMode(ltm.get("next", {}))
 
+        self.wildcard_current = MapData(wildcard.get("current", {}))
+        self.wildcard_next = MapData(wildcard.get("next", {}))
+
 
 class PlatformData:
     def __init__(self, data: dict):
         self.predator_cap = data.get("val", 0)
         self.masters_and_preds = data.get("totalMastersAndPreds", 0)
+        self.rp_change_24h: int | None = data.get("rp_change_24h")
 
 
 class PredatorData:
@@ -160,13 +198,64 @@ class PredatorData:
         }
 
 
+_PREDATOR_ALS_URL = "https://apexlegendsstatus.com/points-for-predator"
+
+
+async def _fill_predator_changes(pred: PredatorData, client) -> None:
+    """从 ALS 页面抓取各平台 24h 变动值并填入 PredatorData.platforms"""
+    import re
+    try:
+        resp = await client.get(_PREDATOR_ALS_URL, timeout=10)
+        resp.raise_for_status()
+        html = resp.text
+    except Exception:
+        return  # 静默失败，变动值保持 None
+
+    # ALS 页面平台顺序：PC, Playstation, Xbox, Switch
+    als_plat_names = ["PC", "Playstation", "Xbox", "Switch"]
+    api_keys = ["PC", "PS4", "X1", "SWITCH"]
+
+    for als_name, api_key in zip(als_plat_names, api_keys):
+        # 每个平台在一个 col-sm-3 容器里
+        # 查找 <p>平台名</p> 之后最近的 change span
+        # ALS 页面格式：<span style="color: red">▼</span>&nbsp;41,637 in 24h
+        #              <span style="color: green">▲</span>&nbsp;12,345 in 24h
+        #              <span style="color: gray">=</span>  (Switch 无变动)
+        pat = re.compile(
+            re.escape(als_name)
+            + r'.*?<span[^>]*style="color:\s*(red|green|gray)"[^>]*>[^<]*</span>\s*(?:&nbsp;)?([\d,]+)\s*in\s+24h',
+            re.DOTALL,
+        )
+        m = pat.search(html)
+        if m:
+            color = m.group(1)
+            if color in ("green", "red"):
+                raw = m.group(2).replace(",", "")
+                change = int(raw) if color == "green" else -int(raw)
+            else:
+                change = 0  # gray "=" 表示无变动
+        else:
+            # 试试只匹配 = （Switch 可能只有等号）
+            eq_pat = re.compile(re.escape(als_name) + r'.*?<span[^>]*color:\s*gray"[^>]*>=</span>', re.DOTALL)
+            if eq_pat.search(html):
+                change = 0
+            else:
+                continue
+
+        plat = pred.platforms.get(api_key)
+        if plat is not None and change is not None:
+            plat.rp_change_24h = change
+
+
 class ServerInfo:
     def __init__(self, name: str, data: dict):
         self.name = name
         # API may return "Status", "status", or only have ResponseTime
         raw_status = data.get("Status") or data.get("status") or ""
-        self.status = str(raw_status).upper() if raw_status else (
-            "UP" if data.get("ResponseTime", 0) > 0 else "UNKNOWN"
+        self.status = (
+            str(raw_status).upper()
+            if raw_status
+            else ("UP" if data.get("ResponseTime", 0) > 0 else "UNKNOWN")
         )
         self.response_time = data.get("ResponseTime", 0)
         self.https_code = data.get("HTTPSResponseCode", 0)
@@ -189,16 +278,19 @@ class ServerInfo:
     @property
     def display_name(self) -> str:
         name = self.name.rsplit(".", 1)[-1] if "." in self.name else self.name
-        return name.replace("_", " ") \
-                   .replace("Origin login", "Origin Login") \
-                   .replace("EA novafusion", "EA Novafusion") \
-                   .replace("EA accounts", "EA Accounts") \
-                   .replace("EA datacenter", "EA Datacenter")
+        return (
+            name.replace("_", " ")
+            .replace("Origin login", "Origin Login")
+            .replace("EA novafusion", "EA Novafusion")
+            .replace("EA accounts", "EA Accounts")
+            .replace("EA datacenter", "EA Datacenter")
+        )
 
 
 class ServerStatus:
     def __init__(self, data: dict):
         self.servers: list[ServerInfo] = []
+        self.als = None  # AlsServerStatus from ALS website scraper
         self._parse(data)
         self.servers.sort(key=lambda s: (not s.is_up, s.name))
 
@@ -227,6 +319,8 @@ class ApexClient:
                 base_url=BASE_URL,
                 timeout=httpx.Timeout(15.0),
                 headers={"Authorization": self.api_key},
+                http2=True,
+                limits=httpx.Limits(max_keepalive_connections=20),
             )
         return self._client
 
@@ -245,29 +339,52 @@ class ApexClient:
             logger.error(f"[ApexClient] HTTP {e.response.status_code} for {endpoint}")
             raise
         except Exception as e:
-            logger.error(f"[ApexClient] Request failed: {e}")
+            logger.error(f"[ApexClient] Request failed ({type(e).__name__}): {e}")
             raise
 
-    async def name_to_uid(self, name: str, platform: str = "PC") -> Optional[NameToUIDResult]:
+    async def name_to_uid(
+        self, name: str, platform: str = "PC"
+    ) -> Optional[NameToUIDResult]:
+        """返回单个最佳匹配, 用于向后兼容"""
+        results = await self.name_to_uid_all(name, platform)
+        return results[0] if results else None
+
+    async def name_to_uid_all(
+        self, name: str, platform: str = "PC"
+    ) -> list[NameToUIDResult]:
+        """返回所有匹配的玩家"""
         try:
             data = await self._get("/nametouid", {"player": name, "platform": platform})
-            if not data.get("uid"):
-                return None
-            return NameToUIDResult(data)
+            results = data if isinstance(data, list) else [data]
+            return [NameToUIDResult(r) for r in results if r.get("uid")]
         except Exception:
-            return None
+            return []
+
+    async def search_player(
+        self, name: str, platform: str = "PC"
+    ) -> list[NameToUIDResult]:
+        """搜索结果 + 猜测可能的名字（ALS 网站搜索用）"""
+        results = await self.name_to_uid_all(name, platform)
+        if results:
+            return results
+        # 名字匹配不到，尝试去掉特殊字符
+        cleaned = name.replace(" ", "").replace("_", "")
+        if cleaned != name:
+            return await self.name_to_uid_all(cleaned, platform)
+        return []
 
     async def get_stats(self, uid: str, platform: str = "PC") -> Optional[PlayerStats]:
         try:
             from .ttl_cache import get as cache_get, set as cache_set
+
             cache_key = f"stats:{platform}:{uid}"
             cached = await cache_get(cache_key)
             if cached is not None:
                 return PlayerStats(cached)
 
-            data = await self._get("/bridge", {
-                "uid": uid, "platform": platform, "merge": "1"
-            })
+            data = await self._get(
+                "/bridge", {"uid": uid, "platform": platform, "merge": "1"}
+            )
             stats = PlayerStats(data) if data else None
             if data:
                 await cache_set(cache_key, data, 60)
@@ -278,6 +395,7 @@ class ApexClient:
     async def get_map_rotation(self) -> Optional[MapRotation]:
         try:
             from .ttl_cache import get as cache_get, set as cache_set
+
             cache_key = "map_rotation"
             cached = await cache_get(cache_key)
             if cached is not None:
@@ -293,6 +411,7 @@ class ApexClient:
     async def get_predator(self) -> Optional[PredatorData]:
         try:
             from .ttl_cache import get as cache_get, set as cache_set
+
             cache_key = "predator"
             cached = await cache_get(cache_key)
             if cached is not None:
@@ -301,34 +420,34 @@ class ApexClient:
             data = await self._get("/predator")
             if data:
                 await cache_set(cache_key, data, 600)
-            return PredatorData(data) if data else None
+
+            pred = PredatorData(data) if data else None
+            if pred:
+                # 从 ALS 页面抓取 24h 变动值
+                await _fill_predator_changes(pred, self._client if self._client else await self._get_client())
+            return pred
         except Exception:
             return None
 
-    async def get_server_status(self) -> Optional[ServerStatus]:
-        try:
-            from .ttl_cache import get as cache_get, set as cache_set
-            cache_key = "server_status"
-            cached = await cache_get(cache_key)
-            if cached is not None:
-                return ServerStatus(cached)
+    async def get_server_status(self):
+        """从 ALS 网站获取服务器状态"""
+        from .als_scraper import scrape_als_server_status
 
-            data = await self._get("/servers")
-            if data:
-                logger.info(f"[ApexClient] Server status raw keys: {list(data.keys())[:5]}")
-                await cache_set(cache_key, data, 120)
-                result = ServerStatus(data)
-                logger.info(f"[ApexClient] Parsed {len(result.servers)} servers")
+        try:
+            als = await scrape_als_server_status()
+            if als:
+                result = ServerStatus({})
+                result.als = als
                 return result
             return None
         except Exception:
-            logger.error(f"[ApexClient] Failed to get server status", exc_info=True)
+            logger.error("[ApexClient] Failed to get server status", exc_info=True)
             return None
-
 
     async def get_rank_distribution(self) -> Optional[RankDistribution]:
         try:
             from .ttl_cache import get as cache_get, set as cache_set
+
             cache_key = "rank_distribution"
             cached = await cache_get(cache_key)
             if cached is not None:
@@ -376,15 +495,26 @@ class RankDistribution:
             if not raw_name:
                 continue
             major = raw_name.split(" ")[0]
+            # API 返回 "Apex Predator"，映射为 "Predator"
+            if major == "Apex":
+                major = "Predator"
             if major in major_map:
                 prev_color, prev_pct, prev_count = major_map[major]
                 major_map[major] = (color, prev_pct + pct, prev_count + count)
             else:
                 major_map[major] = (color, pct, count)
 
-        tier_order = ["Rookie", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Master", "Predator"]
+        tier_order = [
+            "Rookie",
+            "Bronze",
+            "Silver",
+            "Gold",
+            "Platinum",
+            "Diamond",
+            "Master",
+            "Predator",
+        ]
         for tier in tier_order:
             if tier in major_map:
                 color, pct, count = major_map[tier]
                 self.entries.append(RankDistEntry(tier, color, round(pct, 2), count))
-
