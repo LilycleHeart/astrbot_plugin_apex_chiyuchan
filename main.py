@@ -167,19 +167,47 @@ class XiaoChiyu(Star):
         above += tier_count * (div - 1) / 4
         return round(above / total * 100, 2)
 
-    def _extract_at_target(self, args: str) -> tuple[str | None, str]:
-        """从参数字符串中提取 @QQ，返回 (target_qq, cleaned_args)。"""
-        m = re.search(r'\[CQ:at,qq=(\d+)\]', args)
-        if m:
-            target = m.group(1)
-            cleaned = args.replace(m.group(0), "").strip()
-            return target, cleaned
-        m = re.search(r'@(\d+)', args)
-        if m:
-            target = m.group(1)
-            cleaned = args.replace(m.group(0), "").strip()
-            return target, cleaned
-        return None, args
+    def _extract_at_target(self, event: AstrMessageEvent, args: str) -> tuple[str | None, str]:
+        """从消息中提取 @QQ，返回 (target_qq, cleaned_args)。
+        优先从消息链的 At 消息段提取，兼容 CQ 码格式。
+        args 是已经移除命令名的参数字符串。
+        自身 QQ 会被忽略（@机器人只是触发命令，不是指定目标）。"""
+        import astrbot.api.message_components as Comp
+        
+        target_qq = None
+        self_qq = event.get_self_id()
+        
+        # 从消息链提取 At 消息段（跳过 @机器人 自身）
+        msg_obj = event.message_obj
+        if msg_obj and hasattr(msg_obj, 'message'):
+            for seg in msg_obj.message:
+                if isinstance(seg, Comp.At):
+                    qq = str(seg.qq)
+                    if qq != self_qq:
+                        target_qq = qq
+                        break
+        
+        # 从纯文本中提取 CQ 码或 @数字 格式（兜底），同样跳过自身
+        if not target_qq:
+            m = re.search(r'\[CQ:at,qq=(\d+)\]', args)
+            if m:
+                qq = m.group(1)
+                if qq != self_qq:
+                    target_qq = qq
+            else:
+                m = re.search(r'@(\d+)', args)
+                if m:
+                    qq = m.group(1)
+                    if qq != self_qq:
+                        target_qq = qq
+        
+        # 从纯文本中移除 @相关内容
+        cleaned = re.sub(r'\[CQ:at,qq=\d+\]', '', args).strip()
+        cleaned = re.sub(r'@\d+', '', cleaned).strip()
+        # 移除 @昵称(数字) 格式
+        cleaned = re.sub(r'@\S+\(\d+\)', '', cleaned).strip()
+        
+        return target_qq, cleaned
 
     async def _resolve_admin_target(
         self, event: AstrMessageEvent, args: str
@@ -188,7 +216,7 @@ class XiaoChiyu(Star):
         Returns (target_qq, cleaned_args, error_msg).
         若 non-admin 使用 @目标，返回 (None, cleaned_args, 错误消息)。
         """
-        target_qq, cleaned = self._extract_at_target(args)
+        target_qq, cleaned = self._extract_at_target(event, args)
         if target_qq and not event.is_admin():
             return None, cleaned, "只有管理员才能为他人操作"
         return target_qq or event.get_sender_id(), cleaned, None
@@ -300,11 +328,11 @@ class XiaoChiyu(Star):
             return
         platform = platform.upper()
         msg = event.get_message_str().strip()
-        _, rest, err = await self._resolve_admin_target(event, msg)
+        rest = msg.split(maxsplit=1)[1] if " " in msg else ""
+        qq_id, _, err = await self._resolve_admin_target(event, rest)
         if err:
             yield event.plain_result(err)
             return
-        qq_id, _, _ = await self._resolve_admin_target(event, msg)
         stats = await self.apex.get_stats(uid, platform)
         if not stats:
             yield event.plain_result(f"找不到 UID '{uid}'")
@@ -334,23 +362,25 @@ class XiaoChiyu(Star):
 
     @filter.command("stats", alias={"战绩", "查询", "profile", "卡片"})
     async def cmd_stats(self, event: AstrMessageEvent):
-        """查询 Apex 战绩 — /stats [玩家名或UID]"""
+        """查询 Apex 战绩 — /stats [玩家名或UID] [@目标]"""
         qq_id = event.get_sender_id()
         msg = event.get_message_str().strip()
-        name = msg.split(maxsplit=1)[1] if " " in msg else ""
+        rest = msg.split(maxsplit=1)[1] if " " in msg else ""
 
-        if name:
-            # 处理 @提及：查对方绑定
-            at_match = re.search(r'\[CQ:at,qq=(\d+)\]', name) or re.search(r'@(\d+)', name)
-            if at_match:
-                target_qq = at_match.group(1)
-                target_user = await self.db.get_user(target_qq)
-                if not target_user:
-                    yield event.plain_result("对方未绑定 Apex 账号")
-                    return
-                uid = target_user["uid"]
-                platform = target_user.get("platform", "PC")
-            elif name.strip().isdigit():
+        # 提取 @目标
+        target_qq, cleaned = self._extract_at_target(event, rest)
+        name = cleaned.strip()
+
+        if target_qq:
+            # @某人：查对方绑定
+            target_user = await self.db.get_user(target_qq)
+            if not target_user:
+                yield event.plain_result("对方未绑定 Apex 账号")
+                return
+            uid = target_user["uid"]
+            platform = target_user.get("platform", "PC")
+        elif name:
+            if name.strip().isdigit():
                 idx = int(name.strip())
                 cached = self._last_search.get(qq_id, [])
                 if 1 <= idx <= len(cached):
@@ -382,7 +412,6 @@ class XiaoChiyu(Star):
                         return
                     uid = api_results[0].uid
                     platform = "PC"
-                platform = "PC"
         else:
             user = await self.db.get_user(qq_id)
             if not user:
@@ -408,7 +437,8 @@ class XiaoChiyu(Star):
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
         # ── 构建渲染数据 ──
-        qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+        display_qq = target_qq or qq_id
+        qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={display_qq}&s=640"
         _lv = badges.get("level") or stats.level
         _pr = badges.get("prestige") or stats.prestige
         global_pct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
@@ -1044,7 +1074,8 @@ class XiaoChiyu(Star):
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
-        qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={qq_id}&s=640"
+        display_qq = target_qq.strip() if target_qq.strip() else qq_id
+        qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={display_qq}&s=640"
         _lv2 = badges.get("level") or stats.level
         _pr2 = badges.get("prestige") or stats.prestige
         global_pct = badges.get("rankTopPct") or self._calc_global_pct(stats.rank_name, stats.rank_div, rank_dist) or stats.rank_top_pct
