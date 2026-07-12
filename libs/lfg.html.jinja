@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex Legends 找队友</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&family=Noto+Sans+SC:wght@400;500;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<style>
+:root {
+  --md-primary: #A8C8FF;
+  --md-on-primary: #002F65;
+  --md-primary-container: #00458C;
+  --md-on-primary-container: #A8C8FF;
+  --md-secondary-container: #324560;
+  --md-on-secondary-container: #D4E3FC;
+  --md-surface: #101419;
+  --md-on-surface: #E0E2E9;
+  --md-surface-variant: #43474F;
+  --md-on-surface-variant: #C3C6CF;
+  --md-outline-variant: #43474F;
+  --md-surface-container-low: #1A1D24;
+  --md-surface-container: #1E2228;
+  --md-surface-container-high: #282C34;
+  --md-success: #7DD87D;
+  --md-error: #F2B8B5;
+  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.6), 0 2px 6px 2px rgba(0,0,0,0.4);
+}
+
+body.light {
+  --md-primary: #1565C0;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #D4E3FC;
+  --md-on-primary-container: #0B1A30;
+  --md-secondary-container: #D4E3FC;
+  --md-on-secondary-container: #0B1A30;
+  --md-surface: #F8FAFF;
+  --md-on-surface: #181B20;
+  --md-surface-variant: #DDE3F0;
+  --md-on-surface-variant: #43474F;
+  --md-outline-variant: #C3C6CF;
+  --md-surface-container-low: #EFF2F9;
+  --md-surface-container: #E9ECF4;
+  --md-surface-container-high: #E3E6EE;
+  --md-success: #2E7D32;
+  --md-error: #B3261E;
+  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Roboto Flex', 'Noto Sans SC', 'Roboto', system-ui, sans-serif;
+  background: transparent;
+  color: var(--md-on-surface);
+  display: flex;
+  justify-content: center;
+  padding: 32px 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.lfg-list {
+  width: 100%;
+  max-width: 1280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--md-surface-container-low);
+  border-radius: 28px;
+  padding: 8px 0;
+  box-shadow: var(--md-shadow-2);
+  border: 1px solid color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.list-header {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 0.8fr 0.5fr 0.5fr;
+  padding: 0 32px 16px 32px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  align-items: center;
+  gap: 16px;
+}
+
+.list-header > div { text-align: center; }
+.list-header > div:first-child { text-align: left; }
+.list-header > div:nth-child(2) { text-align: left; }
+.list-header > div:nth-child(3) { text-align: left; }
+
+.player-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 0.8fr 0.5fr 0.5fr;
+  align-items: center;
+  background: var(--md-surface-container);
+  padding: 20px 32px;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  gap: 16px;
+}
+
+.player-row:hover {
+  background: var(--md-surface-container-high);
+  transform: translateY(-2px);
+  border-color: var(--md-outline-variant);
+}
+
+.col-player { display: flex; align-items: center; gap: 18px; }
+
+.avatar {
+  width: 52px; height: 52px; border-radius: 14px;
+  object-fit: cover; flex-shrink: 0;
+}
+
+.player-info { display: flex; flex-direction: column; gap: 4px; }
+
+.player-name {
+  font-weight: 700; font-size: 1rem;
+  color: var(--md-on-surface);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;
+}
+
+.status-tag {
+  font-size: 0.7rem;
+  color: var(--md-on-surface-variant);
+  display: flex; align-items: center; gap: 4px;
+}
+
+.col-rank { display: flex; align-items: center; gap: 14px; }
+.rank-icon { width: 44px; height: 44px; flex-shrink: 0; }
+
+.rank-text {
+  display: flex; flex-direction: column; gap: 2px;
+  white-space: nowrap;
+}
+
+.rank-score {
+  font-weight: 700; font-size: 1.15rem;
+  color: var(--md-on-surface);
+}
+
+.rank-label {
+  font-size: 0.78rem;
+  color: var(--md-on-surface-variant);
+}
+
+.col-wants { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.md3-chip {
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+
+.chip-highlight {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.col-data {
+  font-weight: 700; font-size: 1.1rem;
+  text-align: center; white-space: nowrap;
+  color: var(--md-on-surface);
+}
+
+.text-predator { color: #ffb4ab; }
+.text-master { color: #d0bcff; }
+.text-diamond { color: #bac3ff; }
+.text-platinum { color: #99f1ff; }
+.text-gold { color: #ffd966; }
+.text-silver { color: #c0c0c0; }
+.text-bronze { color: #cd7f32; }
+.text-unranked { color: var(--md-on-surface-variant); }
+
+.footer {
+  padding: 16px 32px 0 32px;
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  display: flex; justify-content: space-between;
+  border-top: 1px solid var(--md-outline-variant);
+  margin-top: 8px;
+}
+</style>
+</head>
+<body class="{{ theme }}">
+<div class="lfg-list">
+  <div class="list-header">
+    <div>玩家</div>
+    <div>段位 / 分数</div>
+    <div>寻找队友</div>
+    <div>等级</div>
+    <div>击杀数</div>
+  </div>
+
+  {% for p in players %}
+  <div class="player-row">
+    <div class="col-player">
+      <img class="avatar" src="{{ p.avatar }}" alt="">
+      <div class="player-info">
+        <div class="player-name" title="{{ p.display_name }}">{{ p.display_name }}</div>
+        <div class="status-tag">{{ p.dot_icon }} {{ p.state_text }} · {{ p.platform }}</div>
+      </div>
+    </div>
+    <div class="col-rank">
+      <img class="rank-icon" src="{{ p.rank_img }}" alt="{{ p.rank_name }}">
+      <div class="rank-text">
+        <span class="rank-score text-{{ p.rank_type }}">{{ p.rank_score_fmt }}</span>
+        <span class="rank-label">{{ p.rank_display }}</span>
+      </div>
+    </div>
+    <div class="col-wants">
+      <div class="md3-chip {{ p.chip_class }}">{{ p.chip_icon }} {{ p.mode_label }}</div>
+    </div>
+    <div class="col-data">{{ p.level }}</div>
+    <div class="col-data">{{ p.kills_fmt }}</div>
+  </div>
+  {% endfor %}
+
+  {% if not players %}
+  <div style="text-align:center;padding:40px;color:var(--md-on-surface-variant);">目前没有玩家在线发起组队</div>
+  {% endif %}
+
+  <div class="footer">
+    <span>Data: apexlegendsstatus.com</span>
+    <span>auth.赤羽真白 · Apex Chiyuchan</span>
+  </div>
+</div>
+</body>
+</html>

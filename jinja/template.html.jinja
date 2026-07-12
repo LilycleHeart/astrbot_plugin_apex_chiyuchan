@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }} - Steam Charts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --md-primary: #1565C0;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #D4E3FC;
+  --md-on-primary-container: #0B1A30;
+  --md-secondary-container: #D4E3FC;
+  --md-on-secondary-container: #0B1A30;
+  --md-tertiary-container: #BCEBEC;
+  --md-on-tertiary-container: #002022;
+  --md-surface: #F8FAFF;
+  --md-on-surface: #181B20;
+  --md-surface-variant: #DDE3F0;
+  --md-on-surface-variant: #43474F;
+  --md-outline-variant: #C3C6CF;
+  --md-surface-container-low: #EFF2F9;
+  --md-surface-container: #E9ECF4;
+  --md-surface-container-high: #E3E6EE;
+  --md-surface-container-highest: #DDE0E8;
+  --md-success: #2E7D32;
+  --md-shadow-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-primary: #A8C8FF;
+    --md-on-primary: #002F65;
+    --md-primary-container: #00458C;
+    --md-on-primary-container: #A8C8FF;
+    --md-secondary-container: #324560;
+    --md-on-secondary-container: #D4E3FC;
+    --md-tertiary-container: #1F4D51;
+    --md-on-tertiary-container: #BCEBEC;
+    --md-surface: #101419;
+    --md-on-surface: #E0E2E9;
+    --md-surface-variant: #43474F;
+    --md-on-surface-variant: #C3C6CF;
+    --md-outline-variant: #43474F;
+    --md-surface-container-low: #1A1D24;
+    --md-surface-container: #1E2228;
+    --md-surface-container-high: #282C34;
+    --md-surface-container-highest: #32363E;
+    --md-success: #7DD87D;
+    --md-shadow-1: 0 1px 2px rgba(0,0,0,0.6), 0 1px 3px 1px rgba(0,0,0,0.4);
+    --md-shadow-2: 0 1px 2px rgba(0,0,0,0.6), 0 2px 6px 2px rgba(0,0,0,0.4);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  font-family: 'Roboto Flex', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: radial-gradient(ellipse at top, color-mix(in srgb, var(--md-primary) 8%, var(--md-surface)), var(--md-surface) 60%);
+  color: var(--md-on-surface);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  background: var(--md-surface-container-low);
+  border-radius: 28px;
+  box-shadow: var(--md-shadow-2);
+  overflow: hidden;
+  max-width: 520px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  pointer-events: none;
+}
+
+.hero-stat { padding: 28px 24px 20px 24px; }
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+}
+
+.hero-value {
+  font-size: 56px;
+  font-weight: 300;
+  color: var(--md-primary);
+  line-height: 1.05;
+  margin-top: 6px;
+  letter-spacing: -2px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hero-unit {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--md-on-surface-variant);
+  letter-spacing: 0;
+}
+
+.hero-meta {
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  margin-top: 8px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 16px 16px 16px;
+}
+
+.stat-item {
+  padding: 14px 16px;
+  background: var(--md-surface-container);
+  border-radius: 16px;
+}
+
+.stat-item .stat-label { font-size: 11px; }
+
+.stat-item .stat-value {
+  font-size: 18px;
+  color: var(--md-on-surface);
+  font-weight: 500;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+
+.chart-section { padding: 8px 16px 24px 16px; }
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 12px 8px;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.chart-badge {
+  font-size: 11px;
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.chart-container {
+  position: relative;
+  height: 200px;
+  padding: 0 8px;
+}
+
+.attribution {
+  padding: 14px 24px 20px 24px;
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  border-top: 1px solid var(--md-outline-variant);
+  line-height: 1.5;
+}
+
+.attribution a {
+  color: var(--md-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.attribution a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="hero-stat">
+    <div class="stat-label">当前在线人数</div>
+    <div class="hero-value"><span id="current">{{ current_formatted }}</span><span class="hero-unit">人</span></div>
+    <div class="hero-meta">更新于 {{ updated_local }}</div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-label">24 小时峰值</div>
+      <div class="stat-value">{{ peak_24h_formatted }}</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">历史峰值</div>
+      <div class="stat-value">{{ peak_all_formatted }}</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-header">
+      <div class="chart-title">7 日在线人数趋势</div>
+      <div class="chart-badge">{{ point_count }} 数据点</div>
+    </div>
+    <div class="chart-container">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
+
+  <div class="attribution">
+    数据来源 <a href="https://steamcharts.com/app/{{ app_id }}" target="_blank" rel="noopener">steamcharts.com</a> · 不隶属于 Valve
+  </div>
+</div>
+
+<script>
+const CHART_DATA = {{ data | safe }};
+const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const hour = String(d.getHours()).padStart(2, '0');
+  const minute = String(d.getMinutes()).padStart(2, '0');
+  return month + '/' + day + ' ' + hour + ':' + minute;
+}
+
+const ctx = document.getElementById('trendChart').getContext('2d');
+const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+if (isDark) {
+  gradient.addColorStop(0, 'rgba(168, 200, 255, 0.35)');
+  gradient.addColorStop(1, 'rgba(168, 200, 255, 0.02)');
+} else {
+  gradient.addColorStop(0, 'rgba(21, 101, 192, 0.25)');
+  gradient.addColorStop(1, 'rgba(21, 101, 192, 0.02)');
+}
+
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: CHART_DATA.map(d => formatDate(d[0])),
+    datasets: [{
+      data: CHART_DATA.map(d => d[1]),
+      borderColor: isDark ? '#A8C8FF' : '#1565C0',
+      backgroundColor: gradient,
+      fill: true,
+      tension: 0.35,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      pointHoverBackgroundColor: isDark ? '#A8C8FF' : '#1565C0',
+      pointHoverBorderColor: isDark ? '#101419' : '#F8FAFF',
+      pointHoverBorderWidth: 2,
+      borderWidth: 2,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { intersect: false, mode: 'index' },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: isDark ? '#282C34' : '#1E2228',
+        titleColor: '#FFFFFF',
+        bodyColor: '#FFFFFF',
+        padding: 12,
+        cornerRadius: 12,
+        displayColors: false,
+        titleFont: { size: 11, weight: '500' },
+        bodyFont: { size: 14, weight: '500' },
+        margin: 8,
+        callbacks: {
+          title: items => items[0].label,
+          label: item => '在线 ' + item.parsed.y.toLocaleString() + ' 人'
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { color: isDark ? '#43474F' : '#C3C6CF' },
+        ticks: {
+          color: isDark ? '#C3C6CF' : '#43474F',
+          font: { size: 10 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 8,
+        }
+      },
+      y: {
+        grid: { color: isDark ? 'rgba(67, 71, 79, 0.5)' : 'rgba(67, 71, 79, 0.18)' },
+        border: { display: false },
+        ticks: {
+          color: isDark ? '#C3C6CF' : '#43474F',
+          font: { size: 10 },
+          callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

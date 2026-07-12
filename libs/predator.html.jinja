@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex Legends 猎杀者分数线</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --md-primary: #A8C8FF;
+  --md-on-primary: #002F65;
+  --md-primary-container: #00458C;
+  --md-on-primary-container: #A8C8FF;
+  --md-secondary-container: #324560;
+  --md-on-secondary-container: #D4E3FC;
+  --md-surface: #101419;
+  --md-on-surface: #E0E2E9;
+  --md-surface-variant: #43474F;
+  --md-on-surface-variant: #C3C6CF;
+  --md-outline-variant: #43474F;
+  --md-surface-container-low: #1A1D24;
+  --md-surface-container: #1E2228;
+  --md-surface-container-high: #282C34;
+  --md-success: #7DD87D;
+  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.6), 0 2px 6px 2px rgba(0,0,0,0.4);
+}
+
+body.light {
+  --md-primary: #1565C0;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #D4E3FC;
+  --md-on-primary-container: #0B1A30;
+  --md-secondary-container: #D4E3FC;
+  --md-on-secondary-container: #0B1A30;
+  --md-surface: #F8FAFF;
+  --md-on-surface: #181B20;
+  --md-surface-variant: #DDE3F0;
+  --md-on-surface-variant: #43474F;
+  --md-outline-variant: #C3C6CF;
+  --md-surface-container-low: #EFF2F9;
+  --md-surface-container: #E9ECF4;
+  --md-surface-container-high: #E3E6EE;
+  --md-success: #2E7D32;
+  --md-shadow-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  font-family: 'Roboto Flex', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: transparent;
+  color: var(--md-on-surface);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  background: var(--md-surface-container-low);
+  border-radius: 28px;
+  box-shadow: var(--md-shadow-2);
+  overflow: hidden;
+  max-width: 560px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding: 20px 16px 10px;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.card-header {
+  padding: 0 4px 14px;
+  position: relative;
+  z-index: 2;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  letter-spacing: -0.3px;
+}
+
+.card-subtitle {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+}
+
+.pred-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  position: relative;
+  z-index: 2;
+}
+
+.pred-cell {
+  background: var(--md-surface-container);
+  border-radius: 18px;
+  padding: 12px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pred-platform {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--md-on-surface);
+  text-transform: uppercase;
+}
+
+.pred-rp-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+}
+
+.pred-rp {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: nowrap;
+}
+
+.pred-rp .digit {
+  height: 96px;
+  width: auto;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+.pred-rp-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  margin-left: 4px;
+  align-self: flex-end;
+  margin-bottom: 6px;
+}
+
+.pred-change {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.pred-change.up { color: var(--md-primary); }
+.pred-change.down { color: #B3261E; }
+.pred-change.flat { color: var(--md-on-surface-variant); }
+
+.pred-count-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.pred-count-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+}
+
+.pred-count {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.pred-count .digit {
+  height: 64px;
+  width: auto;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+.pred-count-suffix {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+.pred-count-text {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--md-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.attribution {
+  padding: 10px 8px 2px;
+  font-size: 9px;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  line-height: 1.4;
+  position: relative;
+  z-index: 2;
+}
+
+.attribution a {
+  color: var(--md-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.attribution a:hover { text-decoration: underline; }
+</style>
+</head>
+<body class="{{ theme }}">
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">猎杀者分数线</div>
+    <div class="card-subtitle">Battle Royale · 当前赛季</div>
+  </div>
+
+  <div class="pred-grid">
+    {%- for p in platforms %}
+    <div class="pred-cell">
+      <div class="pred-platform">{{ p.name }}</div>
+      
+      <div class="pred-rp-section">
+        <div class="pred-rp-label">猎杀者分数线</div>
+        <div class="pred-rp">
+          {%- for img in p.rp_imgs %}
+          <img class="digit" src="{{ img }}" alt="*">
+          {%- endfor %}
+          <span class="pred-rp-unit">RP</span>
+        </div>
+      </div>
+
+      <div class="pred-change {{ p.change_class }}">{{ p.change_text }}</div>
+
+      <div class="pred-count-section">
+        <div class="pred-count-label">大师+猎杀人数</div>
+        <div class="pred-count-text">{{ p.count_fmt }} <span class="pred-count-suffix">人</span></div>
+      </div>
+    </div>
+    {%- endfor %}
+  </div>
+
+  <div class="attribution">
+    数据来源 <a href="https://apexlegendsstatus.com/points-for-predator" target="_blank" rel="noopener">apexlegendsstatus.com</a> · auth.赤羽真白 · Apex Chiyuchan
+  </div>
+</div>
+</body>
+</html>
