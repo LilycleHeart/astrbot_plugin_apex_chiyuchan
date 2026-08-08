@@ -326,6 +326,217 @@ def _build_rank_dist_list(
     return result
 
 
+# ── Apex 排位分段门槛（进入该档位所需最低 RP）──
+# 2024 年排位改版后的官方分档（2026-08 官方 API/ALS 实测验证）：
+# Rookie 0 · Bronze 1000 · Silver 3000 · Gold 5500 · Platinum 8500 · Diamond 12000 · Master/Predator 16000
+# （Master 与 Predator 同为 16000 起步，猎杀 = 大师中全服前 750 名）
+_TIER_STEPS = (
+    (0, "rookie4"),
+    (1000, "bronze4"),
+    (3000, "silver4"),
+    (5500, "gold4"),
+    (8500, "platinum4"),
+    (12000, "diamond4"),
+    (16000, "master"),
+)
+_TIER_ICON_BASE = "https://api.mozambiquehe.re/assets/ranks/{}.png"
+
+
+def _tier_index_for_score(score: int) -> int:
+    """返回 score 所处的档位序号（_TIER_STEPS 下标），未定级返回 -1"""
+    idx = -1
+    for i, (thr, _) in enumerate(_TIER_STEPS):
+        if score >= thr:
+            idx = i
+        else:
+            break
+    return idx
+
+
+def _build_rp_chart_html(entries: list) -> str:
+    """RP 历史折线图（SVG，区域渐变 + 首尾标注）。数据不足 2 条返回空串。
+
+    entries: [{score, at}] 按时间正序，at 为 "YYYY-MM-DD HH:MM:SS"
+    """
+    entries = entries or []
+    pts = [
+        (e.get("score"), e.get("at", ""))
+        for e in entries
+        if isinstance(e, dict) and e.get("score") is not None
+    ]
+    if len(pts) < 2:
+        return ""
+    import math
+    scores = [p[0] for p in pts]
+    dates = [p[1] for p in pts]
+    n = len(pts)
+
+    # SVG 内部 pad_l 预留 36px 作为 y 轴刻度区（刻度文字左缘与全局 28px 边距统一）
+    W, H = 664, 150
+    pad_l, pad_r, pad_t, pad_b = 36, 6, 26, 24
+    plot_w = W - pad_l - pad_r
+    plot_h = H - pad_t - pad_b
+    base_y = pad_t + plot_h
+    # Y 轴边界整数化：下界向下取整、上界向上取整到刻度步长整数倍，
+    # 折线不贴边、刻度覆盖完整范围
+    def _nice_step(lo, hi, count=4):
+        raw = ((hi - lo) or 1) / count
+        mag = 10 ** math.floor(math.log10(raw))
+        norm = raw / mag
+        return (next(n for n in (1, 2, 2.5, 5, 10) if norm <= n)) * mag
+
+    step = _nice_step(min(scores), max(scores))
+    lo = math.floor(min(scores) / step) * step
+    hi = math.ceil(max(scores) / step) * step
+    if hi - lo < step:  # 防止全同值
+        hi = lo + step
+    span = hi - lo
+
+    xs = [pad_l + i * plot_w / (n - 1) for i in range(n)]
+    ys = [pad_t + (hi - s) / span * plot_h for s in scores]
+
+    # Y 轴刻度：横向网格线 + 刻度文字（SVG 内联，随图表缩放天然对齐）
+    grid_lines = ""
+    tv = lo
+    while tv <= hi + 1e-9:
+        frac = (tv - lo) / span
+        gy = pad_t + (1 - frac) * plot_h
+        grid_lines += (
+            f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{W - pad_r}" y2="{gy:.1f}" '
+            f'stroke="var(--outline-v)" stroke-width="1"/>'
+            f'<text x="{pad_l - 6}" y="{gy + 3:.1f}" text-anchor="end" font-size="9" '
+            f'fill="var(--on-sv)" font-variant-numeric="tabular-nums">{tv:,.0f}</text>'
+        )
+        tv += step
+
+    line_d = " M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in zip(xs, ys))
+    area_d = f"{line_d} L{xs[-1]:.1f} {base_y:.1f} L{xs[0]:.1f} {base_y:.1f} Z"
+
+    # 段位分档线：显示在 [lo, hi] 内的门槛，虚线 + 档位名；大师线以上用深一档颜色
+    tier_colors = {
+        "bronze4": "#CD7F32", "silver4": "#C0C0C0", "gold4": "#FFD700",
+        "platinum4": "#4ECDC4", "diamond4": "#358DE6", "master": "#9F35E6",
+    }
+    tier_lines = ""
+    for thr, name in _TIER_STEPS:
+        if not (lo < thr <= hi):
+            continue
+        ty = pad_t + (1 - (thr - lo) / span) * plot_h
+        col = tier_colors.get(name, "var(--on-sv)")
+        major = _rank_zh(name[:-1].capitalize() if name != "master" else "Master")
+        tier_lines += (
+            f'<line x1="{pad_l}" y1="{ty:.1f}" x2="{W - pad_r}" y2="{ty:.1f}" '
+            f'stroke="{col}" stroke-opacity="0.55" stroke-width="1" stroke-dasharray="4 3"/>'
+            f'<text x="{W - pad_r - 4}" y="{ty - 3:.1f}" text-anchor="end" font-size="9" '
+            f'fill="{col}" font-weight="600" opacity="0.85">{major}</text>'
+        )
+    # 升档时刻：首次达到比历史最高档位更高的档位时，在该点上方显示段位图标
+    # （跳过 Rookie 起步档；只显示"升到新高"的时刻，降档/回档不显示）
+    peak_idx = -1
+    icons = ""
+    for i, s in enumerate(scores):
+        idx = _tier_index_for_score(s)
+        if idx > 0 and idx > peak_idx:
+            name = _TIER_STEPS[idx][1]
+            ic = 26
+            ix = xs[i] - ic / 2
+            iy = ys[i] - ic - 6
+            if ix < pad_l:
+                ix = pad_l
+            if iy < 2:
+                iy = ys[i] + 6
+            icons += (
+                f'<img src="{_TIER_ICON_BASE.format(name)}" width="{ic}" height="{ic}" '
+                f'style="position:absolute;left:{ix:.1f}px;top:{iy:.1f}px;border-radius:6px;'
+                f'background:var(--sc-low);padding:1px;'
+                f'box-shadow:0 1px 4px rgba(0,0,0,0.25);" '
+                f'loading="eager" decoding="async"/>'
+            )
+        if idx > peak_idx:
+            peak_idx = idx
+
+    # 首点数值标签：贴顶时改放点下方，避免溢出
+    lbl0_y = ys[0] - 8 if ys[0] - 8 >= 14 else ys[0] + 16
+    lbl1_y = ys[-1] - 10 if ys[-1] - 10 >= 14 else ys[-1] + 16
+
+    # X 轴：每个数据点下方标日期（MM-DD）；点数多时隔点显示防重叠
+    x_labels = ""
+    for i, d in enumerate(dates):
+        if n > 8 and i % 2 == 1 and i != n - 1:
+            continue  # 密集时只标偶数位点
+        xl = f"{d[5:10]}" if len(d) >= 10 else ""
+        x_labels += (
+            f'<text x="{xs[i]:.1f}" y="{H - 4}" text-anchor="middle" font-size="9" '
+            f'fill="var(--on-sv)" opacity="0.75" font-variant-numeric="tabular-nums">{xl}</text>'
+        )
+
+    svg = (
+        f'<svg class="rp-chart" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">'
+        "<defs>"
+        '<linearGradient id="rp-fill" x1="0" y1="0" x2="0" y2="1">'
+        '<stop offset="0%" stop-color="var(--p)" stop-opacity="0.28"/>'
+        '<stop offset="100%" stop-color="var(--p)" stop-opacity="0"/>'
+        "</linearGradient>"
+        "</defs>"
+        f"{grid_lines}"
+        f"{tier_lines}"
+        f'<path d="{area_d}" fill="url(#rp-fill)"/>'
+        f'<path d="{line_d}" fill="none" stroke="var(--p)" stroke-width="2" '
+        'stroke-linejoin="round" stroke-linecap="round"/>'
+        f'<circle cx="{xs[0]:.1f}" cy="{ys[0]:.1f}" r="3" fill="var(--p)"/>'
+        f'<circle cx="{xs[-1]:.1f}" cy="{ys[-1]:.1f}" r="4.5" fill="var(--p)" '
+        'stroke="var(--sc-low)" stroke-width="2"/>'
+        f'<text x="{xs[0]:.1f}" y="{lbl0_y:.1f}" text-anchor="start" font-size="11" '
+        f'fill="var(--on-sv)" font-variant-numeric="tabular-nums">{scores[0]:,}</text>'
+        f'<text x="{xs[-1]:.1f}" y="{lbl1_y:.1f}" text-anchor="end" font-size="12" '
+        f'font-weight="700" fill="var(--p-text)" font-variant-numeric="tabular-nums">{scores[-1]:,}</text>'
+        f"{x_labels}"
+        "</svg>"
+    )
+
+    # 升档图标为 HTML 层（绝对定位叠加在 SVG 上，随 _embed_images 一并内嵌）
+    icon_layer = (
+        f'<div style="position:relative;">{svg}{icons}</div>'
+        if icons
+        else svg
+    )
+
+    plot_wrap = icon_layer
+
+    # 24 小时内涨幅徽章：最后两个数据点间隔 ≤ 24h 时显示其差值
+    # （超过一天没查询则不显示，避免误导）
+    trend_html = ""
+    if n >= 2:
+        from datetime import datetime as _dt
+
+        def _parse(s: str):
+            try:
+                return _dt.strptime(s[:19], "%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError):
+                return None
+
+        t0, t1 = _parse(dates[-2]), _parse(dates[-1])
+        if t0 and t1 and (t1 - t0).total_seconds() <= 24 * 3600 and scores[-1] != scores[-2]:
+            diff = scores[-1] - scores[-2]
+            sign = "+" if diff > 0 else ""
+            cls = "rp-up" if diff > 0 else "rp-down"
+            arrow = "▲" if diff > 0 else "▼"
+            trend_html = (
+                f'<span class="{cls}" style="font-size:11px;font-weight:700;">'
+                f"{arrow} {sign}{diff:,} · 24h</span>"
+            )
+
+    return (
+        '<div class="rp-chart-strip">'
+        '<div class="rp-chart-head">'
+        '<span class="col-title">RP 历史</span>'
+        f"{trend_html}"
+        "</div>"
+        f"{plot_wrap}"
+        "</div>"
+    )
+
+
 def _build_stats_html(**d) -> str:
     """根据数据 dict 构建 MD3 Jinja2 战绩卡片 HTML"""
     name = d.get("name", "Unknown")
@@ -348,6 +559,7 @@ def _build_stats_html(**d) -> str:
     rank_top_pct_global = d.get("rank_top_pct_global", rank_top_pct)
     rank_ladder_pos = d.get("rank_ladder_pos", 0)
     rp_delta = d.get("rp_delta")
+    rp_history = d.get("rp_history") or []
     kills = d.get("kills", 0)
     damage = d.get("damage", 0)
     wins = d.get("wins", 0)
@@ -428,6 +640,9 @@ def _build_stats_html(**d) -> str:
     # ── 段位分布 ──
     rank_dist_ctx = _build_rank_dist_list(rank_name, rank_top_pct_global, rank_dist_entries, theme=theme)
 
+    # ── RP 历史折线图 ──
+    rp_chart_html = _build_rp_chart_html(rp_history)
+
     context = {
         "theme": theme,
         "light_theme": light_theme,
@@ -453,6 +668,7 @@ def _build_stats_html(**d) -> str:
         "wins_fmt": f"{wins:,}" if wins else "0",
         "selected_legend": selected_ctx,
         "rank_dist": rank_dist_ctx,
+        "rp_chart_html": rp_chart_html,
         "top_legends": legends_ctx,
         "season_badges": season_badges_ctx,
         "special_badges": special_badges_ctx,

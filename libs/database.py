@@ -54,11 +54,11 @@ class Database:
             );
 
             CREATE TABLE IF NOT EXISTS rp_history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 uid         TEXT NOT NULL,
                 platform    TEXT NOT NULL DEFAULT 'PC',
                 rank_score  INTEGER NOT NULL,
-                recorded_at TEXT DEFAULT (datetime('now','localtime')),
-                PRIMARY KEY (uid, platform)
+                recorded_at TEXT DEFAULT (datetime('now','localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS monitor (
@@ -88,6 +88,27 @@ class Database:
             );
         """)
         # migrate: add qq_name / group_id columns; recreate PK if old schema
+        # migrate: 旧版 rp_history 只有单条记录（(uid,platform) 主键），迁入追加式历史表
+        cursor = await conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='rp_history'"
+        )
+        row = await cursor.fetchone()
+        if row and "id integer primary key" not in row["sql"].lower():
+            await conn.execute("ALTER TABLE rp_history RENAME TO rp_history_old")
+            await conn.execute("""
+                CREATE TABLE rp_history (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    uid         TEXT NOT NULL,
+                    platform    TEXT NOT NULL DEFAULT 'PC',
+                    rank_score  INTEGER NOT NULL,
+                    recorded_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            await conn.execute("""
+                INSERT INTO rp_history (uid, platform, rank_score, recorded_at)
+                SELECT uid, platform, rank_score, recorded_at FROM rp_history_old
+            """)
+            await conn.execute("DROP TABLE rp_history_old")
         try:
             await conn.execute("ALTER TABLE lfg_users ADD COLUMN qq_name TEXT DEFAULT ''")
         except Exception:
@@ -137,7 +158,7 @@ class Database:
                         await conn.execute(f"ALTER TABLE lfg_users ADD COLUMN {col_def}")
                     except Exception:
                         pass
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform)")
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform, id)")
         await conn.commit()
         logger.info("[Database] SQLite tables ready (WAL mode)")
 
@@ -172,7 +193,8 @@ class Database:
         """距上次查询的 RP 变化，无记录返回 None"""
         conn = await self._get_conn()
         async with conn.execute(
-            "SELECT rank_score FROM rp_history WHERE uid = ? AND platform = ?",
+            "SELECT rank_score FROM rp_history WHERE uid = ? AND platform = ? "
+            "ORDER BY id DESC LIMIT 1",
             (uid, platform),
         ) as cursor:
             row = await cursor.fetchone()
@@ -181,13 +203,36 @@ class Database:
         return current_score - row["rank_score"]
 
     async def save_rp(self, uid: str, platform: str, rank_score: int):
+        """追加一条 RP 记录（同值不重复记，避免连续查询刷屏）"""
         conn = await self._get_conn()
+        async with conn.execute(
+            "SELECT rank_score FROM rp_history WHERE uid = ? AND platform = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (uid, platform),
+        ) as cursor:
+            last = await cursor.fetchone()
+        if last is not None and last["rank_score"] == rank_score:
+            return  # 无变化，不追加
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         await conn.execute(
-            "INSERT OR REPLACE INTO rp_history (uid, platform, rank_score, recorded_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO rp_history (uid, platform, rank_score, recorded_at) VALUES (?, ?, ?, ?)",
             (uid, platform, rank_score, now),
         )
         await conn.commit()
+
+    async def get_rp_history(
+        self, uid: str, platform: str, limit: int = 12
+    ) -> list[dict]:
+        """按时间正序返回 RP 历史（最新 limit 条），用于折线图"""
+        conn = await self._get_conn()
+        async with conn.execute(
+            "SELECT rank_score, recorded_at FROM rp_history "
+            "WHERE uid = ? AND platform = ? "
+            "ORDER BY id DESC LIMIT ?",
+            (uid, platform, limit),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        return [{"score": r["rank_score"], "at": r["recorded_at"]} for r in reversed(rows)]
 
     async def get_monitor(self, session_id: str) -> dict | None:
         conn = await self._get_conn()

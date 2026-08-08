@@ -540,6 +540,29 @@ body:not(.light) .rp-down { color: #DA292A; }
 }
 
 .footer a { color: var(--p-text); text-decoration: none; font-weight: 600; }
+
+/* RP 历史折线图 */
+.rp-chart-strip {
+  /* 与全局其他区块一致的左右安全边距 */
+  padding: 16px 28px 8px;
+  background: var(--sc-low);
+  border-top: 1px solid var(--outline-v);
+}
+
+.rp-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.rp-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.rp-chart text { font-family: 'Roboto Flex', 'Noto Sans SC', system-ui, sans-serif; }
 </style>
 </head>
 <body class="{{ theme_class }}">
@@ -600,6 +623,11 @@ body:not(.light) .rp-down { color: #DA292A; }
     <div class="level-track"><div class="level-fill"></div></div>
     <span class="level-pct">{{ level_pct }}%</span>
   </div>
+
+  <!-- ═══ RP HISTORY CHART ═══ -->
+  {% if rp_chart_html %}
+  {{ rp_chart_html|safe }}
+  {% endif %}
 
   <!-- ═══ TWO-COLUMN BODY ═══ -->
   <div class="body-grid">

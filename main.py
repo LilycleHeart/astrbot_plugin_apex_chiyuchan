@@ -432,8 +432,9 @@ class XiaoChiyu(Star):
             yield event.plain_result("无法获取战绩数据")
             return
 
-        # ── RP 变化（距上次查询）──
+        # ── RP 变化（距上次查询）+ 历史折线图数据 ──
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
+        rp_history = await self.db.get_rp_history(stats.uid, platform, limit=12)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
         # ── 构建渲染数据 ──
@@ -478,6 +479,7 @@ class XiaoChiyu(Star):
             "season_badges": badges.get("seasons", []),
             "special_badges": badges.get("special", []),
             "rank_dist_entries": rank_dist.entries if rank_dist else None,
+            "rp_history": rp_history,
         }
 
         self._profile_cache[qq_id] = {
@@ -1072,6 +1074,7 @@ class XiaoChiyu(Star):
             return
 
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
+        rp_history = await self.db.get_rp_history(stats.uid, platform, limit=12)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
         display_qq = target_qq.strip() if target_qq.strip() else qq_id
@@ -1115,6 +1118,7 @@ class XiaoChiyu(Star):
             "season_badges": badges.get("seasons", []),
             "special_badges": badges.get("special", []),
             "rank_dist_entries": rank_dist.entries if rank_dist else None,
+            "rp_history": rp_history,
         }
         img_bytes = await renderer.draw_profile_card(profile_data)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
