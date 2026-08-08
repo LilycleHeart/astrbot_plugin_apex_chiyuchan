@@ -460,13 +460,15 @@ def _build_rp_chart_html(entries: list) -> str:
     lbl1_y = ys[-1] - 10 if ys[-1] - 10 >= 14 else ys[-1] + 16
 
     # X 轴：每个数据点下方标日期（MM-DD）；点数多时隔点显示防重叠
+    # 首点用 start 锚点（文字向右展开）、末点用 end 锚点（文字向左展开），防止贴边裁切
     x_labels = ""
     for i, d in enumerate(dates):
         if n > 8 and i % 2 == 1 and i != n - 1:
             continue  # 密集时只标偶数位点
         xl = f"{d[5:10]}" if len(d) >= 10 else ""
+        anchor = "start" if i == 0 else ("end" if i == n - 1 else "middle")
         x_labels += (
-            f'<text x="{xs[i]:.1f}" y="{H - 4}" text-anchor="middle" font-size="9" '
+            f'<text x="{xs[i]:.1f}" y="{H - 4}" text-anchor="{anchor}" font-size="9" '
             f'fill="var(--on-sv)" opacity="0.75" font-variant-numeric="tabular-nums">{xl}</text>'
         )
 
