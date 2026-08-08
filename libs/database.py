@@ -87,13 +87,39 @@ class Database:
                 PRIMARY KEY (uid, platform)
             );
         """)
-        # migrate: add qq_name / group_id columns; recreate PK if old schema
         # migrate: 旧版 rp_history 只有单条记录（(uid,platform) 主键），迁入追加式历史表
+        # 幂等处理各种中断残留状态：
+        #   - rp_history 已是新结构但 rp_history_old 残留 → 直接删残留
+        #   - rp_history 旧结构 + rp_history_old 残留 → 先删残留再迁移（旧表数据才是权威）
+        #   - rp_history 缺失但 rp_history_old 残留（RENAME 已提交、建新表前崩溃）→ 恢复新表
         cursor = await conn.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='rp_history'"
         )
         row = await cursor.fetchone()
-        if row and "id integer primary key" not in row["sql"].lower():
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='rp_history_old'"
+        )
+        old_exists = await cursor.fetchone() is not None
+        if row is None and old_exists:
+            # 中断最深处：rp_history 已被改走，只剩 rp_history_old → 直接建新表并恢复数据
+            await conn.execute("""
+                CREATE TABLE rp_history (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    uid         TEXT NOT NULL,
+                    platform    TEXT NOT NULL DEFAULT 'PC',
+                    rank_score  INTEGER NOT NULL,
+                    recorded_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            await conn.execute("""
+                INSERT INTO rp_history (uid, platform, rank_score, recorded_at)
+                SELECT uid, platform, rank_score, recorded_at FROM rp_history_old
+            """)
+            await conn.execute("DROP TABLE rp_history_old")
+        elif row and "id integer primary key" not in row["sql"].lower():
+            # 旧结构需要迁移；残留的 rp_history_old 数据已不可信，直接删
+            if old_exists:
+                await conn.execute("DROP TABLE rp_history_old")
             await conn.execute("ALTER TABLE rp_history RENAME TO rp_history_old")
             await conn.execute("""
                 CREATE TABLE rp_history (
@@ -108,6 +134,9 @@ class Database:
                 INSERT INTO rp_history (uid, platform, rank_score, recorded_at)
                 SELECT uid, platform, rank_score, recorded_at FROM rp_history_old
             """)
+            await conn.execute("DROP TABLE rp_history_old")
+        elif old_exists:
+            # rp_history 已是新结构，但上次迁移中断残留了 rp_history_old → 清理
             await conn.execute("DROP TABLE rp_history_old")
         try:
             await conn.execute("ALTER TABLE lfg_users ADD COLUMN qq_name TEXT DEFAULT ''")
