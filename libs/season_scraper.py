@@ -9,7 +9,8 @@ from zoneinfo import ZoneInfo
 from .ttl_cache import get as cache_get, set as cache_set
 
 
-_CST = ZoneInfo("Asia/Shanghai")
+_UTC = ZoneInfo("UTC")
+_CST = ZoneInfo("Asia/Shanghai")  # 北京时间
 
 
 @dataclass
@@ -24,8 +25,8 @@ class SeasonMetaLegend:
 class SeasonInfo:
     season_number: int
     season_name: str
-    season_start: str     # "May 5, 2026"
-    season_end: str       # "Aug 4, 2026"
+    season_start: str     # 北京时间 "2026-05-06"
+    season_end: str       # 北京时间 "2026-08-05"
     split: int            # 1 or 2
     split_label: str      # "Split 1"
     days_left: int
@@ -84,22 +85,27 @@ SEASON_NAME_ZH = {
 # ALS legend icon base URL
 ALS_ICON_BASE = "https://apexlegendsstatus.com/assets/legends"
 
-# 分割日期 (Season 20+ 有 mid-season split)
-# Season 29: Split 1 ends Jun 23, Split 2 starts Jun 23 ends Aug 4
-# (based on page saying "Season 29 will end on August 4, 2026")
-# We estimate split midpoint based on total duration
+# ── 赛季日期 (数据源: ALS, 时区为 UTC) ──
+# Season 29: 开始 2026-05-05 17:00 UTC, Split 1 结束 2026-06-23 17:00 UTC,
+#            赛季结束 2026-08-04 17:00 UTC
+# Apex 更新惯例为 17:00 UTC (= 北京时间次日 01:00), 抓取时统一转成北京时间。
 _SPLIT_DATES_S29 = {
-    "split1_end": _dt.datetime(2026, 6, 23, tzinfo=_CST),
-    "season_end": _dt.datetime(2026, 8, 4, tzinfo=_CST),
-    "season_start": _dt.datetime(2026, 5, 5, tzinfo=_CST),
+    "season_start": _dt.datetime(2026, 5, 5, 17, 0, tzinfo=_UTC),
+    "split1_end": _dt.datetime(2026, 6, 23, 17, 0, tzinfo=_UTC),
+    "season_end": _dt.datetime(2026, 8, 4, 17, 0, tzinfo=_UTC),
 }
+
+
+def _utc_to_bj(dt: _dt.datetime) -> _dt.datetime:
+    """数据源为 UTC, 抓取时转换成北京时间"""
+    return dt.astimezone(_CST)
 
 
 def _determine_split_and_end() -> tuple[int, int, int, int]:
     """Determine current split and compute countdown. Returns (days, hours, minutes, split)."""
     now = _dt.datetime.now(tz=_CST)
-    split1_end = _dt.datetime(2026, 6, 23, tzinfo=_CST)
-    s29_end = _dt.datetime(2026, 8, 4, tzinfo=_CST)
+    split1_end = _utc_to_bj(_SPLIT_DATES_S29["split1_end"])
+    s29_end = _utc_to_bj(_SPLIT_DATES_S29["season_end"])
 
     if now < split1_end:
         split = 1
@@ -126,12 +132,14 @@ async def fetch_season_info() -> SeasonInfo | None:
     days_left, hours_left, minutes_left, split = _determine_split_and_end()
     split_label = f"Split {split}"
     season_name_zh = SEASON_NAME_ZH.get("Overclocked", "超频")
+    season_start_bj = _utc_to_bj(_SPLIT_DATES_S29["season_start"]).strftime("%Y-%m-%d")
+    season_end_bj = _utc_to_bj(_SPLIT_DATES_S29["season_end"]).strftime("%Y-%m-%d")
 
     result = SeasonInfo(
         season_number=29,
         season_name=season_name_zh,
-        season_start="2026-05-05",
-        season_end="2026-08-04",
+        season_start=season_start_bj,
+        season_end=season_end_bj,
         split=split,
         split_label=split_label,
         days_left=days_left,

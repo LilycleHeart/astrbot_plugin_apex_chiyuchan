@@ -8,3 +8,5 @@ assets/moe_digits/
 data/
 __pycache__/
 *.egg-info/
+# 本地敏感配置（vision.js 识图 API Key）
+.env
