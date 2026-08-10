@@ -136,7 +136,18 @@ class Database:
             """)
             await conn.execute("DROP TABLE rp_history_old")
         elif old_exists:
-            # rp_history 已是新结构，但上次迁移中断残留了 rp_history_old → 清理
+            # 新结构 + 残留 rp_history_old：可能是中断残留，也可能是正在进行的迁移
+            # （CREATE 新表后、INSERT 前崩溃 → 新表为空但 rp_history_old 才是权威数据）
+            # 必须先检查新表是否有数据：空表 → 从 rp_history_old 恢复；有数据 → 才是真残留，清理
+            cursor = await conn.execute(
+                "SELECT COUNT(*) FROM rp_history"
+            )
+            new_count = (await cursor.fetchone())[0]
+            if new_count == 0:
+                await conn.execute("""
+                    INSERT INTO rp_history (uid, platform, rank_score, recorded_at)
+                    SELECT uid, platform, rank_score, recorded_at FROM rp_history_old
+                """)
             await conn.execute("DROP TABLE rp_history_old")
         try:
             await conn.execute("ALTER TABLE lfg_users ADD COLUMN qq_name TEXT DEFAULT ''")
