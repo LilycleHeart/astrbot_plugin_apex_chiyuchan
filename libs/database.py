@@ -274,6 +274,21 @@ class Database:
             rows = await cursor.fetchall()
         return [{"score": r["rank_score"], "at": r["recorded_at"]} for r in reversed(rows)]
 
+    async def get_rp_history_for_chart(
+        self, uid: str, platform: str, current_score: int, limit: int = 12
+    ) -> list[dict]:
+        """折线图数据：历史记录并入本次查询分数。
+
+        save_rp 是异步落库，本次渲染时新分数尚未入库，直接读 get_rp_history
+        会让当次查询（如升段）不出现在折线图上。与 save_rp 同值不重复的
+        语义保持一致：当前分数与最后一条相同则不追加。
+        """
+        hist = await self.get_rp_history(uid, platform, limit=limit)
+        if hist and hist[-1]["score"] == current_score:
+            return hist
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return (hist + [{"score": current_score, "at": now}])[-limit:]
+
     async def get_monitor(self, session_id: str) -> dict | None:
         conn = await self._get_conn()
         async with conn.execute(

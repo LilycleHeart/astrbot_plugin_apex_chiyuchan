@@ -432,9 +432,9 @@ class XiaoChiyu(Star):
             yield event.plain_result("无法获取战绩数据")
             return
 
-        # ── RP 变化（距上次查询）+ 历史折线图数据 ──
+        # ── RP 变化（距上次查询）+ 历史折线图数据（并入本次查询分数）──
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
-        rp_history = await self.db.get_rp_history(stats.uid, platform, limit=12)
+        rp_history = await self.db.get_rp_history_for_chart(stats.uid, platform, stats.rank_score, limit=12)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
         # ── 构建渲染数据 ──
@@ -1074,7 +1074,7 @@ class XiaoChiyu(Star):
             return
 
         rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
-        rp_history = await self.db.get_rp_history(stats.uid, platform, limit=12)
+        rp_history = await self.db.get_rp_history_for_chart(stats.uid, platform, stats.rank_score, limit=12)
         self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
 
         display_qq = target_qq.strip() if target_qq.strip() else qq_id
