@@ -51,6 +51,7 @@ LEGEND_ZH = {
 
 # ── 赛季名中文映射 ──
 SEASON_NAME_ZH = {
+    "Marked": "诸神烙印",
     "Overclocked": "超频",
     "Breach": "突破",
     "Amped": "增幅",
@@ -86,13 +87,14 @@ SEASON_NAME_ZH = {
 ALS_ICON_BASE = "https://apexlegendsstatus.com/assets/legends"
 
 # ── 赛季日期 (数据源: ALS, 时区为 UTC) ──
-# Season 29: 开始 2026-05-05 17:00 UTC, Split 1 结束 2026-06-23 17:00 UTC,
-#            赛季结束 2026-08-04 17:00 UTC
+# Season 30: 开始 2026-08-04 17:00 UTC, Split 1 结束 2026-09-15 17:00 UTC,
+#            赛季结束 2026-11-03 17:00 UTC (esportstales 预估)
 # Apex 更新惯例为 17:00 UTC (= 北京时间次日 01:00), 抓取时统一转成北京时间。
-_SPLIT_DATES_S29 = {
-    "season_start": _dt.datetime(2026, 5, 5, 17, 0, tzinfo=_UTC),
-    "split1_end": _dt.datetime(2026, 6, 23, 17, 0, tzinfo=_UTC),
-    "season_end": _dt.datetime(2026, 8, 4, 17, 0, tzinfo=_UTC),
+# 参考: ALS new-season-countdown 显示 "Season 30: Marked, split 2 releases 16/09 @ 01:00" (北京)
+_SPLIT_DATES_S30 = {
+    "season_start": _dt.datetime(2026, 8, 4, 17, 0, tzinfo=_UTC),
+    "split1_end": _dt.datetime(2026, 9, 15, 17, 0, tzinfo=_UTC),
+    "season_end": _dt.datetime(2026, 11, 3, 17, 0, tzinfo=_UTC),
 }
 
 
@@ -104,15 +106,15 @@ def _utc_to_bj(dt: _dt.datetime) -> _dt.datetime:
 def _determine_split_and_end() -> tuple[int, int, int, int]:
     """Determine current split and compute countdown. Returns (days, hours, minutes, split)."""
     now = _dt.datetime.now(tz=_CST)
-    split1_end = _utc_to_bj(_SPLIT_DATES_S29["split1_end"])
-    s29_end = _utc_to_bj(_SPLIT_DATES_S29["season_end"])
+    split1_end = _utc_to_bj(_SPLIT_DATES_S30["split1_end"])
+    s30_end = _utc_to_bj(_SPLIT_DATES_S30["season_end"])
 
     if now < split1_end:
         split = 1
         split_end = split1_end
     else:
         split = 2
-        split_end = s29_end
+        split_end = s30_end
 
     delta = split_end - now
     days = max(0, delta.days)
@@ -131,12 +133,12 @@ async def fetch_season_info() -> SeasonInfo | None:
 
     days_left, hours_left, minutes_left, split = _determine_split_and_end()
     split_label = f"Split {split}"
-    season_name_zh = SEASON_NAME_ZH.get("Overclocked", "超频")
-    season_start_bj = _utc_to_bj(_SPLIT_DATES_S29["season_start"]).strftime("%Y-%m-%d")
-    season_end_bj = _utc_to_bj(_SPLIT_DATES_S29["season_end"]).strftime("%Y-%m-%d")
+    season_name_zh = SEASON_NAME_ZH.get("Marked", "诸神烙印")
+    season_start_bj = _utc_to_bj(_SPLIT_DATES_S30["season_start"]).strftime("%Y-%m-%d")
+    season_end_bj = _utc_to_bj(_SPLIT_DATES_S30["season_end"]).strftime("%Y-%m-%d")
 
     result = SeasonInfo(
-        season_number=29,
+        season_number=30,
         season_name=season_name_zh,
         season_start=season_start_bj,
         season_end=season_end_bj,

@@ -4,9 +4,20 @@ __pycache__/
 *.rar
 debug_card.html
 assets/moe_digits/
+assets/image_cache/
+map_rotation_data.json
 
 data/
 __pycache__/
 *.egg-info/
 # 本地敏感配置（vision.js 识图 API Key）
 .env
+
+# 本地工具目录与调试产物
+.superpowers/
+.zcode/
+/test_*.py
+stats_debug*.html
+stats_light*.html
+stats_light*.png
+test_output.txt
