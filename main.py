@@ -59,6 +59,7 @@ class XiaoChiyu(Star):
         self._profile_cache: dict[str, dict] = {}
         self._lfg_entries: dict[str, dict] = {}
         self._monitor_task: asyncio.Task | None = None
+        self._rp_update_task: asyncio.Task | None = None
 
         from .libs.config import preload_fonts
         preload_fonts()
@@ -127,10 +128,13 @@ class XiaoChiyu(Star):
         asyncio.create_task(_download_moe_digits_async())
         start_cleaner()
         self._monitor_task = asyncio.create_task(self._monitor_loop())
+        self._rp_update_task = asyncio.create_task(self._rp_update_loop())
 
     async def terminate(self):
         if self._monitor_task and not self._monitor_task.done():
             self._monitor_task.cancel()
+        if self._rp_update_task and not self._rp_update_task.done():
+            self._rp_update_task.cancel()
         await self.apex.close()
         await self.db.close()
         from .libs.playwright_manager import close_browser
@@ -901,6 +905,47 @@ class XiaoChiyu(Star):
                 await self._monitor_tick()
             except Exception as e:
                 logger.error(f"[Monitor] tick 异常: {e}")
+
+    async def _rp_update_loop(self):
+        """定时更新绑定玩家积分（RP）到 rp_history，供折线图积累数据"""
+        interval = int(self.config.get("rp_update_interval", 21600))
+        if interval <= 0:
+            logger.info("[RP更新] 已关闭 (rp_update_interval<=0)")
+            return
+        interval = max(60, interval)
+        logger.info(f"[RP更新] loop 启动, 每 {interval}s 更新一次绑定玩家积分")
+        while True:
+            try:
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                logger.info("[RP更新] loop 被终止")
+                return
+            try:
+                await self._rp_update_tick()
+            except Exception as e:
+                logger.error(f"[RP更新] tick 异常: {e}")
+
+    async def _rp_update_tick(self):
+        users = await self.db.get_all_users()
+        if not users:
+            logger.debug("[RP更新] 无绑定玩家, 跳过")
+            return
+        sem = asyncio.Semaphore(3)  # 限流并发，避免打爆 API
+
+        async def _update(u: dict):
+            platform = u.get("platform", "PC")
+            async with sem:
+                stats = await self.apex.get_stats(u["uid"], platform, force=True)
+                if not stats:
+                    return False
+                await self.db.save_rp(stats.uid, platform, stats.rank_score)
+                return True
+
+        results = await asyncio.gather(
+            *[_update(u) for u in users], return_exceptions=True
+        )
+        ok = sum(1 for r in results if r is True)
+        logger.info(f"[RP更新] 完成: 成功 {ok}/{len(users)}")
 
     @filter.command("perf", alias={"性能"})
     async def cmd_perf(self, event: AstrMessageEvent):

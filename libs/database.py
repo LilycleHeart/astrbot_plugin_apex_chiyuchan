@@ -220,6 +220,13 @@ class Database:
             return dict(row)
         return None
 
+    async def get_all_users(self) -> list[dict]:
+        """返回全部绑定玩家的 uid/platform（定时更新 RP 用）"""
+        conn = await self._get_conn()
+        async with conn.execute("SELECT uid, platform FROM users") as cursor:
+            rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
     async def delete_user(self, qq_id: str):
         conn = await self._get_conn()
         await conn.execute("DELETE FROM users WHERE qq_id = ?", (qq_id,))

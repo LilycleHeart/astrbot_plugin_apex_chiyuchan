@@ -373,14 +373,17 @@ class ApexClient:
             return await self.name_to_uid_all(cleaned, platform)
         return []
 
-    async def get_stats(self, uid: str, platform: str = "PC") -> Optional[PlayerStats]:
+    async def get_stats(
+        self, uid: str, platform: str = "PC", force: bool = False
+    ) -> Optional[PlayerStats]:
         try:
             from .ttl_cache import get as cache_get, set as cache_set
 
             cache_key = f"stats:{platform}:{uid}"
-            cached = await cache_get(cache_key)
-            if cached is not None:
-                return PlayerStats(cached)
+            if not force:
+                cached = await cache_get(cache_key)
+                if cached is not None:
+                    return PlayerStats(cached)
 
             data = await self._get(
                 "/bridge", {"uid": uid, "platform": platform, "merge": "1"}

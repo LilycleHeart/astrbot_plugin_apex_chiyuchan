@@ -24,6 +24,12 @@
     "default": 900,
     "hint": "建议 300~3600"
   },
+  "rp_update_interval": {
+    "description": "后台定时更新玩家积分间隔（秒）",
+    "type": "int",
+    "default": 21600,
+    "hint": "建议 3600~86400；填 0 关闭"
+  },
   "use_local_fonts": {
     "description": "使用系统字体代替 Google Fonts（避免外链加载）",
     "type": "bool",
