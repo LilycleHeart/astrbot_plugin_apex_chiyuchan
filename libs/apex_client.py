@@ -40,6 +40,9 @@ class PlayerStats:
         self.rank_name = rank.get("rankName", "Unranked")
         self.rank_div = rank.get("rankDiv", 0)
         self.rank_score = rank.get("rankScore", 0)
+        # API 的 seasonXX_split_Y 标识；缺失时不根据掉分推断重置。
+        season = rank.get("rankedSeason")
+        self.rank_season = season.strip() if isinstance(season, str) and season.strip() else None
         self.rank_img = rank.get("rankImg", "")
         self.rank_top_pct = rank.get("ALStopPercent", 0)
         self.rank_ladder_pos = rank.get("ladderPos", 0)
