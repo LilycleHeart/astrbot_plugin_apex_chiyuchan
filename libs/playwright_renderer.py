@@ -353,8 +353,21 @@ def _tier_index_for_score(score: int) -> int:
     return idx
 
 
-def _build_rp_chart_html(entries: list) -> str:
-    """RP 历史折线图（SVG，区域渐变 + 首尾标注）。数据不足 2 条返回空串。
+def _build_rp_trend_html(window) -> str:
+    """只展示数据库算好的窗口结果，不能拿图表末两点冒充 24h。"""
+    if window is None:
+        return ""
+    cls = "rp-up" if window.delta is not None and window.delta > 0 else (
+        "rp-down" if window.delta is not None and window.delta < 0 else ""
+    )
+    return (
+        f'<span class="{cls}" style="font-size:11px;font-weight:700;">'
+        f'{_escape_html(window.text)}</span>'
+    )
+
+
+def _build_rp_chart_html(entries: list, window=None) -> str:
+    """RP 历史折线图（SVG，区域渐变 + 首尾标注），24h 统计独立传入。
 
     entries: [{score, at}] 按时间正序，at 为 "YYYY-MM-DD HH:MM:SS"
     """
@@ -364,8 +377,15 @@ def _build_rp_chart_html(entries: list) -> str:
         for e in entries
         if isinstance(e, dict) and e.get("score") is not None
     ]
+    trend_html = _build_rp_trend_html(window)
     if len(pts) < 2:
-        return ""
+        if not trend_html:
+            return ""
+        return (
+            '<div class="rp-chart-strip"><div class="rp-chart-head">'
+            '<span class="col-title">RP 历史</span>'
+            f'{trend_html}</div></div>'
+        )
     import math
     scores = [p[0] for p in pts]
     dates = [p[1] for p in pts]
@@ -505,29 +525,6 @@ def _build_rp_chart_html(entries: list) -> str:
 
     plot_wrap = icon_layer
 
-    # 24 小时内涨幅徽章：最后两个数据点间隔 ≤ 24h 时显示其差值
-    # （超过一天没查询则不显示，避免误导）
-    trend_html = ""
-    if n >= 2:
-        from datetime import datetime as _dt
-
-        def _parse(s: str):
-            try:
-                return _dt.strptime(s[:19], "%Y-%m-%d %H:%M:%S")
-            except (ValueError, TypeError):
-                return None
-
-        t0, t1 = _parse(dates[-2]), _parse(dates[-1])
-        if t0 and t1 and (t1 - t0).total_seconds() <= 24 * 3600 and scores[-1] != scores[-2]:
-            diff = scores[-1] - scores[-2]
-            sign = "+" if diff > 0 else ""
-            cls = "rp-up" if diff > 0 else "rp-down"
-            arrow = "▲" if diff > 0 else "▼"
-            trend_html = (
-                f'<span class="{cls}" style="font-size:11px;font-weight:700;">'
-                f"{arrow} {sign}{diff:,} · 24h</span>"
-            )
-
     return (
         '<div class="rp-chart-strip">'
         '<div class="rp-chart-head">'
@@ -600,7 +597,7 @@ def _build_stats_html(**d) -> str:
     if rp_delta is not None:
         sign = "+" if rp_delta >= 0 else ""
         delta_cls = "rp-up" if rp_delta >= 0 else "rp-down"
-        rp_delta_html = f'<span class="{delta_cls}" style="font-size:13px;margin-left:8px;">{sign}{rp_delta} RP</span>'
+        rp_delta_html = f'<span class="{delta_cls}" style="font-size:13px;margin-left:8px;">较上次记录 {sign}{rp_delta} RP</span>'
 
     rank_display = _rank_zh(rank_name) + _rank_div_zh(rank_div, rank_name)
     if rank_ladder_pos and rank_name.startswith(("Predator", "Master")):
@@ -643,7 +640,7 @@ def _build_stats_html(**d) -> str:
     rank_dist_ctx = _build_rank_dist_list(rank_name, rank_top_pct_global, rank_dist_entries, theme=theme)
 
     # ── RP 历史折线图 ──
-    rp_chart_html = _build_rp_chart_html(rp_history)
+    rp_chart_html = _build_rp_chart_html(rp_history, d.get("rp_24h"))
 
     context = {
         "theme": theme,

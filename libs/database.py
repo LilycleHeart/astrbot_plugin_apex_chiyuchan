@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 from astrbot.api import logger
 
+from .rp_window import RPWindow, calculate_rp_window
+
 
 class Database:
     def __init__(self):
@@ -17,6 +19,7 @@ class Database:
         self.db_path = data_dir / "chiyuchan.db"
         self._conn: aiosqlite.Connection | None = None
         self._lock = asyncio.Lock()
+        self._rp_lock = asyncio.Lock()
 
     async def _get_conn(self) -> aiosqlite.Connection:
         if self._conn is None:
@@ -100,6 +103,9 @@ class Database:
             "SELECT name FROM sqlite_master WHERE type='table' AND name='rp_history_old'"
         )
         old_exists = await cursor.fetchone() is not None
+        cursor = await conn.execute("PRAGMA table_info(rp_history)")
+        # 检查列结构而非 CREATE SQL 空格；否则每次启动都会重建表并丢失新字段。
+        has_history_id = any(col[1] == "id" and col[5] == 1 for col in await cursor.fetchall())
         if row is None and old_exists:
             # 中断最深处：rp_history 已被改走，只剩 rp_history_old → 直接建新表并恢复数据
             await conn.execute("""
@@ -116,7 +122,7 @@ class Database:
                 SELECT uid, platform, rank_score, recorded_at FROM rp_history_old
             """)
             await conn.execute("DROP TABLE rp_history_old")
-        elif row and "id integer primary key" not in row["sql"].lower():
+        elif row and not has_history_id:
             # 旧结构需要迁移；残留的 rp_history_old 数据已不可信，直接删
             if old_exists:
                 await conn.execute("DROP TABLE rp_history_old")
@@ -198,7 +204,14 @@ class Database:
                         await conn.execute(f"ALTER TABLE lfg_users ADD COLUMN {col_def}")
                     except Exception:
                         pass
+        cursor = await conn.execute("PRAGMA table_info(rp_history)")
+        if "rank_season" not in {row[1] for row in await cursor.fetchall()}:
+            await conn.execute("ALTER TABLE rp_history ADD COLUMN rank_season TEXT")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_rp_uid_plat ON rp_history(uid, platform, id)")
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rp_time "
+            "ON rp_history(uid, platform, recorded_at, id)"
+        )
         await conn.commit()
         logger.info("[Database] SQLite tables ready (WAL mode)")
 
@@ -249,23 +262,58 @@ class Database:
             return None
         return current_score - row["rank_score"]
 
-    async def save_rp(self, uid: str, platform: str, rank_score: int):
-        """追加一条 RP 记录（同值不重复记，避免连续查询刷屏）"""
+    async def save_rp(
+        self, uid: str, platform: str, rank_score: int, *,
+        now: datetime | None = None, rank_season: str | None = None,
+    ):
+        """保存每次观测（包括同分），保留 24h 窗口的时间基准。"""
+        async with self._rp_lock:
+            await self._save_rp(uid, platform, rank_score, now=now, rank_season=rank_season)
+
+    async def _save_rp(self, uid, platform, rank_score, *, now=None, rank_season=None):
         conn = await self._get_conn()
-        async with conn.execute(
-            "SELECT rank_score FROM rp_history WHERE uid = ? AND platform = ? "
-            "ORDER BY id DESC LIMIT 1",
-            (uid, platform),
-        ) as cursor:
-            last = await cursor.fetchone()
-        if last is not None and last["rank_score"] == rank_score:
-            return  # 无变化，不追加
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 沿用旧表的服务器本地时间，不把旧记录误当 UTC 或卡片显示时区。
+        recorded_at = (now or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
         await conn.execute(
-            "INSERT INTO rp_history (uid, platform, rank_score, recorded_at) VALUES (?, ?, ?, ?)",
-            (uid, platform, rank_score, now),
+            "INSERT INTO rp_history (uid, platform, rank_score, recorded_at, rank_season) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (uid, platform, rank_score, recorded_at, rank_season),
         )
         await conn.commit()
+
+    async def get_rp_window(
+        self, uid: str, platform: str, current_score: int, *,
+        now: datetime | None = None, rank_season: str | None = None,
+    ) -> RPWindow:
+        """独立于图表点数上限，查询 now-24h 处最近的历史基准。"""
+        now = (now or datetime.now()).replace(microsecond=0)
+        cutoff = now - timedelta(hours=24)
+        conn = await self._get_conn()
+        async with conn.execute(
+            "SELECT rank_score, recorded_at, rank_season FROM rp_history "
+            "WHERE uid = ? AND platform = ? AND recorded_at <= ? "
+            "AND recorded_at >= ? "
+            "ORDER BY recorded_at DESC, id DESC",
+            (uid, platform, cutoff.strftime("%Y-%m-%d %H:%M:%S"),
+             (cutoff - timedelta(hours=6)).strftime("%Y-%m-%d %H:%M:%S")),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        return calculate_rp_window(rows, current_score, now, rank_season)
+
+    async def record_rp_snapshot(
+        self, uid: str, platform: str, current_score: int, *,
+        now: datetime | None = None, rank_season: str | None = None,
+    ) -> dict:
+        """命令和 LLM 共用同一个时刻、统计口径与落库流程。"""
+        now = (now or datetime.now()).replace(microsecond=0)
+        async with self._rp_lock:
+            delta = await self.get_rp_delta(uid, platform, current_score)
+            window = await self.get_rp_window(
+                uid, platform, current_score, now=now, rank_season=rank_season,
+            )
+            history = await self.get_rp_history_for_chart(uid, platform, current_score, now=now)
+            await self._save_rp(uid, platform, current_score, now=now, rank_season=rank_season)
+        return {"rp_delta": delta, "rp_24h": window, "rp_history": history}
 
     async def get_rp_history(
         self, uid: str, platform: str, limit: int = 12
@@ -282,19 +330,15 @@ class Database:
         return [{"score": r["rank_score"], "at": r["recorded_at"]} for r in reversed(rows)]
 
     async def get_rp_history_for_chart(
-        self, uid: str, platform: str, current_score: int, limit: int = 12
+        self, uid: str, platform: str, current_score: int, limit: int = 12, *,
+        now: datetime | None = None,
     ) -> list[dict]:
-        """折线图数据：历史记录并入本次查询分数。
-
-        save_rp 是异步落库，本次渲染时新分数尚未入库，直接读 get_rp_history
-        会让当次查询（如升段）不出现在折线图上。与 save_rp 同值不重复的
-        语义保持一致：当前分数与最后一条相同则不追加。
-        """
+        """折线图始终包含本次观测；统计基准不受 limit 影响。"""
         hist = await self.get_rp_history(uid, platform, limit=limit)
-        if hist and hist[-1]["score"] == current_score:
+        point = {"score": current_score, "at": (now or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")}
+        if hist and hist[-1] == point:
             return hist
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        return (hist + [{"score": current_score, "at": now}])[-limit:]
+        return (hist + [point])[-limit:]
 
     async def get_monitor(self, session_id: str) -> dict | None:
         conn = await self._get_conn()

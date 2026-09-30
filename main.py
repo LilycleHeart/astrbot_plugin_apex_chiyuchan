@@ -436,10 +436,11 @@ class XiaoChiyu(Star):
             yield event.plain_result("无法获取战绩数据")
             return
 
-        # ── RP 变化（距上次查询）+ 历史折线图数据（并入本次查询分数）──
-        rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
-        rp_history = await self.db.get_rp_history_for_chart(stats.uid, platform, stats.rank_score, limit=12)
-        self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
+        # ── RP 上次记录差值 + 独立 24h 窗口 + 历史折线图（同步保存）──
+        rp_snapshot = await self.db.record_rp_snapshot(
+            stats.uid, platform, stats.rank_score, rank_season=stats.rank_season,
+        )
+        rp_delta = rp_snapshot["rp_delta"]
 
         # ── 构建渲染数据 ──
         display_qq = target_qq or qq_id
@@ -483,7 +484,7 @@ class XiaoChiyu(Star):
             "season_badges": badges.get("seasons", []),
             "special_badges": badges.get("special", []),
             "rank_dist_entries": rank_dist.entries if rank_dist else None,
-            "rp_history": rp_history,
+            **rp_snapshot,
         }
 
         self._profile_cache[qq_id] = {
@@ -938,7 +939,9 @@ class XiaoChiyu(Star):
                 stats = await self.apex.get_stats(u["uid"], platform, force=True)
                 if not stats:
                     return False
-                await self.db.save_rp(stats.uid, platform, stats.rank_score)
+                await self.db.save_rp(
+                    stats.uid, platform, stats.rank_score, rank_season=stats.rank_season,
+                )
                 return True
 
         results = await asyncio.gather(
@@ -1118,9 +1121,10 @@ class XiaoChiyu(Star):
             yield event.plain_result("无法获取战绩数据")
             return
 
-        rp_delta = await self.db.get_rp_delta(stats.uid, platform, stats.rank_score)
-        rp_history = await self.db.get_rp_history_for_chart(stats.uid, platform, stats.rank_score, limit=12)
-        self._fire_and_forget(self.db.save_rp(stats.uid, platform, stats.rank_score), "保存RP")
+        rp_snapshot = await self.db.record_rp_snapshot(
+            stats.uid, platform, stats.rank_score, rank_season=stats.rank_season,
+        )
+        rp_delta = rp_snapshot["rp_delta"]
 
         display_qq = target_qq.strip() if target_qq.strip() else qq_id
         qq_avatar = f"https://q1.qlogo.cn/g?b=qq&nk={display_qq}&s=640"
@@ -1163,7 +1167,7 @@ class XiaoChiyu(Star):
             "season_badges": badges.get("seasons", []),
             "special_badges": badges.get("special", []),
             "rank_dist_entries": rank_dist.entries if rank_dist else None,
-            "rp_history": rp_history,
+            **rp_snapshot,
         }
         img_bytes = await renderer.draw_profile_card(profile_data)
         img_b64 = base64.b64encode(img_bytes).decode() if img_bytes else ""
@@ -1183,12 +1187,13 @@ class XiaoChiyu(Star):
         )
         rd = profile_data["rank_div"] if profile_data["rank_div"] > 0 else ""
         state = "在线" if profile_data["online"] in ("online", "in_game") else "离线"
-        delta_str = f" (较上次查询 {rp_delta:+d} RP)" if rp_delta is not None else ""
+        delta_str = f" (较上次记录 {rp_delta:+d} RP)" if rp_delta is not None else ""
 
         text = (
             f"玩家 {profile_data['name']} (UID {profile_data['uid']})\n"
             f"等级 Lv.{profile_data['level']} | 状态 {state}\n"
             f"段位 {rn}{rd} | RP {profile_data['rank_score']:,}{delta_str} | 全服 Top {profile_data['rank_top_pct']}%\n"
+            f"{rp_snapshot['rp_24h'].text}\n"
             f"生涯击杀 {profile_data['kills']:,} | 总伤害 {profile_data['damage']:,} | BR 胜场 {profile_data['wins']:,}\n"
         )
         if profile_data["top_legends"]:
