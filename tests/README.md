@@ -14,5 +14,6 @@ They do not execute the legacy network-dependent scripts under `scripts/`.
 Coverage includes rolling cutoff, multiple gains/losses, more than 12 samples,
 unchanged samples, expired gains, incomplete history, long gaps, the 6-hour
 estimate boundary, UID/platform isolation, season resets, absent metadata,
-local legacy timestamps, migration/restart persistence, simultaneous snapshots,
-and command/LLM display parity.
+local legacy timestamps, single-row/append-only migration and restart persistence,
+missing-season estimates without backfill, intervening season changes,
+simultaneous snapshots, concise labels, and command/LLM display parity.

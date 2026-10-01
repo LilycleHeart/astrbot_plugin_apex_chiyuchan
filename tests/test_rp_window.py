@@ -59,7 +59,7 @@ class WindowTests(unittest.TestCase):
     def test_near_boundary_is_estimated(self):
         result = calculate_rp_window([row(1000, 25)], 1500, NOW, SEASON)
         self.assertEqual((result.delta, result.status), (500, "estimated"))
-        self.assertIn("估算", result.text)
+        self.assertEqual(result.text, "▲ ≈+500 · 24h")
 
     def test_six_hour_gap_limit_inclusive(self):
         self.assertEqual(calculate_rp_window([row(1000, 30)], 1500, NOW, SEASON).delta, 500)
@@ -70,7 +70,7 @@ class WindowTests(unittest.TestCase):
             with self.subTest(rows=rows):
                 result = calculate_rp_window(rows, 1500, NOW, SEASON)
                 self.assertIsNone(result.delta)
-                self.assertIn("历史不足", result.text)
+                self.assertEqual(result.text, "24h 暂无")
 
     def test_normal_large_loss_is_not_reset(self):
         result = calculate_rp_window([row(20000, 24)], 10000, NOW, SEASON)
@@ -82,13 +82,52 @@ class WindowTests(unittest.TestCase):
         self.assertIsNone(result.delta)
 
     def test_missing_season_not_assigned_to_new_season(self):
-        result = calculate_rp_window([row(1000, 24, None)], 1500, NOW, SEASON)
-        self.assertEqual(result.status, "season_unknown")
-        self.assertIsNone(result.delta)
+        baseline = row(1000, 24, None)
+        result = calculate_rp_window([baseline], 1500, NOW, SEASON)
+        self.assertEqual((result.delta, result.status), (500, "estimated"))
+        self.assertIsNone(baseline["rank_season"])
 
     def test_legacy_missing_metadata_and_loss_remain_supported(self):
         result = calculate_rp_window([row(1000, 24, None)], 950, NOW, None)
-        self.assertEqual(result.delta, -50)
+        self.assertEqual((result.delta, result.status), (-50, "estimated"))
+
+    def test_current_missing_season_is_estimated(self):
+        result = calculate_rp_window([row(1000, 24)], 1500, NOW, None)
+        self.assertEqual((result.delta, result.status), (500, "estimated"))
+
+    def test_legacy_baseline_with_known_current_preserves_loss(self):
+        result = calculate_rp_window([row(20000, 24, None)], 10000, NOW, SEASON)
+        self.assertEqual((result.delta, result.status), (-10000, "estimated"))
+
+    def test_known_change_after_legacy_baseline_is_rejected(self):
+        result = calculate_rp_window(
+            [row(9000, 12, "season30_split_1"), row(10000, 24, None)],
+            8000, NOW, SEASON,
+        )
+        self.assertEqual(result.status, "reset")
+        self.assertIsNone(result.delta)
+
+    def test_matching_endpoints_do_not_hide_intervening_season_change(self):
+        result = calculate_rp_window(
+            [row(9000, 12, "season30_split_1"), row(10000, 24)],
+            10500, NOW, SEASON,
+        )
+        self.assertEqual(result.status, "reset")
+        self.assertIsNone(result.delta)
+
+    def test_known_change_detected_without_current_season(self):
+        result = calculate_rp_window(
+            [row(9000, 12), row(20000, 24, "season30_split_1")],
+            9500, NOW, None,
+        )
+        self.assertEqual(result.status, "reset")
+
+    def test_before_baseline_and_future_seasons_are_ignored(self):
+        result = calculate_rp_window(
+            [row(9000, -1, "future"), row(1000, 24), row(20000, 25, "old")],
+            1500, NOW, SEASON,
+        )
+        self.assertEqual((result.delta, result.status), (500, "exact"))
 
     def test_invalid_timestamp_skipped(self):
         result = calculate_rp_window(
@@ -99,20 +138,31 @@ class WindowTests(unittest.TestCase):
 
     def test_zero_is_displayed_without_up_arrow(self):
         html = _build_rp_chart_html([], RPWindow(delta=0, status="exact"))
-        self.assertIn("+0 RP", html)
+        self.assertIn("+0 · 24h", html)
         self.assertNotIn("rp-up", html)
+        self.assertNotIn("▲", html)
 
     def test_renderer_does_not_guess_from_two_points(self):
         entries = [{"score": 1000, "at": "2026-09-30 10:00:00"}, {"score": 1200, "at": "2026-09-30 11:00:00"}]
         self.assertNotIn("24h", _build_rp_chart_html(entries))
         html = _build_rp_chart_html(entries, RPWindow(delta=700, status="estimated"))
-        self.assertIn("+700 RP", html)
+        self.assertIn("▲ ≈+700 · 24h", html)
         self.assertNotIn("+200", html)
-        self.assertIn("估算", html)
+        self.assertNotIn("净变化", html)
+
+    def test_compact_card_text_and_original_delta_style(self):
+        for delta, text, cls in ((500, "▲ +500 · 24h", "rp-up"), (-50, "▼ -50 · 24h", "rp-down")):
+            with self.subTest(delta=delta):
+                html = _build_stats_html(rank_score=1500, rp_24h=RPWindow(delta=delta, status="exact"), rp_delta=50)
+                self.assertIn(text, html)
+                self.assertIn(f'<span class="{cls}" style="font-size:11px;font-weight:700;">', html)
+                self.assertIn('<span class="rp-up" style="font-size:13px;margin-left:8px;">+50 RP</span>', html)
+                for extra in ("较上次", "净变化", "缺少同赛季", "估算"):
+                    self.assertNotIn(extra, html)
 
     def test_card_displays_insufficient_without_two_chart_points(self):
         html = _build_stats_html(rank_score=1500, rp_24h=RPWindow(), rp_delta=50)
-        self.assertIn("24h净变化：历史不足", html)
+        self.assertIn("24h 暂无", html)
         self.assertIn("+50 RP", html)
 
     def test_api_rank_season_optional(self):
@@ -181,9 +231,26 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.snapshot())["rp_24h"].delta, 500)
 
     async def test_equal_timestamps_tie_break_by_id(self):
-        await self.seed(900, 24)
+        await self.seed(900, 24, season="season30_split_1")
         await self.seed(1000, 24)
         self.assertEqual((await self.snapshot())["rp_24h"].delta, 500)
+
+    async def test_window_checks_intervening_seasons_not_just_endpoints(self):
+        await self.seed(1000, 24, season=None)
+        await self.seed(1200, 12, season="season30_split_1")
+        await self.seed(1400, 1)
+        result = await self.snapshot()
+        self.assertEqual(result["rp_24h"].status, "reset")
+        self.assertIsNone(result["rp_24h"].delta)
+
+    async def test_season_evidence_is_player_platform_and_time_isolated(self):
+        await self.seed(1000, 24, season=None)
+        await self.seed(1200, 12, uid="other", season="old")
+        await self.seed(1200, 12, platform="PS4", season="old")
+        await self.seed(20000, 25, season="old")
+        await self.seed(20000, -1, season="future")
+        result = await self.snapshot()
+        self.assertEqual((result["rp_24h"].delta, result["rp_24h"].status), (500, "estimated"))
 
     async def test_time_order_not_insertion_order_for_window(self):
         await self.seed(1000, 24)
@@ -238,7 +305,35 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         history = await self.db.get_rp_history("player", "PC")
         self.assertEqual(history, [{"score": 1000, "at": "2026-09-29 18:00:00"}])
         self.assertEqual((await self.db.get_rp_window("player", "PC", 1500, now=NOW)).delta, 500)
-        self.assertEqual((await self.snapshot())["rp_24h"].status, "season_unknown")
+        result = (await self.snapshot())["rp_24h"]
+        self.assertEqual((result.delta, result.status), (500, "estimated"))
+        await self.db.close()
+        self.db = Database()
+        await self.db.init()
+        conn = await self.db._get_conn()
+        async with conn.execute("SELECT rank_season, recorded_at FROM rp_history ORDER BY id") as cursor:
+            rows = await cursor.fetchall()
+        self.assertIsNone(rows[0]["rank_season"])
+        self.assertEqual(rows[0]["recorded_at"], "2026-09-29 18:00:00")
+        self.assertEqual((await self.snapshot())["rp_24h"].delta, 500)
+
+    async def test_append_only_legacy_migration_keeps_rows_and_season_unknown(self):
+        await self.db.close()
+        with sqlite3.connect(self.db.db_path) as conn:
+            conn.execute("DROP TABLE rp_history")
+            conn.execute("CREATE TABLE rp_history (id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT, platform TEXT, rank_score INTEGER, recorded_at TEXT)")
+            conn.executemany("INSERT INTO rp_history (uid, platform, rank_score, recorded_at) VALUES ('player', 'PC', ?, ?)", [
+                (1000, "2026-09-29 18:00:00"),
+                (1200, "2026-09-30 16:00:00"),
+            ])
+        await self.db.init()
+        await self.db.init()
+        result = await self.snapshot()
+        self.assertEqual((result["rp_24h"].delta, result["rp_24h"].status), (500, "estimated"))
+        self.assertEqual(result["rp_delta"], 300)
+        conn = await self.db._get_conn()
+        async with conn.execute("SELECT rank_season FROM rp_history WHERE id <= 2 ORDER BY id") as cursor:
+            self.assertEqual([r[0] for r in await cursor.fetchall()], [None, None])
 
     async def test_command_and_llm_share_window_and_persistence(self):
         spec = importlib.util.spec_from_file_location("apex_test_plugin", ROOT / "main.py", submodule_search_locations=[str(ROOT)])
@@ -272,8 +367,9 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second["rp_24h"].delta, 500)
         self.assertEqual(first["rp_delta"], 300)
         self.assertEqual(second["rp_delta"], 0)
-        self.assertIn("24h净变化 +500 RP", text[0])
-        self.assertIn("较上次记录 +0 RP", text[0])
+        self.assertIn("▲ +500 · 24h", text[0])
+        self.assertIn("(+0 RP)", text[0])
+        self.assertNotIn("较上次", text[0])
 
 
 if __name__ == "__main__":

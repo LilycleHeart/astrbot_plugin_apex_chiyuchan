@@ -597,7 +597,7 @@ def _build_stats_html(**d) -> str:
     if rp_delta is not None:
         sign = "+" if rp_delta >= 0 else ""
         delta_cls = "rp-up" if rp_delta >= 0 else "rp-down"
-        rp_delta_html = f'<span class="{delta_cls}" style="font-size:13px;margin-left:8px;">较上次记录 {sign}{rp_delta} RP</span>'
+        rp_delta_html = f'<span class="{delta_cls}" style="font-size:13px;margin-left:8px;">{sign}{rp_delta} RP</span>'
 
     rank_display = _rank_zh(rank_name) + _rank_div_zh(rank_div, rank_name)
     if rank_ladder_pos and rank_name.startswith(("Predator", "Master")):

@@ -1187,7 +1187,7 @@ class XiaoChiyu(Star):
         )
         rd = profile_data["rank_div"] if profile_data["rank_div"] > 0 else ""
         state = "在线" if profile_data["online"] in ("online", "in_game") else "离线"
-        delta_str = f" (较上次记录 {rp_delta:+d} RP)" if rp_delta is not None else ""
+        delta_str = f" ({rp_delta:+d} RP)" if rp_delta is not None else ""
 
         text = (
             f"玩家 {profile_data['name']} (UID {profile_data['uid']})\n"

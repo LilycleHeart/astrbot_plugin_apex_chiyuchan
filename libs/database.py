@@ -294,7 +294,7 @@ class Database:
             "WHERE uid = ? AND platform = ? AND recorded_at <= ? "
             "AND recorded_at >= ? "
             "ORDER BY recorded_at DESC, id DESC",
-            (uid, platform, cutoff.strftime("%Y-%m-%d %H:%M:%S"),
+            (uid, platform, now.strftime("%Y-%m-%d %H:%M:%S"),
              (cutoff - timedelta(hours=6)).strftime("%Y-%m-%d %H:%M:%S")),
         ) as cursor:
             rows = await cursor.fetchall()
