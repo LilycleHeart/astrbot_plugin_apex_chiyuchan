@@ -150,6 +150,30 @@ class WindowTests(unittest.TestCase):
         self.assertNotIn("+200", html)
         self.assertNotIn("净变化", html)
 
+    def test_chart_skips_unchanged_points_and_preserves_return_to_score(self):
+        entries = [
+            {"score": 6000, "at": "2026-09-30 10:00:00"},
+            {"score": 6000, "at": "2026-09-30 11:00:00"},
+            {"score": 5900, "at": "2026-09-30 12:00:00"},
+            {"score": 5900, "at": "2026-09-30 13:00:00"},
+            {"score": 6000, "at": "2026-09-30 14:00:00"},
+            {"score": 6000, "at": "2026-09-30 15:00:00"},
+        ]
+        self.assertEqual(
+            _build_rp_chart_html(entries),
+            _build_rp_chart_html([entries[0], entries[2], entries[4]]),
+        )
+
+    def test_unchanged_chart_hidden_but_window_still_displayed(self):
+        entries = [
+            {"score": 6000, "at": "2026-09-30 10:00:00"},
+            {"score": 6000, "at": "2026-09-30 11:00:00"},
+        ]
+        self.assertEqual(_build_rp_chart_html(entries), "")
+        html = _build_rp_chart_html(entries, RPWindow(delta=500, status="exact"))
+        self.assertNotIn('<svg', html)
+        self.assertIn("▲ +500 · 24h", html)
+
     def test_compact_card_text_and_original_delta_style(self):
         for delta, text, cls in ((500, "▲ +500 · 24h", "rp-up"), (-50, "▼ -50 · 24h", "rp-down")):
             with self.subTest(delta=delta):

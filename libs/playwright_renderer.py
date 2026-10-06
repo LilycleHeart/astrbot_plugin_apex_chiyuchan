@@ -369,14 +369,19 @@ def _build_rp_trend_html(window) -> str:
 def _build_rp_chart_html(entries: list, window=None) -> str:
     """RP 历史折线图（SVG，区域渐变 + 首尾标注），24h 统计独立传入。
 
+    连续同分只保留首点；过滤后不足 2 条时只显示独立的 24h 统计。
+
     entries: [{score, at}] 按时间正序，at 为 "YYYY-MM-DD HH:MM:SS"
     """
     entries = entries or []
-    pts = [
-        (e.get("score"), e.get("at", ""))
-        for e in entries
-        if isinstance(e, dict) and e.get("score") is not None
-    ]
+    pts = []
+    for e in entries:
+        if not isinstance(e, dict) or e.get("score") is None:
+            continue
+        score = e["score"]
+        if pts and pts[-1][0] == score:
+            continue
+        pts.append((score, e.get("at", "")))
     trend_html = _build_rp_trend_html(window)
     if len(pts) < 2:
         if not trend_html:
