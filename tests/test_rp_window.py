@@ -7,6 +7,7 @@ import sys
 import tempfile
 import types
 import unittest
+from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -239,14 +240,76 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         result = await self.snapshot()
         self.assertEqual(result["rp_24h"].delta, 0)
         self.assertEqual(len(await self.db.get_rp_history("player", "PC")), 6)
-        self.assertEqual(result["rp_history"][-1]["at"], "2026-09-30 18:00:00")
+        self.assertEqual(result["rp_history"][-1]["at"], "2026-09-29 18:00:00")
 
     async def test_stale_gain_after_days_is_insufficient(self):
         await self.seed(1000, 73)
         await self.seed(1500, 72)
         result = await self.snapshot()
         self.assertIsNone(result["rp_24h"].delta)
-        self.assertEqual(result["rp_history"][-1]["at"], "2026-09-30 18:00:00")
+        self.assertEqual(result["rp_history"][-1]["at"], "2026-09-27 18:00:00")
+
+    async def test_chart_backfills_twelve_changes_across_many_unchanged_rows(self):
+        conn = await self.db._get_conn()
+        observations = [
+            ("player", "PC", 1000 + change * 100,
+             (NOW - timedelta(minutes=500 - change * 30 - repeat)).strftime("%Y-%m-%d %H:%M:%S"))
+            for change in range(15) for repeat in range(30)
+        ]
+        await conn.executemany(
+            "INSERT INTO rp_history (uid, platform, rank_score, recorded_at) VALUES (?, ?, ?, ?)",
+            observations,
+        )
+        await conn.commit()
+        history = await self.db.get_rp_history_for_chart("player", "PC", 2400, now=NOW)
+        self.assertEqual([point["score"] for point in history], list(range(1300, 2500, 100)))
+        self.assertEqual([point["at"] for point in history], [observations[i * 30][3] for i in range(3, 15)])
+        self.assertIn('<svg', _build_rp_chart_html(history))
+        async with conn.execute("SELECT COUNT(*) FROM rp_history") as cursor:
+            self.assertEqual((await cursor.fetchone())[0], 450)
+
+    async def test_chart_backfills_past_long_current_plateau(self):
+        await self.seed(1000, 30)
+        conn = await self.db._get_conn()
+        observations = [
+            ("player", "PC", 1500, (NOW - timedelta(minutes=300 - i)).strftime("%Y-%m-%d %H:%M:%S"))
+            for i in range(300)
+        ]
+        await conn.executemany(
+            "INSERT INTO rp_history (uid, platform, rank_score, recorded_at) VALUES (?, ?, ?, ?)",
+            observations,
+        )
+        await conn.commit()
+        history = await self.db.get_rp_history_for_chart("player", "PC", 1500, now=NOW)
+        self.assertEqual([point["score"] for point in history], [1000, 1500])
+        self.assertEqual(history[-1]["at"], observations[0][3])
+        self.assertIn('<svg', _build_rp_chart_html(history))
+
+    async def test_chart_keeps_return_to_score_and_isolates_player_platform(self):
+        await self.seed(1500, 5)
+        await self.seed(1500, 4)
+        await self.seed(1400, 3)
+        await self.seed(9000, 2, uid="other")
+        await self.seed(8000, 1, platform="PS4")
+        history = await self.db.get_rp_history_for_chart("player", "PC", 1500, now=NOW)
+        self.assertEqual([point["score"] for point in history], [1500, 1400, 1500])
+        self.assertEqual(history[0]["at"], "2026-09-30 13:00:00")
+        self.assertEqual(history[-1]["at"], "2026-09-30 18:00:00")
+
+    async def test_chart_empty_history_and_small_limits(self):
+        self.assertEqual(
+            await self.db.get_rp_history_for_chart("player", "PC", 1500, now=NOW),
+            [{"score": 1500, "at": "2026-09-30 18:00:00"}],
+        )
+        await self.seed(1000, 3)
+        await self.seed(1500, 2)
+        await self.seed(1500, 1)
+        self.assertEqual(
+            await self.db.get_rp_history_for_chart("player", "PC", 1500, limit=1, now=NOW),
+            [{"score": 1500, "at": "2026-09-30 16:00:00"}],
+        )
+        for limit in (0, -1):
+            self.assertEqual(await self.db.get_rp_history_for_chart("player", "PC", 1500, limit=limit, now=NOW), [])
 
     async def test_boundary_uses_latest_at_or_before_not_after(self):
         await self.seed(900, 25)
@@ -320,7 +383,7 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_migration_preserves_legacy_local_timestamp(self):
         await self.db.close()
-        with sqlite3.connect(self.db.db_path) as conn:
+        with closing(sqlite3.connect(self.db.db_path)) as conn, conn:
             conn.execute("DROP TABLE rp_history")
             conn.execute("CREATE TABLE rp_history (uid TEXT, platform TEXT, rank_score INTEGER, recorded_at TEXT, PRIMARY KEY (uid, platform))")
             conn.execute("INSERT INTO rp_history VALUES ('player', 'PC', 1000, '2026-09-29 18:00:00')")
@@ -343,7 +406,7 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_append_only_legacy_migration_keeps_rows_and_season_unknown(self):
         await self.db.close()
-        with sqlite3.connect(self.db.db_path) as conn:
+        with closing(sqlite3.connect(self.db.db_path)) as conn, conn:
             conn.execute("DROP TABLE rp_history")
             conn.execute("CREATE TABLE rp_history (id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT, platform TEXT, rank_score INTEGER, recorded_at TEXT)")
             conn.executemany("INSERT INTO rp_history (uid, platform, rank_score, recorded_at) VALUES ('player', 'PC', ?, ?)", [

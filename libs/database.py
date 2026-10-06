@@ -318,7 +318,7 @@ class Database:
     async def get_rp_history(
         self, uid: str, platform: str, limit: int = 12
     ) -> list[dict]:
-        """按时间正序返回 RP 历史（最新 limit 条），用于折线图"""
+        """按时间正序返回原始 RP 观测（最新 limit 条，包含同分）。"""
         conn = await self._get_conn()
         async with conn.execute(
             "SELECT rank_score, recorded_at FROM rp_history "
@@ -333,12 +333,31 @@ class Database:
         self, uid: str, platform: str, current_score: int, limit: int = 12, *,
         now: datetime | None = None,
     ) -> list[dict]:
-        """折线图始终包含本次观测；统计基准不受 limit 影响。"""
-        hist = await self.get_rp_history(uid, platform, limit=limit)
+        """向前查找最新 limit 个变化节点，连续同分保留首次观测时间。
+
+        本次分数先作为末点并入；原始同分观测仍保留用于 24h 统计。
+        """
+        if limit <= 0:
+            return []
         point = {"score": current_score, "at": (now or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")}
-        if hist and hist[-1] == point:
-            return hist
-        return (hist + [point])[-limit:]
+        points = [point]
+        conn = await self._get_conn()
+        async with conn.execute(
+            "SELECT rank_score, recorded_at FROM rp_history "
+            "WHERE uid = ? AND platform = ? ORDER BY id DESC",
+            (uid, platform),
+        ) as cursor:
+            # 分批向前读，直到找齐变化节点；同分记录不占 limit。
+            while rows := await cursor.fetchmany(128):
+                for row in rows:
+                    point = {"score": row["rank_score"], "at": row["recorded_at"]}
+                    if points[-1]["score"] == point["score"]:
+                        points[-1] = point
+                    elif len(points) < limit:
+                        points.append(point)
+                    else:
+                        return list(reversed(points))
+        return list(reversed(points))
 
     async def get_monitor(self, session_id: str) -> dict | None:
         conn = await self._get_conn()
