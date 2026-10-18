@@ -166,24 +166,22 @@ async def fetch_meta_top5() -> list[SeasonMetaLegend]:
         return cached
 
     from .playwright_manager import run_with_page
+    from .als_scraper import _block_noise
 
     results: list[SeasonMetaLegend] = []
 
     try:
         async with run_with_page() as page:
-            try:
-                await page.goto(
-                    "https://apexlegendsstatus.com/meta",
-                    wait_until="networkidle",
-                    timeout=30000,
-                )
-            except Exception:
-                await page.goto(
-                    "https://apexlegendsstatus.com/meta",
-                    wait_until="domcontentloaded",
-                    timeout=30000,
-                )
-            await page.wait_for_timeout(3000)
+            await _block_noise(page)
+            await page.goto(
+                "https://apexlegendsstatus.com/meta",
+                wait_until="domcontentloaded",
+                timeout=30000,
+            )
+            await page.wait_for_function(
+                r"() => /#\d+\s+\S[\s\S]*?\d+(?:\.\d+)?%\s+\d+(?:\.\d+)?%\s+[\d,]+/.test(document.body.innerText)",
+                timeout=15000,
+            )
 
             # 获取 innerText 然后用正则解析
             text = await page.evaluate("() => document.body.innerText")

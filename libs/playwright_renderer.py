@@ -620,7 +620,17 @@ def _build_stats_html(**d) -> str:
             "border": f"rgba({_hex_to_rgba(color, 0.3)})",
         })
 
-    special_badges_ctx = [{"badge_url": b.get("badge_url", "")} for b in special_badges if b.get("badge_url")]
+    # Keep the full inventory in fetched data; limit only the card's visible row.
+    special_badges_ctx = []
+    seen_special_names = set()
+    for badge in special_badges:
+        url = badge.get("badge_url", "")
+        name = badge.get("name") or url
+        if url and name not in seen_special_names:
+            seen_special_names.add(name)
+            special_badges_ctx.append({"badge_url": url})
+        if len(special_badges_ctx) == 5:
+            break
 
     # ── 英雄排行 ──
     legends_ctx = []
@@ -774,14 +784,14 @@ _MIME_MAP = {
 
 async def _download_and_cache(url: str) -> str | None:
     """异步下载图片转base64，优先从磁盘缓存加载"""
-    import httpx
-    
+    from .http_client import get_async_client
+
     # 尝试从磁盘缓存获取
     try:
         cached_data = await disk_cache.get(url)
         if cached_data:
             stripped = cached_data.lstrip()
-            mime = 'image/png'
+            mime = "image/png"
             for prefix, m in _MIME_MAP.items():
                 if stripped[:4].startswith(prefix) or stripped[:5].startswith(prefix):
                     mime = m
@@ -790,7 +800,7 @@ async def _download_and_cache(url: str) -> str | None:
             return f"data:{mime};base64,{b64}"
     except Exception:
         pass
-    
+
     # 缓存未命中，从网络下载
     try:
         headers = {
@@ -798,29 +808,30 @@ async def _download_and_cache(url: str) -> str | None:
             "Referer": "https://apexlegendsstatus.com/",
             "Accept": "image/svg+xml,image/png,image/*,*/*;q=0.8",
         }
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=headers) as c:
-            r = await c.get(url)
-            r.raise_for_status()
-            raw = r.content
-            if not raw:
-                return None
-            
-            # 写入磁盘缓存（永久保存）
-            try:
-                await disk_cache.set(url, raw)
-            except Exception:
-                pass
-            
-            stripped = raw.lstrip()
-            mime = 'image/png'
-            for prefix, m in _MIME_MAP.items():
-                if stripped[:4].startswith(prefix) or stripped[:5].startswith(prefix):
-                    mime = m
-                    break
-            b64 = base64.b64encode(raw).decode()
-            return f"data:{mime};base64,{b64}"
+        c = await get_async_client()
+        r = await c.get(url, timeout=10.0, follow_redirects=True, headers=headers)
+        r.raise_for_status()
+        raw = r.content
+        if not raw:
+            return None
+
+        # 写入磁盘缓存（永久保存）
+        try:
+            await disk_cache.set(url, raw)
+        except Exception:
+            pass
+
+        stripped = raw.lstrip()
+        mime = "image/png"
+        for prefix, m in _MIME_MAP.items():
+            if stripped[:4].startswith(prefix) or stripped[:5].startswith(prefix):
+                mime = m
+                break
+        b64 = base64.b64encode(raw).decode()
+        return f"data:{mime};base64,{b64}"
     except Exception as e:
         from astrbot.api import logger
+
         logger.warning(f"[Renderer] 下载失败 {url[:80]}: {e}")
         return None
 
@@ -1800,30 +1811,22 @@ async def draw_steamcharts_card(data) -> bytes:
     ) as page:
         # 允许外部 CDN 资源加载（Chart.js + Google Fonts）
         await page.set_content(html, wait_until="load", timeout=30000)
-        # 等待 Chart.js 库加载完成
-        try:
-            await page.wait_for_function(
-                "() => typeof window.Chart !== 'undefined'",
-                timeout=15000,
-            )
-        except Exception:
-            pass
-        # 等待 chart 实例创建 + canvas 渲染（等待 Chart.js 内部动画首帧）
-        try:
-            await page.wait_for_function(
-                "() => { const c = document.getElementById('trendChart'); "
-                "return c && c.width > 0 && c.height > 0; }",
-                timeout=10000,
-            )
-        except Exception:
-            pass
-        # 额外等待让 Chart.js 完成渲染动画
-        await page.wait_for_timeout(800)
+        # The template disables animations; wait for a chart instance rather
+        # than an allocated but potentially blank canvas.
+        await page.wait_for_function(
+            """() => {
+                if (typeof window.Chart === 'undefined') return false;
+                const chart = Chart.getChart('trendChart');
+                return chart && chart.width > 0 && chart.height > 0;
+            }""",
+            timeout=15000,
+        )
         # 等待字体就绪
         try:
             await page.wait_for_function("() => document.fonts.ready", timeout=5000)
         except Exception:
             pass
+        await page.evaluate("() => Chart.getChart('trendChart').update('none')")
         card = await page.query_selector(".card")
         if card:
             return await card.screenshot(type="png", omit_background=True)

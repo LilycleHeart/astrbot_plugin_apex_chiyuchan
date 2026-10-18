@@ -11,7 +11,7 @@ _playwright = None
 _browser: Browser | None = None
 _lock = asyncio.Lock()
 _semaphore = asyncio.Semaphore(2)
-_context_pool: asyncio.Queue[BrowserContext] = asyncio.Queue()
+_context_pools: dict[float, asyncio.Queue[BrowserContext]] = {}
 _CONTEXT_POOL_SIZE = 2
 
 # 时区 & 主题（通过 main.py 从插件配置读取）
@@ -27,6 +27,7 @@ def set_timezone(tz: str):
 def set_color_scheme(scheme: str):
     global _COLOR_SCHEME
     _COLOR_SCHEME = scheme
+
 
 # 性能监控
 _stats: dict[str, list[float]] = {
@@ -67,12 +68,14 @@ async def get_browser() -> Browser:
 
 async def close_browser():
     global _playwright, _browser
-    while not _context_pool.empty():
-        try:
-            ctx = _context_pool.get_nowait()
-            await ctx.close()
-        except Exception:
-            pass
+    for pool in _context_pools.values():
+        while not pool.empty():
+            try:
+                ctx = pool.get_nowait()
+                await ctx.close()
+            except Exception:
+                pass
+    _context_pools.clear()
     if _browser:
         await _browser.close()
         _browser = None
@@ -82,12 +85,13 @@ async def close_browser():
 
 
 async def _get_context(device_scale_factor: float = 1) -> BrowserContext:
-    # df=1 走连接池；df≠1 说明是截图场景，每次新建避免污染池内 context
-    if device_scale_factor == 1:
-        try:
-            return _context_pool.get_nowait()
-        except asyncio.QueueEmpty:
-            pass
+    # Keep scraping and rendering contexts separate, preserving their scale and
+    # browser resource caches across requests.
+    pool = _context_pools.setdefault(device_scale_factor, asyncio.Queue())
+    try:
+        return pool.get_nowait()
+    except asyncio.QueueEmpty:
+        pass
     browser = await get_browser()
     t0 = time.perf_counter()
     # Playwright 只支持 dark|light|no-preference|no-override
@@ -95,6 +99,7 @@ async def _get_context(device_scale_factor: float = 1) -> BrowserContext:
     scheme = _COLOR_SCHEME
     if scheme == "auto":
         from datetime import datetime, timezone, timedelta
+
         hour = datetime.now(timezone(timedelta(hours=8))).hour
         scheme = "light" if 6 <= hour < 18 else "dark"
     elif scheme not in ("dark", "light"):
@@ -109,9 +114,10 @@ async def _get_context(device_scale_factor: float = 1) -> BrowserContext:
     return ctx
 
 
-async def _return_context(ctx: BrowserContext):
-    if _context_pool.qsize() < _CONTEXT_POOL_SIZE:
-        await _context_pool.put(ctx)
+async def _return_context(ctx: BrowserContext, device_scale_factor: float):
+    pool = _context_pools.setdefault(device_scale_factor, asyncio.Queue())
+    if pool.qsize() < _CONTEXT_POOL_SIZE:
+        await pool.put(ctx)
     else:
         await ctx.close()
 
@@ -133,4 +139,4 @@ async def run_with_page(viewport: dict = None, device_scale_factor: float = 1):
         finally:
             _log_stat("page_use", time.perf_counter() - t_use)
             await page.close()
-            await _return_context(ctx)
+            await _return_context(ctx, device_scale_factor)

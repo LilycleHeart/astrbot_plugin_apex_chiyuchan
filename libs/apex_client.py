@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import httpx
+import asyncio
 from typing import Optional
 from astrbot.api import logger
 
@@ -423,15 +424,20 @@ class ApexClient:
             if cached is not None:
                 return PredatorData(cached)
 
-            data = await self._get("/predator")
+            changes = PredatorData({})
+            data, _ = await asyncio.gather(
+                self._get("/predator"),
+                _fill_predator_changes(changes, await self._get_client()),
+                return_exceptions=True,
+            )
+            if isinstance(data, Exception):
+                return None
             if data:
+                for key, platform in changes.platforms.items():
+                    if platform.rp_change_24h is not None:
+                        data.setdefault("RP", {}).setdefault(key, {})["rp_change_24h"] = platform.rp_change_24h
                 await cache_set(cache_key, data, 600)
-
-            pred = PredatorData(data) if data else None
-            if pred:
-                # 从 ALS 页面抓取 24h 变动值
-                await _fill_predator_changes(pred, self._client if self._client else await self._get_client())
-            return pred
+            return PredatorData(data) if data else None
         except Exception:
             return None
 

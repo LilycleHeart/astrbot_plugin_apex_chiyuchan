@@ -30,6 +30,7 @@ sys.modules["astrbot.core.utils.astrbot_path"].get_astrbot_data_path = lambda: "
 decorator = lambda *a, **kw: lambda f: f
 sys.modules["astrbot.api.event"].filter = types.SimpleNamespace(
     command=decorator, llm_tool=decorator, on_astrbot_loaded=decorator,
+    on_decorating_result=decorator, after_message_sent=decorator,
 )
 sys.modules["astrbot.api.event"].AstrMessageEvent = object
 sys.modules["astrbot.api.star"].Context = object
@@ -439,7 +440,7 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         async def send_card(event, image):
             yield "card"
         bot._send_card = send_card
-        event = types.SimpleNamespace(get_sender_id=lambda: "qq", get_message_str=lambda: "/stats", plain_result=lambda text: text)
+        event = types.SimpleNamespace(get_sender_id=lambda: "qq", get_message_str=lambda: "/stats", plain_result=lambda text: text, set_extra=lambda *args: None)
         await self.db.upsert_user("qq", "player", "Player", "PC")
         await self.seed(1000, 24)
         await self.seed(1200, 2)

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import re
+import asyncio
+from html import unescape
 from dataclasses import dataclass, field
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -54,14 +56,21 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
         nonlocal result
         await page.route(
             "**/*",
-            lambda route: route.abort()
-            if route.request.resource_type in ("image", "font", "media", "stylesheet")
-            or "analytics" in (route.request.url or "")
-            or "googletagmanager" in (route.request.url or "")
-            or "cookieconsent" in (route.request.url or "")
-            else route.continue_(),
+            lambda route: (
+                route.abort()
+                if route.request.resource_type
+                in ("image", "font", "media", "stylesheet")
+                or "analytics" in (route.request.url or "")
+                or "googletagmanager" in (route.request.url or "")
+                or "cookieconsent" in (route.request.url or "")
+                else route.continue_()
+            ),
         )
-        await page.goto("https://apexlegendsstatus.com/", wait_until="domcontentloaded", timeout=20000)
+        await page.goto(
+            "https://apexlegendsstatus.com/",
+            wait_until="domcontentloaded",
+            timeout=20000,
+        )
 
         content = await page.content()
 
@@ -76,7 +85,7 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
             result.alert_banner = text
 
         # Parse outage announcement
-        if 'v2-alert--danger' in content and 'Outage in progress' in content:
+        if "v2-alert--danger" in content and "Outage in progress" in content:
             result.outage_announcement = True
 
         # Parse status sections
@@ -90,11 +99,11 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
 
             # Section name and pill status
             name_m = re.search(
-                r'v2-status-card__name[^>]*>(?:<[^>]*>)*\s*([^<]+)',
+                r"v2-status-card__name[^>]*>(?:<[^>]*>)*\s*([^<]+)",
                 sec_html,
             )
             pill_m = re.search(
-                r'v2-status-pill[^>]*>([^<]+)',
+                r"v2-status-pill[^>]*>([^<]+)",
                 sec_html,
             )
             if not name_m:
@@ -113,27 +122,31 @@ async def scrape_als_server_status() -> AlsServerStatus | None:
             for row_match in row_pattern.finditer(sec_html):
                 row_html = row_match.group(1)
                 row_name_m = re.search(
-                    r'v2-status-row__name[^>]*>([^<]+)',
+                    r"v2-status-row__name[^>]*>([^<]+)",
                     row_html,
                 )
                 row_status_m = re.search(
-                    r'v2-status-row__state[^>]*>([^<]+)',
+                    r"v2-status-row__state[^>]*>([^<]+)",
                     row_html,
                 )
                 row_rt_m = re.search(
-                    r'v2-status-row__rt[^>]*>([^<]+)',
+                    r"v2-status-row__rt[^>]*>([^<]+)",
                     row_html,
                 )
                 if row_name_m:
                     # Extract ALS flag class (e.g. "flag-icon-eu")
-                    flag_m = re.search(r'flag-icon-(\w+)', row_html)
+                    flag_m = re.search(r"flag-icon-(\w+)", row_html)
                     flag_cls = f"flag-icon-{flag_m.group(1)}" if flag_m else ""
-                    section.entries.append(AlsServerEntry(
-                        name=row_name_m.group(1).strip(),
-                        status=row_status_m.group(1).strip() if row_status_m else "",
-                        response_time=row_rt_m.group(1).strip() if row_rt_m else "",
-                        flag_class=flag_cls,
-                    ))
+                    section.entries.append(
+                        AlsServerEntry(
+                            name=row_name_m.group(1).strip(),
+                            status=row_status_m.group(1).strip()
+                            if row_status_m
+                            else "",
+                            response_time=row_rt_m.group(1).strip() if row_rt_m else "",
+                            flag_class=flag_cls,
+                        )
+                    )
 
             result.sections.append(section)
 
@@ -152,105 +165,251 @@ async def _block_noise(page):
     """拦截图片/字体/媒体/统计请求，加速页面加载"""
     await page.route(
         "**/*",
-        lambda route: route.abort()
-        if route.request.resource_type in ("image", "font", "media", "stylesheet")
-        or "analytics" in (route.request.url or "")
-        or "googletagmanager" in (route.request.url or "")
-        or "cookieconsent" in (route.request.url or "")
-        else route.continue_(),
+        lambda route: (
+            route.abort()
+            if route.request.resource_type in ("image", "font", "media", "stylesheet")
+            or "analytics" in (route.request.url or "")
+            or "googletagmanager" in (route.request.url or "")
+            or "cookieconsent" in (route.request.url or "")
+            else route.continue_()
+        ),
     )
 
 
-async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
-    url = f"https://apexlegendsstatus.com/profile/{platform}/{name_or_uid}"
+async def _get_profile_soup(name_or_uid: str, platform: str):
+    """Fetch the public profile fragment using the site's own bootstrap.
+
+    Args:
+        name_or_uid: Player name or numeric UID.
+        platform: Apex platform identifier.
+
+    Returns:
+        Parsed profile HTML and its base URL, with no browser resources loaded.
+    """
+    from bs4 import BeautifulSoup
+    from .http_client import get_async_client
+
+    profile_path = "profile/uid" if name_or_uid.isdigit() else "profile"
+    url = f"https://apexlegendsstatus.com/{profile_path}/{platform}/{quote(name_or_uid, safe='')}"
+    client = await get_async_client()
+    response = await client.get(url, follow_redirects=True)
+    response.raise_for_status()
+    document, base_url = response.text, str(response.url)
+    if "fetchApiData(" in document:
+        token = re.search(
+            r"""(?:let|const|var)\s+token\s*=\s*(["'])(.*?)\1""", document
+        )
+        fragment = re.search(
+            r"""fetchApiData\(\s*["'](/core/interface-v2\?token=)["']\s*\+\s*token\s*\+\s*["']([^"']*)["']\s*\)""",
+            document,
+        )
+        if not token or not fragment:
+            raise ValueError("Unsupported profile bootstrap")
+        fragment_url = urljoin(
+            "https://apexlegendsstatus.com/",
+            fragment[1] + quote(token[2], safe="") + unescape(fragment[2]),
+        )
+        response = await client.get(
+            fragment_url,
+            follow_redirects=True,
+            headers={"X-Requested-With": "XMLHttpRequest", "Referer": base_url},
+        )
+        response.raise_for_status()
+        document = response.text
+    soup = BeautifulSoup(document, "html.parser")
+    if not soup.select_one(".als-v2, .player-name"):
+        raise ValueError("Profile fragment contains no player data")
+    return soup, base_url
+
+
+def _parse_profile(soup, base_url: str) -> dict:
+    """Extract the same profile fields as the browser parser from real HTML.
+
+    Args:
+        soup: Parsed response from the public profile endpoint.
+        base_url: Base URL for relative badge and level images.
+
+    Returns:
+        Badge media and the live profile counters used by cards and LFG.
+    """
+    colors = {
+        "bronze": "#cd7f32",
+        "silver": "#c0c0c0",
+        "gold": "#ffd700",
+        "platinum": "#4ECDC4",
+        "diamond": "#358de6",
+        "master": "#9f35e6",
+        "predator": "#e31b39",
+    }
+    seasons, special, seen = [], [], set()
+    for img in soup.select("img[src]"):
+        src = urljoin(base_url, img["src"])
+        match = re.search(r"you_re_tiering_me_apart_(\w+)_rs(\d+)", src)
+        if match:
+            seasons.append(
+                {
+                    "season": "S" + match[2],
+                    "tier": match[1],
+                    "badge_url": src,
+                    "color": colors.get(match[1], "#666"),
+                }
+            )
+        if "you_re_tiering_me_apart" in src:
+            continue
+        match = re.search(r"badges/badges_new/(.+?)\.png", src)
+        if match:
+            name = re.sub(r"\b\w", lambda m: m[0].upper(), match[1].replace("_", " "))
+            name = re.sub(r" Rs\d+", "", name)
+            for old, new in [
+                (" Iv", " IV"),
+                (" Iii", " III"),
+                (" Ii", " II"),
+                (" Vi", " VI"),
+            ]:
+                if name.endswith(old):
+                    name = name[: -len(old)] + new
+            if src not in seen:
+                seen.add(src)
+                special.append({"name": name, "color": "#b1f4fa", "badge_url": src})
+    result = dict(
+        seasons=seasons,
+        special=special,
+        kills=0,
+        wins=0,
+        level=0,
+        prestige=0,
+        rankPos=0,
+        rankScore=0,
+        rankTopPct=0,
+        rankPcPos=0,
+        level_icon="",
+    )
+    icon = soup.select_one('.v2-sb-stat--level img, img[alt="level"]')
+    if icon and icon.get("src"):
+        result["level_icon"] = urljoin(base_url, icon["src"])
+    level_card = soup.select_one(".v2-sb-stat--level")
+    if level_card:
+        value = level_card.select_one(".v2-sb-stat__value")
+        match = re.search(r"[\d,]+", value.get_text()) if value else None
+        if match:
+            result["level"] = int(match[0].replace(",", ""))
+        match = re.search(
+            r"Prestige\s*(\d+)", level_card.get_text(" ", strip=True), re.I
+        )
+        if match:
+            result["prestige"] = int(match[1])
+    # Global counters must stay inside their legend section; otherwise a missing
+    # career tracker can accidentally consume the next legend's wins or kills.
+    for legend in soup.select(".v2-legend"):
+        heading = legend.select_one(".profile-legend__name")
+        if not heading or heading.get_text(strip=True) != "Global":
+            continue
+        for stat in legend.select(".v2-stat"):
+            label, amount = (
+                stat.select_one(".v2-stat__label"),
+                stat.select_one(".amount__total"),
+            )
+            if not label or not amount:
+                continue
+            field = {
+                "career kills": "kills",
+                "career wins": "wins",
+                "wins": "wins",
+            }.get(label.get_text(strip=True).casefold())
+            match = re.search(r"[\d,]+", amount.get_text())
+            if field and match:
+                result[field] = int(match[0].replace(",", ""))
+        break
+    rank_card = soup.select_one(".v2-sb-stat--rank")
+    if rank_card:
+        value = rank_card.select_one(".v2-sb-stat__value")
+        match = (
+            re.search(r"([\d,]+)\s*RP", value.get_text(" ", strip=True))
+            if value
+            else None
+        )
+        if match:
+            result["rankScore"] = int(match[1].replace(",", ""))
+        pill = rank_card.select_one(".v2-sb-stat__pill--rank")
+        if pill:
+            span = pill.select_one("span")
+            match = re.search(r"[\d.]+", (span or pill).get_text().replace("%", ""))
+            if match:
+                result["rankTopPct"] = float(match[0])
+        top = rank_card.select_one(".v2-sb-stat__pill--top")
+        match = re.search(r"#([\d,]+)", top.get_text()) if top else None
+        if match:
+            result["rankPcPos"] = int(match[1].replace(",", ""))
+        # BR positions are supplied in encoded tooltip HTML. Text elsewhere on
+        # the page contains unrelated tracker rankings and is not a fallback.
+        from bs4 import BeautifulSoup
+
+        for pill in rank_card.select("[title]"):
+            tooltip = BeautifulSoup(pill["title"], "html.parser")
+            for label in tooltip.select(".ranking-tooltip-subtitle"):
+                value = label.find_next_sibling(class_="ranking-tooltip-value")
+                match = (
+                    re.search(r"#\s*([\d,]+)", value.get_text(" ", strip=True))
+                    if value
+                    else None
+                )
+                if not match:
+                    continue
+                scope = label.get_text(" ", strip=True).casefold()
+                if "global" in scope:
+                    result["rankPos"] = int(match[1].replace(",", ""))
+                elif "only" in scope:
+                    result["rankPcPos"] = int(match[1].replace(",", ""))
+    return result
+
+
+async def _load_profile(page, name_or_uid: str, platform: str) -> str:
+    """Load the browser fallback when the direct public request is unavailable.
+
+    Args:
+        page: Page used for the existing browser flow.
+        name_or_uid: Player name or numeric UID.
+        platform: Apex platform identifier.
+
+    Returns:
+        The resolved profile URL.
+    """
+    profile_path = "profile/uid" if name_or_uid.isdigit() else "profile"
+    url = f"https://apexlegendsstatus.com/{profile_path}/{platform}/{quote(name_or_uid, safe='')}"
     await _block_noise(page)
     await page.goto(url, wait_until="domcontentloaded", timeout=15000)
-    try:
-        await page.wait_for_selector(".player-name", timeout=5000)
-    except Exception:
-        pass
-    # 段位 pill 是 fetchApiData 异步加载后才插入 DOM 的，必须等它出现
-    try:
-        await page.wait_for_selector(".v2-sb-stat__pill--rank", timeout=8000)
-    except Exception:
-        pass
-    # 等级图标也等 DOM 渲染
-    try:
-        await page.wait_for_selector(".v2-sb-stat--level img, img[alt='level']", timeout=5000)
-    except Exception:
-        pass
-    return await page.evaluate("""() => {
-        const colors = {
-            bronze:'#cd7f32',silver:'#c0c0c0',gold:'#ffd700',
-            platinum:'#4ECDC4',diamond:'#358de6',
-            master:'#9f35e6',predator:'#e31b39'
-        };
-        const seasons = [];
-        document.querySelectorAll('img[src*="you_re_tiering_me_apart"]').forEach(img => {
-            const m = img.src.match(/you_re_tiering_me_apart_(\\w+)_rs(\\d+)/);
-            if (m) seasons.push({
-                season: 'S' + m[2],
-                tier: m[1],
-                badge_url: img.src,
-                color: colors[m[1]] || '#666'
-            });
-        });
-        const special = [];
-        const seen = new Set();
-        document.querySelectorAll('img[src*="badges"]').forEach(img => {
-            const src = img.src;
-            if (src.includes('you_re_tiering_me_apart')) return;
-            const m = src.match(/badges\\/badges_new\\/(.+?)\\.png/);
-            if (m) {
-                let nm = m[1].replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase());
-                nm = nm.replace(/ Rs\\d+/,'')
-                       .replace(/ Iv$/,' IV').replace(/ Iii$/,' III')
-                       .replace(/ Ii$/,' II').replace(/ Vi$/,' VI');
-                if (!seen.has(nm) && nm.length < 40) {
-                    seen.add(nm);
-                    special.push({name:nm, color:'#b1f4fa', badge_url: src});
-                }
-            }
-        });
-        let level_icon = '';
-        const li = document.querySelector('.v2-sb-stat--level img') || document.querySelector('img[alt="level"]');
-        if (li && li.src) level_icon = li.src;
-        const text = document.body.innerText;
-        const gIdx = text.indexOf('\\nGlobal\\n');
-        let kills = 0, wins = 0, rankScore = 0;
-        if (gIdx >= 0) {
-            const gSection = text.substring(gIdx, gIdx + 500);
-            const ck = gSection.match(/Career Kills\\s*\\n([\\d,]+)\\n/);
-            if (ck) kills = parseInt(ck[1].replace(/,/g,''));
-            const cw = gSection.match(/Wins\\s*\\n([\\d,]+)\\n/);
-            if (cw) wins = parseInt(cw[1].replace(/,/g,''));
-        }
-        let level = 0, prestige = 0;
-        const lv = text.match(/LEVEL\\s*\\n(\\d+)\\s*\\nPRESTIGE\\s*(\\d+)/);
-        if (lv) { level = parseInt(lv[1]); prestige = parseInt(lv[2]); }
-        let rankPos = 0;
-        const brRank = text.match(/BR Rank[\\s\\S]*?#([\\d,]{1,12})\\b/);
-        if (brRank) rankPos = parseInt(brRank[1].replace(/,/g,''));
-        const brScore = text.match(/BR Rank[\\s\\S]*?([\\d,]+)\\s*RP/);
-        if (brScore) rankScore = parseInt(brScore[1].replace(/,/g,''));
-        let rankTopPct = 0, rankPcPos = 0;
-        const rp = document.querySelector('.v2-sb-stat__pill--rank');
-        if (rp) {
-            const sp = rp.querySelector('span');
-            const raw = sp ? sp.textContent.trim() : rp.textContent.trim();
-            const m = raw.replace('%','').match(/[\d.]+/);
-            if (m) rankTopPct = parseFloat(m[0]);
-        }
-        const tp = document.querySelector('.v2-sb-stat__pill--top');
-        if (tp) {
-            const m2 = tp.textContent.trim().match(/#([\\d,]+)/);
-            if (m2) rankPcPos = parseInt(m2[1].replace(/,/g,''));
-        }
-        return {seasons, special: special.slice(0, 5), kills, wins, level, prestige, rankPos, rankScore, rankTopPct, rankPcPos, level_icon};
-    }""")
+    await page.wait_for_function(
+        """() => {
+            const content = document.querySelector('[data-role="profile-content"]');
+            if (content) return content.children.length > 0
+                && !content.querySelector(':scope > .loading-indicator');
+            return !!document.querySelector('.player-name');
+        }""",
+        timeout=15000,
+    )
+    return page.url
 
 
-async def fetch_badges(name_or_uid: str, platform: str = "PC", force: bool = False) -> dict:
+async def _do_fetch(page, name_or_uid: str, platform: str) -> dict:
+    """Use the same extraction rules after the browser loads the profile.
+
+    Args:
+        page: Browser fallback page.
+        name_or_uid: Player lookup value.
+        platform: Apex platform identifier.
+
+    Returns:
+        Parsed profile fields from the completed browser DOM.
+    """
+    from bs4 import BeautifulSoup
+
+    base_url = await _load_profile(page, name_or_uid, platform)
+    return _parse_profile(BeautifulSoup(await page.content(), "html.parser"), base_url)
+
+
+async def fetch_badges(
+    name_or_uid: str, platform: str = "PC", force: bool = False
+) -> dict:
     """从 ALS 个人页面抓取赛季徽章和特殊徽章（仅网络超时重试，空数据不重试，TTL 缓存1h）
     force=True 时跳过内存缓存，强制重新抓取。"""
     import time
@@ -265,12 +424,26 @@ async def fetch_badges(name_or_uid: str, platform: str = "PC", force: bool = Fal
 
     t0 = time.time()
 
+    try:
+        soup, base_url = await asyncio.wait_for(
+            _get_profile_soup(name_or_uid, platform), timeout=10
+        )
+        result = _parse_profile(soup, base_url)
+        if result.get("seasons") or result.get("special"):
+            await cache_set(cache_key, result, 3600)
+        logger.info("[BadgeFetcher] HTTP profile %.2fs", time.time() - t0)
+        return result
+    except Exception as exc:
+        logger.debug("[BadgeFetcher] Using browser fallback (%s)", type(exc).__name__)
+
     for attempt in range(2):
         try:
             async with run_with_page() as page:
                 result = await _do_fetch(page, name_or_uid, platform)
                 dt = time.time() - t0
-                logger.info(f"[BadgeFetcher] 耗时: {dt:.1f}s (attempt={attempt+1}) rankTopPct={result.get('rankTopPct',0)} rankPcPos={result.get('rankPcPos',0)} rankPos={result.get('rankPos',0)}")
+                logger.info(
+                    f"[BadgeFetcher] 耗时: {dt:.1f}s (attempt={attempt + 1}) rankTopPct={result.get('rankTopPct', 0)} rankPcPos={result.get('rankPcPos', 0)} rankPos={result.get('rankPos', 0)}"
+                )
                 if result.get("seasons") or result.get("special"):
                     await cache_set(cache_key, result, 3600)
                 return result
@@ -301,25 +474,58 @@ async def search_players(name: str, platform: str = "PC") -> list[dict]:
         return cached
 
     t0 = time.time()
-    encoded = quote(name, safe="")
-    url = f"https://apexlegendsstatus.com/profile/{platform}/{encoded}"
+    try:
+        soup, _ = await asyncio.wait_for(_get_profile_soup(name, platform), timeout=10)
+        uid, player_name = soup.select_one("#puid"), soup.select_one("#pname")
+        if uid and player_name and uid.get("value") and player_name.get("value"):
+            pplat = soup.select_one("#pplat")
+            result = [
+                {
+                    "name": player_name["value"],
+                    "uid": uid["value"],
+                    "platform": pplat.get("value", platform) if pplat else platform,
+                }
+            ]
+        else:
+            result, seen = [], set()
+            for link in soup.select('a[href*="profile/uid"]'):
+                match = re.search(r"profile/uid/(\w+)/(\d+)", link["href"])
+                player_name = link.select_one(".player-name")
+                if match and player_name and match[2] not in seen:
+                    seen.add(match[2])
+                    result.append(
+                        {
+                            "name": player_name.get_text(strip=True),
+                            "uid": match[2],
+                            "platform": match[1],
+                        }
+                    )
+            result = result[:10]
+        if result:
+            await cache_set(cache_key, result, 300)
+        logger.info("[SearchPlayers] HTTP profile %.2fs", time.time() - t0)
+        return result
+    except Exception as exc:
+        logger.debug("[SearchPlayers] Using browser fallback (%s)", type(exc).__name__)
     async with run_with_page() as page:
         try:
-            await _block_noise(page)
-            await page.goto(url, wait_until="commit", timeout=10000)
-            logger.info(f"[SearchPlayers] 实际URL: {page.url} (请求: {url})")
+            url = await _load_profile(page, name, platform)
+            logger.info(f"[SearchPlayers] Profile URL: {url}")
             dt = time.time() - t0
             logger.info(f"[SearchPlayers] 页面加载耗时: {dt:.1f}s")
-            try:
-                await page.wait_for_selector(".player-name", timeout=5000)
-            except Exception:
-                pass
-            result = await page.evaluate("""() => {
+            result = await page.evaluate(
+                """(platform) => {
+                const uid = document.getElementById('puid')?.value;
+                const name = document.getElementById('pname')?.value
+                    || document.querySelector('.player-name')?.textContent?.trim();
+                if (name && uid) return [{name, uid,
+                    platform: document.getElementById('pplat')?.value || platform}];
                 const items = [];
                 document.querySelectorAll('a[href*="profile/uid"]').forEach(a => {
                     const m = (a.href || '').match(/profile\\/uid\\/(\\w+)\\/(\\d+)/);
                     if (!m) return;
                     const pn = a.querySelector('.player-name');
+                    if (!pn) return;
                     const name = pn ? pn.textContent.trim() : a.textContent.trim().split(/Lvl|Prestige|Currently/)[0].trim();
                     const row = a.textContent;
                     const lv = (row.match(/Lvl\\s*(\\d+)/) || [])[1] || '';
@@ -329,14 +535,11 @@ async def search_players(name: str, platform: str = "PC") -> list[dict]:
                     const rank_img = ri ? ri.src : '';
                     items.push({name, uid: m[2], platform: m[1], level: lv, prestige: pr, rp: rp.replace(/,/g,''), rank_img});
                 });
-                if (!items.length) {
-                    const name = (document.querySelector('.player-name') || {}).textContent?.trim();
-                    const uid = (document.getElementById('puid') || {}).value;
-                    if (name && uid) items.push({name, uid, platform: '""" + platform + """'});
-                }
                 const seen = new Set();
                 return items.filter(i => { const k = i.uid; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 10);
-            }""")
+            }""",
+                platform,
+            )
             if result:
                 await cache_set(cache_key, result, 300)
             return result
@@ -346,76 +549,28 @@ async def search_players(name: str, platform: str = "PC") -> list[dict]:
 
 
 async def fetch_lfg_stats(name_or_uid: str, platform: str = "PC") -> dict:
-    """轻量版 Playwright 爬虫，只取 LFG 所需数据 (kills/level/prestige/rankPos)，跳过徽章
+    """Read live LFG fields after the complete profile fragment arrives.
 
-    先试 `/profile/{platform}/{name_or_uid}`；如果找不到 `.player-name`（如消歧页面），
-    再试 `/profile/uid/{platform}/{name_or_uid}`（ALS 数字 UID 路径）。TTL 缓存 5 分钟。
+    Args:
+        name_or_uid: Player name or numeric UID.
+        platform: Apex platform identifier.
+
+    Returns:
+        LFG counters and ranks, or an empty dict when the source fails.
     """
-    from .playwright_manager import run_with_page
-    from .ttl_cache import get as cache_get, set as cache_set
-
     cache_key = f"lfg_stats:{platform}:{name_or_uid}"
     cached = await cache_get(cache_key)
     if cached is not None:
         return cached
-
-    async def _scrape(page):
-        try:
-            await page.wait_for_selector(".player-name", timeout=5000)
-        except Exception:
-            pass
-        if not await page.query_selector(".player-name"):
-            return {}
-        # 段位 pill 异步加载，等它出现
-        try:
-            await page.wait_for_selector(".v2-sb-stat__pill--rank", timeout=8000)
-        except Exception:
-            pass
-        text = await page.evaluate("document.body.innerText")
-        kills = 0; level = 0; prestige = 0; rankPos = 0; rankTopPct = 0; rankPcPos = 0
-        gIdx = text.find("\nGlobal\n")
-        if gIdx >= 0:
-            sec = text[gIdx:gIdx + 500]
-            import re
-            ck = re.search(r"Career Kills\s*\n([\d,]+)\n", sec)
-            if ck: kills = int(ck.group(1).replace(",", ""))
-        lv = __import__("re").search(r"LEVEL\s*\n(\d+)\s*\nPRESTIGE\s*(\d+)", text)
-        if lv: level = int(lv.group(1)); prestige = int(lv.group(2))
-        br = __import__("re").search(r"BR Rank[\s\S]*?#([\d,]{1,12})\b", text)
-        if br: rankPos = int(br.group(1).replace(",", ""))
-        # DOM 方式提取排名百分比和位置
-        rp_el = await page.query_selector('.v2-sb-stat__pill--rank span')
-        if rp_el:
-            try: rankTopPct = float((await rp_el.text_content()).strip().replace('%',''))
-            except: pass
-        tp_el = await page.query_selector('.v2-sb-stat__pill--top')
-        if tp_el:
-            import re
-            m = re.search(r'#([\d,]+)', await tp_el.text_content())
-            if m: rankPcPos = int(m.group(1).replace(',',''))
-        return {"kills": kills, "level": level, "prestige": prestige, "rankPos": rankPos, "rankTopPct": rankTopPct, "rankPcPos": rankPcPos}
-
-    async with run_with_page() as page:
-        await _block_noise(page)
-        is_uid = name_or_uid.isdigit()
-        urls = [
-            f"https://apexlegendsstatus.com/profile/uid/{platform}/{name_or_uid}" if is_uid
-            else f"https://apexlegendsstatus.com/profile/{platform}/{name_or_uid}",
-        ]
-        # name 时再备一个 uid 路径
-        if not is_uid:
-            urls.append(f"https://apexlegendsstatus.com/profile/uid/{platform}/{name_or_uid}")
-        result = {"kills": 0, "level": 0, "prestige": 0, "rankPos": 0}
-        for url in urls:
-            try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=15000)
-            except Exception:
-                continue
-            r = await _scrape(page)
-            if r and (r.get("kills") or r.get("level") or r.get("rankPos")):
-                result = r
-                break
-
-        if result.get("kills") or result.get("level") or result.get("prestige"):
+    try:
+        profile = await fetch_badges(name_or_uid, platform, force=True)
+        fields = ("kills", "level", "prestige", "rankPos", "rankTopPct", "rankPcPos")
+        result = {key: profile.get(key, 0) for key in fields}
+        if any(result.values()):
             await cache_set(cache_key, result, 300)
         return result
+    except Exception:
+        from astrbot.api import logger
+
+        logger.warning("[LFGFetcher] Failed to load profile", exc_info=True)
+        return {}

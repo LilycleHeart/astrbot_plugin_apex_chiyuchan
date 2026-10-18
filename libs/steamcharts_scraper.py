@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import asyncio
 from dataclasses import dataclass, field
 
 from .ttl_cache import get as cache_get, set as cache_set
@@ -14,7 +15,7 @@ _CHART_URL = f"https://steamcharts.com/app/{_APP_ID}/chart-data.json"
 
 @dataclass
 class MonthEntry:
-    month: str       # "May 2026" / "Last 30 Days"
+    month: str  # "May 2026" / "Last 30 Days"
     avg_players: float
     gain: float | None
     gain_pct: float | None
@@ -23,7 +24,7 @@ class MonthEntry:
 
 @dataclass
 class HourlyBucket:
-    ts_ms: int          # 桶起始时间戳（毫秒）
+    ts_ms: int  # 桶起始时间戳（毫秒）
     avg_players: float  # 桶内平均在线
 
 
@@ -88,7 +89,7 @@ _UA = (
 
 async def fetch_steamcharts() -> SteamchartsData | None:
     """抓取 Apex Steamcharts 页面 + chart-data.json（5 分钟 TTL 缓存）"""
-    import httpx
+    from .http_client import get_async_client
 
     cache_key = "steamcharts:apex"
     cached = await cache_get(cache_key)
@@ -99,15 +100,37 @@ async def fetch_steamcharts() -> SteamchartsData | None:
 
     # ── 主页 HTML ──
     try:
-        async with httpx.AsyncClient(
-            timeout=10.0, follow_redirects=True,
-            headers={"User-Agent": _UA, "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"},
-        ) as c:
-            r = await c.get(_URL)
-            r.raise_for_status()
-            html = r.text
+        client = await get_async_client()
+        responses = await asyncio.gather(
+            client.get(
+                _URL,
+                timeout=10.0,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": _UA,
+                    "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+                },
+            ),
+            client.get(
+                _CHART_URL,
+                timeout=10.0,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": _UA,
+                    "Referer": _URL,
+                    "Accept": "application/json,*/*;q=0.8",
+                },
+            ),
+            return_exceptions=True,
+        )
+        r = responses[0]
+        if isinstance(r, Exception):
+            raise r
+        r.raise_for_status()
+        html = r.text
     except Exception as e:
         from astrbot.api import logger
+
         logger.warning(f"[Steamcharts] HTML 下载失败: {e}")
         return None
 
@@ -123,7 +146,7 @@ async def fetch_steamcharts() -> SteamchartsData | None:
 
     # 月度表格行
     row_re = re.compile(
-        r'<tr[^>]*>\s*'
+        r"<tr[^>]*>\s*"
         r'<td class="month-cell left([^"]*)">([^<]+)</td>\s*'
         r'<td class="right num-f[^"]*">([^<]+)</td>\s*'
         r'<td class="right num-p gainorloss[^"]*">([^<]+)</td>\s*'
@@ -140,27 +163,27 @@ async def fetch_steamcharts() -> SteamchartsData | None:
         if avg is None:
             continue
         data.months.append(
-            MonthEntry(month=month, avg_players=avg, gain=gain, gain_pct=gain_pct, peak=peak)
+            MonthEntry(
+                month=month, avg_players=avg, gain=gain, gain_pct=gain_pct, peak=peak
+            )
         )
 
     # ── chart-data.json：最近 7 天数据 ──
     try:
-        async with httpx.AsyncClient(
-            timeout=10.0, follow_redirects=True,
-            headers={"User-Agent": _UA, "Referer": _URL, "Accept": "application/json,*/*;q=0.8"},
-        ) as c:
-            r = await c.get(_CHART_URL)
-            r.raise_for_status()
-            chart_raw = r.json()
-            if isinstance(chart_raw, list):
-                data.seven_day_buckets = _bucket_last_7_days(chart_raw)
-                # 保留最近 7 天的原始数据点（供 Jinja 模板 Chart.js 使用）
-                if chart_raw:
-                    now_ms = chart_raw[-1][0]
-                    start_ms = now_ms - 7 * 86400_000
-                    data.raw_7d_points = [[ts, p] for ts, p in chart_raw if ts >= start_ms]
+        r = responses[1]
+        if isinstance(r, Exception):
+            raise r
+        r.raise_for_status()
+        chart_raw = r.json()
+        if isinstance(chart_raw, list):
+            data.seven_day_buckets = _bucket_last_7_days(chart_raw)
+            if chart_raw:
+                now_ms = chart_raw[-1][0]
+                start_ms = now_ms - 7 * 86400_000
+                data.raw_7d_points = [[ts, p] for ts, p in chart_raw if ts >= start_ms]
     except Exception as e:
         from astrbot.api import logger
+
         logger.warning(f"[Steamcharts] chart-data.json 下载失败: {e}")
 
     if not data.months and not data.current_online:
