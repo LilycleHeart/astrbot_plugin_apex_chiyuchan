@@ -2,6 +2,7 @@
 import asyncio
 import importlib.util
 import logging
+import re
 import sqlite3
 import sys
 import tempfile
@@ -42,7 +43,8 @@ sys.modules["astrbot.api.message_components"].Plain = str
 
 from libs.database import Database
 from libs.apex_client import PlayerStats
-from libs.playwright_renderer import _build_rp_chart_html, _build_stats_html
+from libs.card_kit import ICON_PATHS
+from libs.playwright_renderer import _build_rp_chart_html, _build_rp_trend_html, _build_stats_html
 from libs.rp_window import RPWindow, calculate_rp_window
 
 NOW = datetime(2026, 9, 30, 18, 0, 0)
@@ -51,6 +53,11 @@ SEASON = "season30_split_2"
 
 def row(score, age_hours, season=SEASON):
     return {"rank_score": score, "recorded_at": (NOW - timedelta(hours=age_hours)).strftime("%Y-%m-%d %H:%M:%S"), "rank_season": season}
+
+
+def visible(html):
+    """Card markup without <style>: the embedded base64 font must not match digit checks."""
+    return re.sub(r"<style\b.*?</style>", "", html, flags=re.S)
 
 
 class WindowTests(unittest.TestCase):
@@ -139,16 +146,19 @@ class WindowTests(unittest.TestCase):
         self.assertEqual(result.delta, 500)
 
     def test_zero_is_displayed_without_up_arrow(self):
-        html = _build_rp_chart_html([], RPWindow(delta=0, status="exact"))
+        html = _build_rp_trend_html(RPWindow(delta=0, status="exact"))
         self.assertIn("+0 · 24h", html)
-        self.assertNotIn("rp-up", html)
+        self.assertTrue(html.startswith('<span class="chip">'))
+        self.assertNotIn(ICON_PATHS["trending_up"], html)
         self.assertNotIn("▲", html)
 
     def test_renderer_does_not_guess_from_two_points(self):
         entries = [{"score": 1000, "at": "2026-09-30 10:00:00"}, {"score": 1200, "at": "2026-09-30 11:00:00"}]
         self.assertNotIn("24h", _build_rp_chart_html(entries))
-        html = _build_rp_chart_html(entries, RPWindow(delta=700, status="estimated"))
-        self.assertIn("▲ ≈+700 · 24h", html)
+        html = visible(_build_stats_html(
+            rank_score=1200, rp_history=entries, rp_24h=RPWindow(delta=700, status="estimated"),
+        ))
+        self.assertIn("≈+700 · 24h", html)
         self.assertNotIn("+200", html)
         self.assertNotIn("净变化", html)
 
@@ -172,17 +182,24 @@ class WindowTests(unittest.TestCase):
             {"score": 6000, "at": "2026-09-30 11:00:00"},
         ]
         self.assertEqual(_build_rp_chart_html(entries), "")
-        html = _build_rp_chart_html(entries, RPWindow(delta=500, status="exact"))
-        self.assertNotIn('<svg', html)
-        self.assertIn("▲ +500 · 24h", html)
+        html = visible(_build_stats_html(
+            rank_score=6000, rp_history=entries, rp_24h=RPWindow(delta=500, status="exact"),
+        ))
+        self.assertNotIn('id="rp-fill"', html)
+        self.assertIn("+500 · 24h", html)
 
-    def test_compact_card_text_and_original_delta_style(self):
-        for delta, text, cls in ((500, "▲ +500 · 24h", "rp-up"), (-50, "▼ -50 · 24h", "rp-down")):
+    def test_compact_card_text_and_delta_style(self):
+        for delta, text, cls in ((500, "+500 · 24h", "chip up"), (-50, "-50 · 24h", "chip down")):
             with self.subTest(delta=delta):
-                html = _build_stats_html(rank_score=1500, rp_24h=RPWindow(delta=delta, status="exact"), rp_delta=50)
-                self.assertIn(text, html)
-                self.assertIn(f'<span class="{cls}" style="font-size:11px;font-weight:700;">', html)
-                self.assertIn('<span class="rp-up" style="font-size:13px;margin-left:8px;">+50 RP</span>', html)
+                window = RPWindow(delta=delta, status="exact")
+                chip = _build_rp_trend_html(window)
+                self.assertTrue(chip.startswith(f'<span class="{cls}">'))
+                self.assertTrue(chip.endswith(f"{text}</span>"))
+                self.assertNotIn("▲", chip)
+                self.assertNotIn("▼", chip)
+                html = visible(_build_stats_html(rank_score=1500, rp_24h=window, rp_delta=50))
+                self.assertIn(chip, html)
+                self.assertIn('<span class="rp-delta up">+50 RP</span>', html)
                 for extra in ("较上次", "净变化", "缺少同赛季", "估算"):
                     self.assertNotIn(extra, html)
 

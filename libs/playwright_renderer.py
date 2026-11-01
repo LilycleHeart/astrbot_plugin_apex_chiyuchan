@@ -30,6 +30,17 @@ def set_use_local_fonts(val: bool):
     global _USE_LOCAL_FONTS
     _USE_LOCAL_FONTS = val
 
+
+def _use_web_cjk_font() -> bool:
+    """是否加载 Google 的 Noto Sans SC。
+
+    Google 只提供可变字体，Windows 版 WebKit 画不出粗细（全部变成细体），
+    所以 Windows 或用户选了系统字体时只用本机字体。
+    """
+    import sys
+
+    return not _USE_LOCAL_FONTS and sys.platform != "win32"
+
 def _escape_html(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
@@ -354,61 +365,95 @@ def _tier_index_for_score(score: int) -> int:
 
 
 def _build_rp_trend_html(window) -> str:
-    """只展示数据库算好的窗口结果，不能拿图表末两点冒充 24h。"""
+    """只展示数据库算好的窗口结果，不能拿图表末两点冒充 24h。
+
+    文字沿用 RPWindow.text 的紧凑写法，箭头换成 Material 图标。
+    """
+    from . import card_kit as kit
+
     if window is None:
         return ""
-    cls = "rp-up" if window.delta is not None and window.delta > 0 else (
-        "rp-down" if window.delta is not None and window.delta < 0 else ""
-    )
-    return (
-        f'<span class="{cls}" style="font-size:11px;font-weight:700;">'
-        f'{_escape_html(window.text)}</span>'
-    )
+    text = window.text.replace("▲ ", "").replace("▼ ", "")
+    if window.delta is None:
+        cls, ic = "", "history"
+    elif window.delta > 0:
+        cls, ic = "up", "trending_up"
+    elif window.delta < 0:
+        cls, ic = "down", "trending_down"
+    else:
+        cls, ic = "", "trending_flat"
+    cls_attr = f"chip {cls}".strip()
+    return f'<span class="{cls_attr}">{kit.icon(ic)}{_escape_html(text)}</span>'
 
 
-def _build_rp_chart_html(entries: list, window=None) -> str:
-    """RP 历史折线图（SVG，区域渐变 + 首尾标注），24h 统计独立传入。
+def _monotone_path(xs: list, ys: list) -> str:
+    """单调三次曲线（Fritsch–Carlson）：线条平滑，但不会画出数据里没有的高低点。"""
+    import math
 
-    连续同分只保留首点；过滤后不足 2 条时只显示独立的 24h 统计。
+    n = len(xs)
+    if n < 3:
+        return "M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in zip(xs, ys))
+    dx = [xs[i + 1] - xs[i] for i in range(n - 1)]
+    m = [(ys[i + 1] - ys[i]) / dx[i] if dx[i] else 0.0 for i in range(n - 1)]
+    t = [m[0]] + [0.0] * (n - 2) + [m[-1]]
+    for i in range(1, n - 1):
+        t[i] = 0.0 if m[i - 1] * m[i] <= 0 else (m[i - 1] + m[i]) / 2
+    for i in range(n - 1):
+        if m[i] == 0:
+            t[i] = t[i + 1] = 0.0
+            continue
+        a, b = t[i] / m[i], t[i + 1] / m[i]
+        s = a * a + b * b
+        if s > 9:
+            k = 3 / math.sqrt(s)
+            t[i], t[i + 1] = k * a * m[i], k * b * m[i]
+    d = f"M{xs[0]:.1f} {ys[0]:.1f}"
+    for i in range(n - 1):
+        h = dx[i] / 3
+        d += (
+            f" C{xs[i] + h:.1f} {ys[i] + t[i] * h:.1f} "
+            f"{xs[i + 1] - h:.1f} {ys[i + 1] - t[i + 1] * h:.1f} "
+            f"{xs[i + 1]:.1f} {ys[i + 1]:.1f}"
+        )
+    return d
+
+
+def _build_rp_chart_html(entries: list) -> str:
+    """RP 走势图（SVG 平滑曲线 + 段位分档线 + 升段图标），返回一个完整区块。
+
+    连续同分只保留首点；过滤后不足 2 个点时不画图（24h 变化在头部单独显示）。
 
     entries: [{score, at}] 按时间正序，at 为 "YYYY-MM-DD HH:MM:SS"
     """
-    entries = entries or []
+    import math
+    from . import card_kit as kit
+
     pts = []
-    for e in entries:
+    for e in entries or []:
         if not isinstance(e, dict) or e.get("score") is None:
             continue
         score = e["score"]
         if pts and pts[-1][0] == score:
             continue
         pts.append((score, e.get("at", "")))
-    trend_html = _build_rp_trend_html(window)
     if len(pts) < 2:
-        if not trend_html:
-            return ""
-        return (
-            '<div class="rp-chart-strip"><div class="rp-chart-head">'
-            '<span class="col-title">RP 历史</span>'
-            f'{trend_html}</div></div>'
-        )
-    import math
+        return ""
     scores = [p[0] for p in pts]
     dates = [p[1] for p in pts]
     n = len(pts)
 
-    # SVG 内部 pad_l 预留 36px 作为 y 轴刻度区（刻度文字左缘与全局 28px 边距统一）
-    W, H = 664, 150
-    pad_l, pad_r, pad_t, pad_b = 36, 6, 26, 24
+    W, H = 672, 160
+    pad_l, pad_r, pad_t, pad_b = 46, 44, 26, 28
     plot_w = W - pad_l - pad_r
     plot_h = H - pad_t - pad_b
     base_y = pad_t + plot_h
-    # Y 轴边界整数化：下界向下取整、上界向上取整到刻度步长整数倍，
-    # 折线不贴边、刻度覆盖完整范围
+
+    # Y 轴取整到刻度步长，折线不贴边
     def _nice_step(lo, hi, count=4):
         raw = ((hi - lo) or 1) / count
         mag = 10 ** math.floor(math.log10(raw))
         norm = raw / mag
-        return (next(n for n in (1, 2, 2.5, 5, 10) if norm <= n)) * mag
+        return next(s for s in (1, 2, 2.5, 5, 10) if norm <= s) * mag
 
     step = _nice_step(min(scores), max(scores))
     lo = math.floor(min(scores) / step) * step
@@ -420,272 +465,330 @@ def _build_rp_chart_html(entries: list, window=None) -> str:
     xs = [pad_l + i * plot_w / (n - 1) for i in range(n)]
     ys = [pad_t + (hi - s) / span * plot_h for s in scores]
 
-    # Y 轴刻度：横向网格线 + 刻度文字（SVG 内联，随图表缩放天然对齐）
-    grid_lines = ""
+    grid = ""
     tv = lo
     while tv <= hi + 1e-9:
-        frac = (tv - lo) / span
-        gy = pad_t + (1 - frac) * plot_h
-        grid_lines += (
+        gy = pad_t + (hi - tv) / span * plot_h
+        grid += (
             f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{W - pad_r}" y2="{gy:.1f}" '
-            f'stroke="var(--outline-v)" stroke-width="1"/>'
-            f'<text x="{pad_l - 6}" y="{gy + 3:.1f}" text-anchor="end" font-size="9" '
-            f'fill="var(--on-sv)" font-variant-numeric="tabular-nums">{tv:,.0f}</text>'
+            f'stroke="var(--line)" stroke-width="1"/>'
+            f'<text x="{pad_l - 10}" y="{gy + 4:.1f}" text-anchor="end" font-size="12" '
+            f'font-weight="600" fill="var(--text-3)">{tv:,.0f}</text>'
         )
         tv += step
 
-    line_d = " M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in zip(xs, ys))
-    area_d = f"{line_d} L{xs[-1]:.1f} {base_y:.1f} L{xs[0]:.1f} {base_y:.1f} Z"
-
-    # 段位分档线：显示在 [lo, hi] 内的门槛，虚线 + 档位名；大师线以上用深一档颜色
-    tier_colors = {
-        "bronze4": "#CD7F32", "silver4": "#C0C0C0", "gold4": "#FFD700",
-        "platinum4": "#4ECDC4", "diamond4": "#358DE6", "master": "#9F35E6",
-    }
+    # 段位分档线：落在 Y 轴范围内的门槛，虚线 + 段位名
     tier_lines = ""
-    for thr, name in _TIER_STEPS:
+    for thr, slug in _TIER_STEPS:
         if not (lo < thr <= hi):
             continue
-        ty = pad_t + (1 - (thr - lo) / span) * plot_h
-        col = tier_colors.get(name, "var(--on-sv)")
-        major = _rank_zh(name[:-1].capitalize() if name != "master" else "Master")
+        tier = "Master" if slug == "master" else slug[:-1].capitalize()
+        ts = kit.tier_style(tier)
+        ty = pad_t + (hi - thr) / span * plot_h
         tier_lines += (
-            f'<line x1="{pad_l}" y1="{ty:.1f}" x2="{W - pad_r}" y2="{ty:.1f}" '
-            f'stroke="{col}" stroke-opacity="0.55" stroke-width="1" stroke-dasharray="4 3"/>'
-            f'<text x="{W - pad_r - 4}" y="{ty - 3:.1f}" text-anchor="end" font-size="9" '
-            f'fill="{col}" font-weight="600" opacity="0.85">{major}</text>'
+            f'<g class="tl" style="--c:{ts["bright"]};--cd:{ts["deep"]};">'
+            f'<line x1="{pad_l}" y1="{ty:.1f}" x2="{W - pad_r + 6}" y2="{ty:.1f}" '
+            f'stroke-width="1.2" stroke-dasharray="5 4"/>'
+            f'<text x="{W}" y="{ty + 4:.1f}" text-anchor="end" font-size="12" '
+            f'font-weight="700">{ts["zh"]}</text></g>'
         )
-    # 升档时刻：首次达到比历史最高档位更高的档位时，在该点上方显示段位图标
-    # （跳过 Rookie 起步档；只显示"升到新高"的时刻，降档/回档不显示）
+
+    line_d = _monotone_path(xs, ys)
+    area_d = f"{line_d} L{xs[-1]:.1f} {base_y:.1f} L{xs[0]:.1f} {base_y:.1f} Z"
+
+    dots = "".join(
+        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.8" fill="var(--bg)" stroke="var(--accent)" stroke-width="1.8"/>'
+        for x, y in zip(xs[:-1], ys[:-1])
+    )
+    last = (
+        f'<circle cx="{xs[-1]:.1f}" cy="{ys[-1]:.1f}" r="11" fill="var(--accent)" opacity=".18"/>'
+        f'<circle cx="{xs[-1]:.1f}" cy="{ys[-1]:.1f}" r="5" fill="var(--accent)" '
+        f'stroke="var(--bg)" stroke-width="2"/>'
+    )
+
+    # 首点上方有段位图标时数值放下方；下方会压到日期行时改放到图标上方
+    first_icon = _tier_index_for_score(scores[0]) > 0
+    lbl0_y = ys[0] + 22 if first_icon or ys[0] - 12 < 14 else ys[0] - 12
+    if first_icon and lbl0_y > base_y + 4 and ys[0] - 40 >= 14:
+        lbl0_y = ys[0] - 40
+    # 末点数值放左上方，压到分档线或贴顶时改放下方
+    tier_ys = [pad_t + (hi - thr) / span * plot_h for thr, _ in _TIER_STEPS if lo < thr <= hi]
+    lbl1_y = ys[-1] - 14
+    if lbl1_y < 16 or any(lbl1_y - 16 <= ty <= lbl1_y + 4 for ty in tier_ys):
+        lbl1_y = ys[-1] + 26
+    values = (
+        f'<text class="halo" x="{xs[0] + 2:.1f}" y="{lbl0_y:.1f}" text-anchor="start" font-size="13" '
+        f'font-weight="600" fill="var(--text-2)">{scores[0]:,}</text>'
+        f'<text class="halo" x="{xs[-1] + 6:.1f}" y="{lbl1_y:.1f}" text-anchor="end" font-size="18" '
+        f'font-weight="700" fill="var(--accent)">{scores[-1]:,}</text>'
+    )
+
+    # X 轴：每天只标一次（取当天第一个点），间距太近时让位给最新日期
+    day_idx = []
+    seen = set()
+    for i, at in enumerate(dates):
+        day = at[5:10] if len(at) >= 10 else ""
+        if day and day not in seen:
+            seen.add(day)
+            day_idx.append(i)
+    picked = []
+    for i in day_idx:
+        if picked and xs[i] - xs[picked[-1]] < 56:
+            if i == day_idx[-1] and len(picked) > 1:
+                picked[-1] = i
+            continue
+        picked.append(i)
+    x_labels = ""
+    for i in picked:
+        anchor = "start" if xs[i] - pad_l < 24 else ("end" if W - pad_r - xs[i] < 24 else "middle")
+        x_labels += (
+            f'<text x="{xs[i]:.1f}" y="{H - 6}" text-anchor="{anchor}" font-size="12" '
+            f'font-weight="600" fill="var(--text-3)">{dates[i][5:10]}</text>'
+        )
+
+    svg = (
+        f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">'
+        "<defs>"
+        '<linearGradient id="rp-fill" x1="0" y1="0" x2="0" y2="1">'
+        '<stop offset="0%" stop-color="var(--accent)" stop-opacity="0.30"/>'
+        '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>'
+        "</linearGradient>"
+        "</defs>"
+        f"{grid}{tier_lines}"
+        f'<path d="{area_d}" fill="url(#rp-fill)"/>'
+        f'<path d="{line_d}" fill="none" stroke="var(--accent)" stroke-width="2.6" '
+        'stroke-linejoin="round" stroke-linecap="round"/>'
+        f"{dots}{last}{values}{x_labels}"
+        "</svg>"
+    )
+
+    # 升档时刻：首次达到比历史最高档位更高的档位时，在该点上方放段位图标
+    # （跳过 Rookie 起步档；只显示"升到新高"，降档/回档不显示）
     peak_idx = -1
     icons = ""
     for i, s in enumerate(scores):
         idx = _tier_index_for_score(s)
         if idx > 0 and idx > peak_idx:
-            name = _TIER_STEPS[idx][1]
             ic = 26
-            ix = xs[i] - ic / 2
-            iy = ys[i] - ic - 6
-            if ix < pad_l:
-                ix = pad_l
+            ix = max(xs[i] - ic / 2, pad_l)
+            iy = ys[i] - ic - 8
             if iy < 2:
-                iy = ys[i] + 6
+                iy = ys[i] + 8
             icons += (
-                f'<img src="{_TIER_ICON_BASE.format(name)}" width="{ic}" height="{ic}" '
-                f'style="position:absolute;left:{ix:.1f}px;top:{iy:.1f}px;border-radius:6px;'
-                f'background:var(--sc-low);padding:1px;'
-                f'box-shadow:0 1px 4px rgba(0,0,0,0.25);" '
-                f'loading="eager" decoding="async"/>'
+                f'<img class="promo" src="{_TIER_ICON_BASE.format(_TIER_STEPS[idx][1])}" '
+                f'style="left:{ix / W * 100:.2f}%;top:{iy:.1f}px;" loading="eager" decoding="async"/>'
             )
         if idx > peak_idx:
             peak_idx = idx
 
-    # 首点数值标签：贴顶时改放点下方，避免溢出
-    lbl0_y = ys[0] - 8 if ys[0] - 8 >= 14 else ys[0] + 16
-    lbl1_y = ys[-1] - 10 if ys[-1] - 10 >= 14 else ys[-1] + 16
-
-    # X 轴：每个数据点下方标日期（MM-DD）；点数多时隔点显示防重叠
-    # 首点用 start 锚点（文字向右展开）、末点用 end 锚点（文字向左展开），防止贴边裁切
-    x_labels = ""
-    for i, d in enumerate(dates):
-        if n > 8 and i % 2 == 1 and i != n - 1:
-            continue  # 密集时只标偶数位点
-        xl = f"{d[5:10]}" if len(d) >= 10 else ""
-        anchor = "start" if i == 0 else ("end" if i == n - 1 else "middle")
-        x_labels += (
-            f'<text x="{xs[i]:.1f}" y="{H - 4}" text-anchor="{anchor}" font-size="9" '
-            f'fill="var(--on-sv)" opacity="0.75" font-variant-numeric="tabular-nums">{xl}</text>'
-        )
-
-    svg = (
-        f'<svg class="rp-chart" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">'
-        "<defs>"
-        '<linearGradient id="rp-fill" x1="0" y1="0" x2="0" y2="1">'
-        '<stop offset="0%" stop-color="var(--p)" stop-opacity="0.28"/>'
-        '<stop offset="100%" stop-color="var(--p)" stop-opacity="0"/>'
-        "</linearGradient>"
-        "</defs>"
-        f"{grid_lines}"
-        f"{tier_lines}"
-        f'<path d="{area_d}" fill="url(#rp-fill)"/>'
-        f'<path d="{line_d}" fill="none" stroke="var(--p)" stroke-width="2" '
-        'stroke-linejoin="round" stroke-linecap="round"/>'
-        f'<circle cx="{xs[0]:.1f}" cy="{ys[0]:.1f}" r="3" fill="var(--p)"/>'
-        f'<circle cx="{xs[-1]:.1f}" cy="{ys[-1]:.1f}" r="4.5" fill="var(--p)" '
-        'stroke="var(--sc-low)" stroke-width="2"/>'
-        f'<text x="{xs[0]:.1f}" y="{lbl0_y:.1f}" text-anchor="start" font-size="11" '
-        f'fill="var(--on-sv)" font-variant-numeric="tabular-nums">{scores[0]:,}</text>'
-        f'<text x="{xs[-1]:.1f}" y="{lbl1_y:.1f}" text-anchor="end" font-size="12" '
-        f'font-weight="700" fill="var(--p-text)" font-variant-numeric="tabular-nums">{scores[-1]:,}</text>'
-        f"{x_labels}"
-        "</svg>"
-    )
-
-    # 升档图标为 HTML 层（绝对定位叠加在 SVG 上，随 _embed_images 一并内嵌）
-    icon_layer = (
-        f'<div style="position:relative;">{svg}{icons}</div>'
-        if icons
-        else svg
-    )
-
-    plot_wrap = icon_layer
-
+    meta = f"{dates[0][5:10]} 至 {dates[-1][5:10]}" if dates[0] and dates[-1] else ""
     return (
-        '<div class="rp-chart-strip">'
-        '<div class="rp-chart-head">'
-        '<span class="col-title">RP 历史</span>'
-        f"{trend_html}"
+        '<section class="block">'
+        '<div class="block-head">'
+        f'<span class="block-title">{kit.icon("show_chart")}RP 走势</span>'
+        f'<span class="block-meta">{meta}</span>'
         "</div>"
-        f"{plot_wrap}"
-        "</div>"
+        f'<div class="chart">{svg}{icons}</div>'
+        "</section>"
     )
+
+
+_ALS_LEGEND_ART = "https://apexlegendsstatus.com/assets/legends-select/{}.png"
+
+
+def _legend_art_url(name: str, url: str = "") -> str:
+    """传奇半身像（透明底，491×302），用于头图和传奇卡片。"""
+    if url and "legends-select" in url:
+        return url
+    if name:
+        return _ALS_LEGEND_ART.format(name.lower().replace(" ", "").replace("'", ""))
+    return url
+
+
+def _build_rank_hist(player_tier: str, entries) -> tuple[list[dict], str]:
+    """段位分布柱状图数据；没有真实分布数据时不显示（不拿旧比例凑数）。"""
+    from . import card_kit as kit
+
+    if not entries:
+        return [], ""
+    by_tier = {kit.normalize_tier(e.name): e for e in entries}
+    rows = []
+    for tier in kit.TIER_ORDER:
+        e = by_tier.get(tier)
+        pct = float(e.pct) if e and e.pct else 0.0
+        count = int(e.count) if e and e.count else 0
+        rows.append((tier, pct, count))
+    peak = max(p for _, p, _ in rows) or 1
+    total = sum(c for _, _, c in rows)
+    hist = []
+    for tier, pct, _ in rows:
+        ts = kit.tier_style(tier)
+        hist.append({
+            "zh": ts["zh"],
+            "pct": f"{pct:.1f}" if pct >= 1 else f"{pct:.2f}",
+            "height": round(max(4.0, pct / peak * 50), 1),
+            "bright": ts["bright"],
+            "deep": ts["deep"],
+            "me": tier == player_tier,
+        })
+    total_fmt = "".join(kit.fmt_big(total)) if total else ""
+    return hist, total_fmt
 
 
 def _build_stats_html(**d) -> str:
-    """根据数据 dict 构建 MD3 Jinja2 战绩卡片 HTML"""
-    name = d.get("name", "Unknown")
-    tag = d.get("tag", "")
-    alias = d.get("alias", "")
-    uid = d.get("uid", "")
-    avatar_url = d.get("avatar_url", "")
-    platform = d.get("platform", "PC")
+    """根据数据 dict 构建战绩卡片 HTML（段位头图 + 生涯数据 + 走势 + 传奇 + 赛季 + 分布）"""
+    from . import card_kit as kit
+
+    name = d.get("name", "Unknown") or "Unknown"
+    tag = d.get("tag", "") or ""
+    alias = d.get("alias", "") or ""
+    uid = d.get("uid", "") or ""
+    avatar_url = d.get("avatar_url", "") or ""
+    platform = (d.get("platform", "PC") or "PC").upper()
     online = d.get("online", d.get("online_status", "offline"))
-    level = d.get("level", 0)
-    level_pct = d.get("level_pct", d.get("to_next_level_pct", 0))
-    prestige = d.get("prestige", 0)
-    level_icon = d.get("level_icon", "")
-    level_raw = d.get("level_raw", level)
+    level = d.get("level", 0) or 0
+    level_pct = d.get("level_pct", d.get("to_next_level_pct", 0)) or 0
     rank_name = d.get("rank_name", "Unranked")
-    rank_div = d.get("rank_div", 0)
-    rank_score = d.get("rank_score", 0)
-    rank_img = d.get("rank_img", d.get("rank_icon_url", ""))
+    rank_div = d.get("rank_div", 0) or 0
+    rank_score = d.get("rank_score", 0) or 0
+    rank_img = d.get("rank_img", d.get("rank_icon_url", "")) or ""
     rank_top_pct = d.get("rank_top_pct", 0)
     rank_top_pct_global = d.get("rank_top_pct_global", rank_top_pct)
-    rank_ladder_pos = d.get("rank_ladder_pos", 0)
+    rank_ladder_pos = d.get("rank_ladder_pos", 0) or 0
     rp_delta = d.get("rp_delta")
-    rp_history = d.get("rp_history") or []
-    kills = d.get("kills", 0)
-    damage = d.get("damage", 0)
-    wins = d.get("wins", 0)
-    top_legends = d.get("top_legends", [])
-    season_badges = d.get("season_badges", [])
-    special_badges = d.get("special_badges", [])
-    selected_legend = d.get("selected_legend")
+    kills = d.get("kills", 0) or 0
+    damage = d.get("damage", 0) or 0
+    wins = d.get("wins", 0) or 0
+    top_legends = d.get("top_legends", []) or []
+    season_badges = d.get("season_badges", []) or []
+    special_badges = d.get("special_badges", []) or []
+    selected_legend = d.get("selected_legend") or {}
     rank_dist_entries = d.get("rank_dist_entries", None)
 
-    # ── 段位主题色 ──
-    theme = _theme_for_rank(rank_name)
-    # MD3 亮色主题：primary 用 Tone 40 等效（比暗色 Tone 80 更深）
-    light_theme = {
-        "primary": theme["primary"],
-        "surface": "#F8FAFF",
-        "card": "#FFFFFF",
-        "card2": "#F0F3F8",
-        "card3": "#E1E5EC",
-        "text": "#11161F",
-        "muted": "#44474F",
-        "outline": "#BCC3D0",
-    }
+    # ── 段位：主色、徽章、小段、进度 ──
+    tier = kit.normalize_tier(rank_name)
+    style = kit.tier_style(tier)
+    elite = tier in ("Master", "Predator")
+    plat = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox", "SWITCH": "Switch"}.get(platform, platform)
 
-    _p = {"PC": "PC", "PS4": "PS", "PS5": "PS", "X1": "Xbox", "XBX": "Xbox"}.get(platform.upper(), platform.upper())
-    top_pct_label = "全平台" if rank_name.startswith(("Predator", "Master")) else _p
+    has_div = tier in kit.DIVISION_START and rank_div in kit.ROMAN
+    tier_name = f"{style['zh']} {kit.ROMAN[rank_div]}" if has_div else style["zh"]
+    hd = kit.hd_emblem(tier)
+    plate_text, plate_is_pos = "", False
+    if hd and has_div:
+        plate_text = kit.ROMAN[rank_div]
+    elif hd and elite and rank_ladder_pos:
+        plate_text, plate_is_pos = f"#{rank_ladder_pos:,}", True
 
-    display_name = f"{name} [{tag}]" if tag else name
-    online_map = {"online": "在线", "offline": "离线", "in_game": "游戏中"}
-    state_text = online_map.get(online, online)
-    state_dot = "#4CE5B1" if online in ("online", "in_game") else "#555"
-
-    rank_c = _rank_color(rank_name)
-    top_global = f"{rank_top_pct_global}%"
+    top_text = ""
+    if rank_top_pct_global:
+        top_text = f"Top {rank_top_pct_global}% · {'全平台' if elite else plat}"
 
     rp_delta_html = ""
     if rp_delta is not None:
-        sign = "+" if rp_delta >= 0 else ""
-        delta_cls = "rp-up" if rp_delta >= 0 else "rp-down"
-        rp_delta_html = f'<span class="{delta_cls}" style="font-size:13px;margin-left:8px;">{sign}{rp_delta} RP</span>'
+        cls = "up" if rp_delta > 0 else "down" if rp_delta < 0 else "flat"
+        rp_delta_html = f'<span class="rp-delta {cls}">{rp_delta:+,} RP</span>'
 
-    rank_display = _rank_zh(rank_name) + _rank_div_zh(rank_div, rank_name)
-    if rank_ladder_pos and rank_name.startswith(("Predator", "Master")):
-        rank_display += f" #{rank_ladder_pos}"
+    states = {
+        "online": ("在线", "on"), "inLobby": ("在线", "on"),
+        "in_game": ("游戏中", "game"), "inMatch": ("游戏中", "game"),
+        "offline": ("离线", ""),
+    }
+    state_text, state_class = states.get(online, (str(online or "离线"), ""))
 
-    # ── 徽章 ──
-    season_badges_ctx = []
-    for b in season_badges:
-        color = b.get("color") or "#666"
-        season_badges_ctx.append({
-            "badge_url": b.get("badge_url", ""),
-            "season": b.get("season", ""),
-            "color": color,
-            "bg": f"rgba({_hex_to_rgba(color, 0.15)})",
-            "border": f"rgba({_hex_to_rgba(color, 0.3)})",
+    # ── 传奇：头图用当前选用，没有就用击杀最多的 ──
+    selected_en = selected_legend.get("name", "") if isinstance(selected_legend, dict) else ""
+    legends_ctx = []
+    for leg in top_legends[:3]:
+        leg_name = leg.get("name", "")
+        legends_ctx.append({
+            "icon_url": _legend_art_url(leg_name, leg.get("icon_url", "") or leg.get("icon", "")),
+            "name_zh": _escape_html(_legend_zh(leg_name)),
+            "kills_fmt": kit.fmt_int(leg.get("kills", 0)),
+            "selected": bool(selected_en) and leg_name == selected_en,
         })
+    if selected_en:
+        hero_art = _legend_art_url(selected_en, selected_legend.get("icon_url", ""))
+    else:
+        hero_art = legends_ctx[0]["icon_url"] if legends_ctx else ""
+
+    # ── 赛季足迹 + 各段位次数 ──
+    seasons_ctx = [
+        {"badge_url": b.get("badge_url", ""), "season": _escape_html(str(b.get("season", "")))}
+        for b in season_badges
+    ]
+    tier_counts: dict[str, int] = {}
+    for b in season_badges:
+        t = kit.normalize_tier(b.get("tier", ""))
+        if t != "Unranked":
+            tier_counts[t] = tier_counts.get(t, 0) + 1
+    season_summary = [
+        {"zh": kit.tier_style(t)["zh"], "count": tier_counts[t],
+         "bright": kit.tier_style(t)["bright"], "deep": kit.tier_style(t)["deep"]}
+        for t in reversed(kit.TIER_ORDER) if t in tier_counts
+    ]
 
     # Keep the full inventory in fetched data; limit only the card's visible row.
-    special_badges_ctx = []
+    special_ctx = []
     seen_special_names = set()
     for badge in special_badges:
         url = badge.get("badge_url", "")
-        name = badge.get("name") or url
-        if url and name not in seen_special_names:
-            seen_special_names.add(name)
-            special_badges_ctx.append({"badge_url": url})
-        if len(special_badges_ctx) == 5:
+        badge_name = badge.get("name") or url
+        if url and badge_name not in seen_special_names:
+            seen_special_names.add(badge_name)
+            special_ctx.append({"badge_url": url})
+        if len(special_ctx) == 5:
             break
 
-    # ── 英雄排行 ──
-    legends_ctx = []
-    for leg in top_legends[:4]:
-        legends_ctx.append({
-            "icon_url": leg.get("icon_url", "") or leg.get("icon", ""),
-            "name_zh": _legend_zh(leg["name"]),
-            "kills_fmt": f"{leg.get('kills', 0):,}",
-        })
+    rank_hist, rank_total = _build_rank_hist(tier, rank_dist_entries)
+    damage_fmt, damage_unit = kit.fmt_big(damage)
 
-    # ── 当前选用 ──
-    selected_ctx = None
-    if selected_legend:
-        ss = selected_legend.get("stats", [])
-        selected_ctx = {
-            "icon_url": selected_legend.get("icon_url", ""),
-            "name_zh": _legend_zh(selected_legend.get("name", "")),
-            "stats": [{"name": s.get("name", ""), "value": s.get("value", "")} for s in ss],
-        }
-
-    # ── 段位分布 ──
-    rank_dist_ctx = _build_rank_dist_list(rank_name, rank_top_pct_global, rank_dist_entries, theme=theme)
-
-    # ── RP 历史折线图 ──
-    rp_chart_html = _build_rp_chart_html(rp_history, d.get("rp_24h"))
-
+    icon_names = (
+        "person", "leaderboard", "gps_fixed", "bolt", "emoji_events",
+        "star", "group", "military_tech", "bar_chart",
+    )
     context = {
-        "theme": theme,
-        "light_theme": light_theme,
+        "local_fonts": not _use_web_cjk_font(),
+        "font_css": kit.font_face_css(),
         "theme_class": _beijing_theme(),
+        "tier": style,
+        "tier_zh": style["zh"],
+        "icons": {k: kit.icon(k) for k in icon_names},
+        "hero_art": hero_art,
         "avatar_url": avatar_url,
-        "display_name": display_name,
-        "alias": alias,
-        "uid": uid,
-        "platform": platform,
-        "state_text": state_text,
-        "state_dot": state_dot,
-        "rank_img": rank_img,
-        "rank_display": rank_display,
-        "rank_score_fmt": f"{rank_score:,}",
+        "name": _escape_html(name),
+        "tag": _escape_html(tag),
+        "alias": _escape_html(alias),
+        "uid": _escape_html(str(uid)),
+        "platform": _escape_html(plat),
+        "state_text": _escape_html(state_text),
+        "state_class": state_class,
+        "selected_name": _escape_html(_legend_zh(selected_en)) if selected_en else "",
+        "emblem": hd or rank_img,
+        "plate_text": plate_text,
+        "plate_is_pos": plate_is_pos,
+        "plate_y": style["plate"],
+        "tier_name": tier_name,
+        "rank_score_fmt": kit.fmt_int(rank_score),
         "rp_delta_html": rp_delta_html,
-        "top_global": top_global,
-        "top_pct_label": top_pct_label,
-        "level_icon": level_icon,
+        "rp_trend_html": _build_rp_trend_html(d.get("rp_24h")),
+        "top_text": top_text,
+        "ladder": kit.rank_ladder(rank_score, tier, rank_div),
+        "elite_pos": f"#{rank_ladder_pos:,}" if elite and rank_ladder_pos else "",
+        "elite_label": f"{style['zh']} · {plat} 排名",
+        "kills_fmt": kit.fmt_int(kills),
+        "damage_fmt": damage_fmt,
+        "damage_unit": damage_unit,
+        "wins_fmt": kit.fmt_int(wins),
         "level": level,
         "level_pct": level_pct,
-        "kills_fmt": f"{kills:,}",
-        "damage_fmt": f"{damage:,}",
-        "wins_fmt": f"{wins:,}" if wins else "0",
-        "selected_legend": selected_ctx,
-        "rank_dist": rank_dist_ctx,
-        "rp_chart_html": rp_chart_html,
+        "rp_chart_html": _build_rp_chart_html(d.get("rp_history") or []),
         "top_legends": legends_ctx,
-        "season_badges": season_badges_ctx,
-        "special_badges": special_badges_ctx,
+        "season_badges": seasons_ctx,
+        "season_summary": season_summary,
+        "special_badges": special_ctx,
+        "rank_hist": rank_hist,
+        "rank_total": rank_total,
     }
     return _get_jinja_template("stats.html.jinja").render(**context)
 

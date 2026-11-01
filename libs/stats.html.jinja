@@ -2,713 +2,379 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Apex Legends 战绩</title>
+{% if not local_fonts %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700;8..144,900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;700;900&display=swap" rel="stylesheet">
+{% endif %}
 <style>
-:root {
-  --p: {{ theme.primary }};
-  --p-text: {{ theme.primary }};
-  --on-p: #FFF;
-  --p-container: {{ theme.primary }}22;
-  --s: {{ theme.surface }};
-  --on-s: {{ theme.text }};
-  --sv: {{ theme.outline }};
-  --on-sv: {{ theme.muted }};
-  --outline: {{ theme.outline }};
-  --outline-v: {{ theme.outline }}66;
-  --sc-low: {{ theme.card }};
-  --sc: {{ theme.card2 }};
-  --sc-high: {{ theme.card3 }};
-  --shadow: 0 10px 20px rgba(0,0,0,0.4);
-  --r-xl: 28px;
-  --r-lg: 20px;
-  --r-md: 16px;
-  --r-sm: 12px;
-  --r-xs: 8px;
-  --avatar-glow: 0 0 24px color-mix(in srgb, var(--p) 35%, transparent);
-  --rank-shadow: drop-shadow(0 2px 8px color-mix(in srgb, var(--p) 25%, transparent));
-}
+{{ font_css }}
+{% include "card_base.css" %}
 
-body.light {
-  /* MD3 Light Theme: Primary=Tone40(darker), Surface=Tone98(near-white) */
-  --p: color-mix(in srgb, {{ light_theme.primary }} 65%, #000 35%);
-  --p-text: color-mix(in srgb, {{ light_theme.primary }} 75%, #000 25%);
-  --on-p: #FFF;
-  --p-container: color-mix(in srgb, {{ light_theme.primary }} 12%, #F0F4F8);
-
-  /* MD3 Surface hierarchy: Surface→SC Low→SC→SC High */
-  --s: #FAFAFA;
-  --on-s: #11161F;
-  --sv: #C3C8D0;
-  --on-sv: #44474F;
-
-  /* MD3 Outline: Tone50(主) + Tone80(轻) */
-  --outline: {{ light_theme.outline }};
-  --outline-v: color-mix(in srgb, {{ light_theme.primary }} 8%, rgba(0,0,0,0.08));
-
-  /* MD3 Surface Container: Lowest→Low→Default→High */
-  --sc-low: {{ light_theme.card }};
-  --sc: {{ light_theme.card2 }};
-  --sc-high: {{ light_theme.card3 }};
-
-  /* MD3 Elevation: 物理阴影替代发光 */
-  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
-  --avatar-glow: 0 4px 16px color-mix(in srgb, {{ light_theme.primary }} 15%, rgba(0,0,0,0.10));
-  --rank-shadow: drop-shadow(0 3px 8px color-mix(in srgb, {{ light_theme.primary }} 12%, rgba(0,0,0,0.08)));
-}
-
-* { margin:0; padding:0; box-sizing:border-box; }
-
-body {
-  font-family: 'Roboto Flex', 'Noto Sans SC', system-ui, sans-serif;
-  background: transparent;
-  color: var(--on-s);
-  display: flex;
-  justify-content: center;
-  padding: 24px;
-  -webkit-font-smoothing: antialiased;
-}
-
-.card {
-  width: 720px;
-  background: var(--sc-low);
-  border-radius: var(--r-xl);
-  overflow: hidden;
-  box-shadow: var(--shadow);
-  border: 1px solid color-mix(in srgb, var(--on-s) 8%, transparent);
-  transition: background 0.3s ease;
-}
-
+/* ═══ 头部：段位主色只用在这一块 ═══ */
 .hero {
   position: relative;
-  padding: 32px 28px 28px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--p) 14%, var(--sc)) 0%, var(--sc-low) 100%);
-  border-bottom: 1px solid var(--outline-v);
-  display: flex;
-  align-items: flex-end;
-  gap: 20px;
-  min-height: 140px;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 22px 24px 20px;
+  background:
+    radial-gradient(120% 95% at 0% 0%, color-mix(in srgb, var(--tier) 30%, transparent) 0%, transparent 62%),
+    linear-gradient(180deg, color-mix(in srgb, var(--tier) 13%, var(--bg)) 0%, var(--bg) 100%);
 }
-
-.hero-rank-img {
-  position: absolute;
-  right: 24px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 100px;
-  height: 100px;
-  opacity: 0.12;
-  filter: var(--rank-shadow);
-  pointer-events: none;
+body.light .hero {
+  background:
+    radial-gradient(120% 95% at 0% 0%, color-mix(in srgb, var(--tier) 30%, transparent) 0%, transparent 62%),
+    linear-gradient(180deg, color-mix(in srgb, var(--tier) 14%, #fff) 0%, var(--bg) 100%);
 }
-
-.hero-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 1;
-  min-width: 0;
+.hero::before {
+  content: "";
+  position: absolute; inset: 0; z-index: -2;
+  background: repeating-linear-gradient(115deg, color-mix(in srgb, var(--text) 5%, transparent) 0 1px, transparent 1px 11px);
+  -webkit-mask-image: linear-gradient(100deg, transparent 0%, #000 35%, #000 55%, transparent 85%);
+  mask-image: linear-gradient(100deg, transparent 0%, #000 35%, #000 55%, transparent 85%);
 }
+.hero-art {
+  position: absolute; z-index: -1;
+  right: -40px; top: 6px;
+  height: 236px; width: auto;
+  -webkit-mask-image: radial-gradient(60% 72% at 60% 40%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(60% 72% at 60% 40%, #000 40%, transparent 100%);
+  filter: grayscale(1) contrast(1.1);
+  mix-blend-mode: luminosity;
+  opacity: .44;
+}
+body.light .hero-art { mix-blend-mode: multiply; opacity: .26; }
 
+.id { display: flex; align-items: center; gap: 12px; }
 .avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--p);
-  box-shadow: var(--avatar-glow);
-  flex-shrink: 0;
+  width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tier) 75%, transparent), 0 4px 14px rgba(0,0,0,.25);
+}
+.id-text { min-width: 0; }
+.name {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 20px; font-weight: 800; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 460px;
+}
+.tag {
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  padding: 2px 7px; border-radius: 6px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--tier) 16%, transparent);
+}
+.meta { display: flex; align-items: center; gap: 7px; margin-top: 4px; font-size: 12px; color: var(--text-2); }
+.meta .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+.dot.on { background: var(--up); box-shadow: 0 0 0 3px color-mix(in srgb, var(--up) 22%, transparent); }
+.dot.game { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); }
+
+.using {
+  margin-left: auto; align-self: flex-start;
+  display: flex; align-items: center; gap: 4px;
+  height: 24px; padding: 0 9px; border-radius: 7px;
+  font-size: 11.5px; font-weight: 700; color: var(--text);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border: 1px solid var(--line-2);
+}
+.using .ic { font-size: 14px; color: var(--accent); }
+
+.rank { display: flex; align-items: center; gap: 18px; margin-top: 16px; }
+.emblem { position: relative; width: 132px; height: 132px; flex-shrink: 0; }
+.emblem img {
+  width: 100%; height: 100%; object-fit: contain;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--tier) 50%, transparent)) drop-shadow(0 6px 10px rgba(0,0,0,.35));
+}
+body.light .emblem img {
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--tier) 40%, transparent)) drop-shadow(0 6px 10px rgba(0,0,0,.18));
+}
+.plate {
+  position: absolute; left: 50%; transform: translate(-50%, -50%);
+  font-size: 19px; font-weight: 700; letter-spacing: 1px; line-height: 1;
+  color: #FFF; text-shadow: 0 0 8px color-mix(in srgb, var(--tier) 80%, transparent);
+}
+.plate.pos { font-size: 14px; letter-spacing: .3px; }
+
+.rank-info { min-width: 0; }
+.tier-name { font-size: 24px; font-weight: 900; line-height: 1.15; color: var(--accent); letter-spacing: 1px; }
+.rp-line { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
+.rp { font-size: 68px; font-weight: 700; line-height: .92; letter-spacing: -.5px; }
+.rp-unit { font-family: var(--num); font-size: 20px; font-weight: 700; color: var(--text-2); }
+.rp-delta { font-family: var(--num); font-size: 18px; font-weight: 700; margin-left: 6px; }
+.chips { display: flex; gap: 6px; margin-top: 10px; }
+
+/* 段位进度条 */
+.ladder { margin-top: 16px; }
+.ladder-head { display: flex; align-items: baseline; justify-content: space-between; font-size: 13px; color: var(--text-2); }
+.ladder-head b { color: var(--text); font-weight: 800; }
+.ladder-head .goal .num { font-size: 18px; color: var(--accent); margin: 0 1px; }
+.ladder-head .now { font-size: 14px; }
+.ladder-head .now em { font-style: normal; color: var(--text-3); }
+.bar {
+  position: relative; height: 10px; margin-top: 7px; border-radius: 5px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.bar .fill {
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tier) 45%, transparent), var(--tier));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--tier) 45%, transparent);
+}
+body.light .bar .fill { background: linear-gradient(90deg, color-mix(in srgb, var(--tier) 55%, #fff), var(--tier-deep)); box-shadow: none; }
+.bar .tick { position: absolute; top: -1px; bottom: -1px; width: 3px; margin-left: -1.5px; background: var(--bg); }
+.bar .knob {
+  position: absolute; top: 50%; width: 16px; height: 16px; margin-left: -8px; transform: translateY(-50%);
+  border-radius: 50%; background: #FFF;
+  box-shadow: 0 0 0 3px var(--tier), 0 0 14px color-mix(in srgb, var(--tier) 70%, transparent);
+}
+body.light .bar .knob { box-shadow: 0 0 0 3px var(--tier-deep), 0 2px 6px rgba(0,0,0,.2); }
+.bar-labels { position: relative; height: 16px; margin-top: 6px; font-size: 11px; font-weight: 700; color: var(--text-3); }
+.bar-labels span { position: absolute; transform: translateX(-50%); font-family: var(--num); font-size: 13px; letter-spacing: .5px; }
+.bar-labels span.cur { color: var(--accent); }
+.bar-labels .edge-l { left: 0; transform: none; font-family: var(--sans); font-size: 11px; }
+.bar-labels .edge-r { right: 0; left: auto; transform: none; font-family: var(--sans); font-size: 11px; }
+
+.elite {
+  display: flex; align-items: center; gap: 10px; margin-top: 16px;
+  padding: 10px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 50%, transparent);
+  border: 1px solid var(--line-2);
+  font-size: 13px; color: var(--text-2);
+}
+.elite .ic { font-size: 18px; color: var(--accent); }
+.elite b { margin-left: auto; font-family: var(--num); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+
+/* ═══ 生涯数据 ═══ */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 4px 24px 20px; }
+.tile { position: relative; padding: 12px 14px 13px; border-radius: 14px; background: var(--bg-2); }
+.t-label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-2); }
+.t-label .ic { font-size: 14px; color: var(--text-3); }
+.t-val { margin-top: 7px; font-size: 31px; font-weight: 700; line-height: 1; }
+.t-val small { margin-left: 2px; font-family: var(--sans); font-size: 13px; font-weight: 700; color: var(--text-2); }
+.t-sub { position: absolute; right: 14px; top: 12px; font-family: var(--num); font-size: 13px; font-weight: 600; color: var(--text-3); }
+.t-bar { height: 4px; margin-top: 8px; border-radius: 2px; background: var(--bg-3); overflow: hidden; }
+.t-bar i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+
+/* ═══ RP 走势 ═══ */
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: var(--num); }
+.chart text.halo { paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.chart .tl line { stroke: var(--c); stroke-opacity: .6; }
+.chart .tl text { fill: var(--c); font-family: var(--sans); }
+body.light .chart .tl line { stroke: var(--cd); stroke-opacity: .5; }
+body.light .chart .tl text { fill: var(--cd); }
+.chart .promo {
+  position: absolute; width: 26px; height: 26px; border-radius: 7px; padding: 1px;
+  background: var(--bg); box-shadow: 0 1px 4px rgba(0,0,0,.3);
 }
 
-.hero-info {
-  flex: 1;
-  min-width: 0;
+/* ═══ 常用传奇 ═══ */
+.legs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.leg { position: relative; isolation: isolate; height: 100px; border-radius: 14px; overflow: hidden; background: var(--bg-2); }
+.leg.top { background: linear-gradient(150deg, color-mix(in srgb, var(--tier) 24%, var(--bg-2)) 0%, var(--bg-2) 70%); }
+.leg-art {
+  position: absolute; z-index: -2; right: -24px; top: -6px; height: 120px; width: auto;
+  -webkit-mask-image: linear-gradient(to left, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 50%, transparent 100%);
+}
+.leg::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(0deg, color-mix(in srgb, var(--bg-2) 92%, transparent) 0%, transparent 62%);
+}
+.leg-info { position: absolute; left: 14px; bottom: 11px; }
+.leg-name { font-size: 15px; font-weight: 800; }
+.leg-kills { margin-top: 1px; font-size: 12px; color: var(--text-2); }
+.leg-kills b { margin-right: 4px; font-family: var(--num); font-size: 25px; font-weight: 700; color: var(--text); }
+.leg-rank { position: absolute; left: 12px; top: 10px; font-family: var(--num); font-size: 13px; font-weight: 700; color: var(--text-3); }
+.leg.top .leg-rank { color: var(--accent); }
+.leg-tag {
+  position: absolute; right: 8px; top: 8px; height: 20px; padding: 0 7px; border-radius: 6px;
+  display: flex; align-items: center; font-size: 11px; font-weight: 700;
+  color: var(--accent); background: color-mix(in srgb, var(--bg) 70%, transparent);
 }
 
-.player-name {
-  font-size: 26px;
-  font-weight: 900;
-  letter-spacing: -0.5px;
-  line-height: 1.1;
-  color: var(--on-s);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* ═══ 赛季足迹 ═══ */
+.tsum { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.tsum i { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); background: var(--c); }
+body.light .tsum i { background: var(--cd); }
+.tsum b { font-family: var(--num); font-size: 14px; color: var(--text); }
+.badges { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 2px; }
+.sb { width: 46px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.sb img { width: 38px; height: 38px; object-fit: contain; }
+.sb span { font-family: var(--num); font-size: 12px; font-weight: 600; color: var(--text-2); line-height: 1; }
+.badge-sep { width: 1px; height: 38px; margin: 0 8px 8px auto; background: var(--line-2); }
+.sp { width: 42px; height: 53px; display: flex; align-items: flex-start; justify-content: center; }
+.sp img { width: 38px; height: 38px; object-fit: contain; }
+
+/* ═══ 段位分布 ═══ */
+.hist { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; align-items: end; }
+.hcol { display: flex; flex-direction: column; align-items: stretch; }
+.hbar { height: 92px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; }
+.hbar i { display: block; width: 100%; min-height: 3px; border-radius: 6px 6px 3px 3px; background: var(--c); opacity: .5; }
+body.light .hbar i { background: var(--cd); opacity: .3; }
+.hpct { font-size: 13px; font-weight: 600; color: var(--text-2); line-height: 1; }
+.hname { margin-top: 6px; text-align: center; font-size: 12px; color: var(--text-2); }
+.hcol.me .hbar i { opacity: 1; box-shadow: 0 0 16px color-mix(in srgb, var(--c) 55%, transparent); }
+body.light .hcol.me .hbar i { opacity: 1; box-shadow: none; }
+.hcol.me .hpct, .hcol.me .hname { color: var(--text); font-weight: 800; }
+.me-pin {
+  height: 18px; padding: 0 6px; border-radius: 5px;
+  display: flex; align-items: center; font-size: 11px; font-weight: 800;
+  color: var(--bg); background: var(--accent);
 }
-
-.player-sub {
-  font-size: 12px;
-  color: var(--on-sv);
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: {{ state_dot }};
-  display: inline-block;
-  border: 2px solid var(--sc-low);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-}
-
-.platform-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--sc);
-  border: 1px solid var(--outline-v);
-  border-radius: 12px;
-  padding: 2px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--on-sv);
-}
-
-.rank-strip {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 28px;
-  background: var(--sc);
-  border-bottom: 1px solid var(--outline-v);
-}
-
-.rank-icon {
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-  filter: var(--rank-shadow);
-}
-
-.rank-main {
-  flex: 1;
-}
-
-.rank-tier {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--p-text);
-  line-height: 1;
-}
-
-.rank-rp-line {
-  font-size: 13px;
-  color: var(--on-sv);
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.rp-up { color: #2AA881; font-weight: 700; }
-.rp-down { color: #D11A2A; font-weight: 700; }
-
-body:not(.light) .rp-up { color: #4CE5B1; }
-body:not(.light) .rp-down { color: #DA292A; }
-
-.rank-badge {
-  text-align: center;
-  padding: 8px 16px;
-  background: var(--sc-high);
-  border-radius: var(--r-sm);
-  border: 1px solid var(--outline-v);
-}
-
-.rank-badge-val {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--p-text);
-  font-variant-numeric: tabular-nums;
-}
-
-.rank-badge-lbl {
-  font-size: 10px;
-  color: var(--on-sv);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-top: 2px;
-}
-
-.stat-chips {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--outline-v);
-}
-
-.chip {
-  background: var(--sc-low);
-  padding: 18px 12px;
-  text-align: center;
-}
-
-.chip-val {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--on-s);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.chip-val.accent { color: var(--p-text); }
-
-.chip-lbl {
-  font-size: 10px;
-  color: var(--on-sv);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-top: 6px;
-}
-
-.level-strip {
-  padding: 12px 28px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--sc-low);
-  border-bottom: 1px solid var(--outline-v);
-}
-
-.level-num {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--p-text);
-  min-width: 48px;
-  font-variant-numeric: tabular-nums;
-}
-
-.level-track {
-  flex: 1;
-  height: 6px;
-  background: var(--sc-high);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.level-fill {
-  height: 100%;
-  width: {{ level_pct }}%;
-  background: var(--p);
-  border-radius: 3px;
-}
-
-.level-pct {
-  font-size: 11px;
-  color: var(--on-sv);
-  min-width: 36px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.body-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: var(--outline-v);
-}
-
-.col {
-  background: var(--sc-low);
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-}
-
-.col-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--on-sv);
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 12px;
-}
-
-.col-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.col-title-row .col-title {
-  margin-bottom: 0;
-}
-
-.current-leg {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 10px;
-  background: var(--sc);
-  border-radius: var(--r-sm);
-  border: 1px solid var(--outline-v);
-}
-
-.current-leg-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--p);
-  flex-shrink: 0;
-}
-
-.current-leg-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--on-s);
-  flex: 1;
-}
-
-.current-leg-stats {
-  display: flex;
-  gap: 12px;
-}
-
-.current-leg-stat {
-  text-align: right;
-}
-
-.current-leg-stat-lbl {
-  font-size: 10px;
-  color: var(--on-sv);
-  display: block;
-}
-
-.current-leg-stat-val {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--on-s);
-}
-
-.top-leg-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--outline-v);
-}
-
-.top-leg-row:last-child { border-bottom: none; }
-
-.top-leg-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.top-leg-icon.gold { border: 2px solid var(--p); }
-.top-leg-icon.silver { border: 2px solid var(--outline); }
-
-.top-leg-name {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--on-s);
-}
-
-.top-leg-kills {
-  font-size: 15px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.top-leg-kills.gold { color: var(--p-text); }
-
-.dist-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 6px;
-  font-size: 11px;
-  color: var(--on-sv);
-  font-variant-numeric: tabular-nums;
-}
-
-.dist-name {
-  width: 24px;
-  text-align: left;
-  flex-shrink: 0;
-  font-weight: 500;
-  font-size: 11px;
-}
-
-.dist-track {
-  flex: 1;
-  height: 8px;
-  border-radius: 4px;
-  background: var(--sc-high);
-  overflow: hidden;
-}
-
-.dist-fill {
-  height: 100%;
-  border-radius: 4px;
-}
-
-.dist-count {
-  width: 28px;
-  text-align: right;
-  flex-shrink: 0;
-  font-size: 10px;
-  color: var(--on-sv);
-}
-
-.dist-pct {
-  width: 44px;
-  text-align: right;
-  flex-shrink: 0;
-  font-weight: 600;
-  font-size: 11px;
-  margin-left: 4px;
-}
-
-.dist-current {
-  background: color-mix(in srgb, var(--p) 10%, transparent);
-  border-radius: var(--r-xs);
-  padding: 4px 6px;
-  margin-left: -6px;
-  margin-right: -6px;
-}
-
-.dist-current .dist-name,
-.dist-current .dist-pct {
-  color: var(--p-text);
-  font-weight: 700;
-}
-
-.badges-strip {
-  padding: 12px 28px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  border-top: 1px solid var(--outline-v);
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.badge img {
-  width: 28px;
-  height: 28px;
-}
-
-.spec {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--p) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--p) 20%, transparent);
-}
-
-.spec img {
-  width: 24px;
-  height: 24px;
-  display: block;
-}
-
-.footer {
-  padding: 10px 28px;
-  font-size: 10px;
-  color: var(--on-sv);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  opacity: 0.85;
-}
-
-.footer a { color: var(--p-text); text-decoration: none; font-weight: 600; }
-
-/* RP 历史折线图 */
-.rp-chart-strip {
-  /* 与全局其他区块一致的左右安全边距 */
-  padding: 16px 28px 8px;
-  background: var(--sc-low);
-  border-top: 1px solid var(--outline-v);
-}
-
-.rp-chart-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 8px;
-}
-
-.rp-chart {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.rp-chart text { font-family: 'Roboto Flex', 'Noto Sans SC', system-ui, sans-serif; }
 </style>
 </head>
-<body class="{{ theme_class }}">
-<div class="card">
+<body class="{{ theme_class }}" style="--tier:{{ tier.bright }};--tier-deep:{{ tier.deep }};">
+<div class="card stats">
 
-  <!-- ═══ HERO ═══ -->
-  <div class="hero">
-    <div class="hero-left">
-      <img class="avatar" src="{{ avatar_url }}" onerror="this.style.display='none'">
-      <div class="hero-info">
-        <div class="player-name">{{ display_name }}</div>
-        <div class="player-sub">
-          <span class="status-dot"></span>
-          <span>{{ state_text }}</span>
-          {% if alias %}<span>aka {{ alias }}</span>{% endif %}
-          <span>UID {{ uid }}</span>
-          <span class="platform-pill">{{ platform }}</span>
+  <!-- ═══ 头部：身份 + 段位 + 进度 ═══ -->
+  <section class="hero">
+    {% if hero_art %}<img class="hero-art" src="{{ hero_art }}" onerror="this.remove()">{% endif %}
+
+    <div class="id">
+      {% if avatar_url %}<img class="avatar" src="{{ avatar_url }}" onerror="this.style.visibility='hidden'">{% endif %}
+      <div class="id-text">
+        <div class="name">{{ name }}{% if tag %}<span class="tag">{{ tag }}</span>{% endif %}</div>
+        <div class="meta">
+          <i class="dot {{ state_class }}"></i><span>{{ state_text }}</span>
+          <b class="sep"></b><span>{{ platform }}</span>
+          {% if alias %}<b class="sep"></b><span>aka {{ alias }}</span>{% endif %}
+          <b class="sep"></b><span>UID {{ uid }}</span>
         </div>
       </div>
+      {% if selected_name %}<div class="using">{{ icons.person }}<span>{{ selected_name }}</span></div>{% endif %}
     </div>
-  </div>
 
-  <!-- ═══ RANK STRIP ═══ -->
-  <div class="rank-strip">
-    <img class="rank-icon" src="{{ rank_img }}" onerror="this.style.display='none'">
-    <div class="rank-main">
-      <div class="rank-tier">{{ rank_display }}</div>
-      <div class="rank-rp-line">
-        <span>{{ rank_score_fmt }} RP</span>
-        {{ rp_delta_html }}
+    <div class="rank">
+      <div class="emblem">
+        {% if emblem %}<img src="{{ emblem }}" onerror="this.remove()">{% endif %}
+        {% if plate_text %}<span class="plate num{% if plate_is_pos %} pos{% endif %}" style="top:{{ plate_y }}%">{{ plate_text }}</span>{% endif %}
+      </div>
+      <div class="rank-info">
+        <div class="tier-name">{{ tier_name }}</div>
+        <div class="rp-line"><span class="rp num">{{ rank_score_fmt }}</span><span class="rp-unit">RP</span>{{ rp_delta_html }}</div>
+        <div class="chips">{{ rp_trend_html }}{% if top_text %}<span class="chip">{{ icons.leaderboard }}{{ top_text }}</span>{% endif %}</div>
       </div>
     </div>
-    <div class="rank-badge">
-      <div class="rank-badge-val">{{ top_global }}</div>
-      <div class="rank-badge-lbl">Top {{ top_pct_label }}</div>
-    </div>
-  </div>
 
-  <!-- ═══ STAT CHIPS ═══ -->
-  <div class="stat-chips">
-    <div class="chip">
-      <div class="chip-val accent">{{ kills_fmt }}</div>
-      <div class="chip-lbl">生涯击杀</div>
-    </div>
-    <div class="chip">
-      <div class="chip-val">{{ damage_fmt }}</div>
-      <div class="chip-lbl">BR 总伤害</div>
-    </div>
-    <div class="chip">
-      <div class="chip-val">{{ wins_fmt }}</div>
-      <div class="chip-lbl">BR 胜场</div>
-    </div>
-  </div>
-
-  <!-- ═══ LEVEL BAR ═══ -->
-  <div class="level-strip">
-    <span class="level-num">Lv.{{ level }}</span>
-    <div class="level-track"><div class="level-fill"></div></div>
-    <span class="level-pct">{{ level_pct }}%</span>
-  </div>
-
-  <!-- ═══ RP HISTORY CHART ═══ -->
-  {% if rp_chart_html %}
-  {{ rp_chart_html|safe }}
-  {% endif %}
-
-  <!-- ═══ TWO-COLUMN BODY ═══ -->
-  <div class="body-grid">
-    <!-- Left: Legends -->
-    <div class="col">
-      <div class="col-title-row">
-        <span class="col-title">英雄</span>
-        {% if selected_legend %}<span class="col-title">当前选用</span>{% endif %}
+    {% if ladder %}
+    <div class="ladder">
+      <div class="ladder-head">
+        <span class="goal">距 <b>{{ ladder.target_name }}</b> 还差 <b class="num">{{ ladder.remaining_fmt }}</b> RP</span>
+        <span class="now num">{{ rank_score_fmt }} <em>/ {{ ladder.end_fmt }}</em></span>
       </div>
-
-      {% if selected_legend %}
-      <div class="current-leg">
-        {% if selected_legend.icon_url %}
-        <img class="current-leg-icon" src="{{ selected_legend.icon_url }}" onerror="this.style.display='none'">
+      <div class="bar">
+        <i class="fill" style="width:{{ ladder.fill }}%"></i>
+        {% for s in ladder.segments[1:] %}<b class="tick" style="left:{{ s.left }}%"></b>{% endfor %}
+        <span class="knob" style="left:{{ ladder.fill }}%"></span>
+      </div>
+      <div class="bar-labels">
+        {% if ladder.segments %}
+          {% for s in ladder.segments %}<span class="{{ 'cur' if s.current else '' }}" style="left:{{ s.left + s.width / 2 }}%">{{ s.label }}</span>{% endfor %}
+        {% else %}
+          <span class="edge-l">{{ tier_zh }} {{ ladder.start_fmt }}</span>
+          <span class="edge-r">{{ ladder.end_name }} {{ ladder.end_fmt }}</span>
         {% endif %}
-        <span class="current-leg-name">{{ selected_legend.name_zh }}</span>
-        <div class="current-leg-stats">
-          {% for s in selected_legend.stats %}
-          <div class="current-leg-stat">
-            <span class="current-leg-stat-lbl">{{ s.name }}</span>
-            <span class="current-leg-stat-val">{{ s.value }}</span>
-          </div>
-          {% endfor %}
-        </div>
       </div>
-      {% endif %}
-
-      {% if top_legends %}
-        {% for leg in top_legends %}
-        <div class="top-leg-row">
-          {% if leg.icon_url %}
-          <img class="top-leg-icon {{ 'gold' if loop.first else 'silver' }}" src="{{ leg.icon_url }}" onerror="this.style.display='none'">
-          {% endif %}
-          <span class="top-leg-name">{{ leg.name_zh }}</span>
-          <span class="top-leg-kills {{ 'gold' if loop.first else '' }}">{{ leg.kills_fmt }}</span>
-        </div>
-        {% endfor %}
-      {% else %}
-        <div style="color:var(--on-sv);font-size:12px;">暂无英雄数据</div>
-      {% endif %}
-      <div style="flex:1;"></div>
     </div>
+    {% elif elite_pos %}
+    <div class="elite">{{ icons.leaderboard }}<span>{{ elite_label }}</span><b>{{ elite_pos }}</b></div>
+    {% endif %}
+  </section>
 
-    <!-- Right: Distribution -->
-    <div class="col" style="justify-content:space-between;">
-      <div class="col-title">段位分布（全平台）</div>
-      {% for d in rank_dist %}
-      <div class="dist-row{% if d.is_player %} dist-current{% endif %}">
-        <span class="dist-name">{{ d.name }}</span>
-        <div class="dist-track">
-          <div class="dist-fill" style="width:{{ d.pct }}%;background:{{ d.color }};"></div>
+  <!-- ═══ 生涯数据 ═══ -->
+  <section class="tiles">
+    <div class="tile">
+      <div class="t-label">{{ icons.gps_fixed }}生涯击杀</div>
+      <div class="t-val num">{{ kills_fmt }}</div>
+    </div>
+    <div class="tile">
+      <div class="t-label">{{ icons.bolt }}BR 总伤害</div>
+      <div class="t-val num">{{ damage_fmt }}{% if damage_unit %}<small>{{ damage_unit }}</small>{% endif %}</div>
+    </div>
+    <div class="tile">
+      <div class="t-label">{{ icons.emoji_events }}BR 胜场</div>
+      <div class="t-val num">{{ wins_fmt }}</div>
+    </div>
+    <div class="tile">
+      <div class="t-label">{{ icons.star }}等级</div>
+      <span class="t-sub">{{ level_pct }}%</span>
+      <div class="t-val num">{{ level }}</div>
+      <div class="t-bar"><i style="width:{{ level_pct }}%"></i></div>
+    </div>
+  </section>
+
+  <!-- ═══ RP 走势 ═══ -->
+  {{ rp_chart_html }}
+
+  <!-- ═══ 常用传奇 ═══ -->
+  {% if top_legends %}
+  <section class="block">
+    <div class="block-head">
+      <span class="block-title">{{ icons.group }}常用传奇</span>
+      <span class="block-meta">按击杀排序</span>
+    </div>
+    <div class="legs">
+      {% for leg in top_legends %}
+      <div class="leg{% if loop.first %} top{% endif %}">
+        {% if leg.icon_url %}<img class="leg-art" src="{{ leg.icon_url }}" onerror="this.remove()">{% endif %}
+        <span class="leg-rank">#{{ loop.index }}</span>
+        {% if leg.selected %}<span class="leg-tag">使用中</span>{% endif %}
+        <div class="leg-info">
+          <div class="leg-name">{{ leg.name_zh }}</div>
+          <div class="leg-kills"><b>{{ leg.kills_fmt }}</b>击杀</div>
         </div>
-        <span class="dist-count">{{ d.count_fmt }}</span>
-        <span class="dist-pct">{{ d.pct_display }}%</span>
       </div>
       {% endfor %}
     </div>
-  </div>
-
-  <!-- ═══ BADGES ═══ -->
-  {% if season_badges or special_badges %}
-  <div class="badges-strip">
-    {% for b in season_badges %}
-    <span class="badge" style="background:{{ b.bg }};color:{{ b.color }};border:1px solid {{ b.border }};">
-      {% if b.badge_url %}<img src="{{ b.badge_url }}" onerror="this.remove()">{% endif %}{{ b.season }}
-    </span>
-    {% endfor %}
-    {% for b in special_badges %}
-    <span class="spec">
-      {% if b.badge_url %}<img src="{{ b.badge_url }}" onerror="this.remove()">{% endif %}
-    </span>
-    {% endfor %}
-  </div>
+  </section>
   {% endif %}
 
-  <!-- ═══ FOOTER ═══ -->
-  <div class="footer">
-    <span>Data: <a href="https://apexlegendsstatus.com" target="_blank">Apex Legends Status</a> · 由于游戏限制数据仅供参考</span>
-    <span>auth.赤羽真白 · Apex Chiyuchan</span>
-  </div>
+  <!-- ═══ 赛季足迹 ═══ -->
+  {% if season_badges or special_badges %}
+  <section class="block">
+    <div class="block-head">
+      <span class="block-title">{{ icons.military_tech }}赛季足迹</span>
+      <span class="block-meta">
+        {% for t in season_summary %}<span class="tsum" style="--c:{{ t.bright }};--cd:{{ t.deep }};"><i></i>{{ t.zh }}<b>{{ t.count }}</b></span>{% endfor %}
+      </span>
+    </div>
+    <div class="badges">
+      {% for b in season_badges %}
+      <div class="sb">{% if b.badge_url %}<img src="{{ b.badge_url }}" onerror="this.remove()">{% endif %}<span>{{ b.season }}</span></div>
+      {% endfor %}
+      {% if season_badges and special_badges %}<i class="badge-sep"></i>{% endif %}
+      {% for b in special_badges %}
+      <div class="sp">{% if b.badge_url %}<img src="{{ b.badge_url }}" onerror="this.remove()">{% endif %}</div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
+  <!-- ═══ 段位分布 ═══ -->
+  {% if rank_hist %}
+  <section class="block">
+    <div class="block-head">
+      <span class="block-title">{{ icons.bar_chart }}段位分布</span>
+      <span class="block-meta">全平台{% if rank_total %} · {{ rank_total }}人{% endif %}</span>
+    </div>
+    <div class="hist">
+      {% for h in rank_hist %}
+      <div class="hcol{% if h.me %} me{% endif %}" style="--c:{{ h.bright }};--cd:{{ h.deep }};">
+        <div class="hbar">
+          {% if h.me %}<span class="me-pin">你</span>{% endif %}
+          <span class="hpct num">{{ h.pct }}%</span>
+          <i style="height:{{ h.height }}px"></i>
+        </div>
+        <span class="hname">{{ h.zh }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <footer class="foot">数据 <b>apexlegendsstatus.com</b> · 由于游戏限制数据仅供参考 · auth.赤羽真白 · Apex Chiyuchan</footer>
 </div>
 </body>
 </html>

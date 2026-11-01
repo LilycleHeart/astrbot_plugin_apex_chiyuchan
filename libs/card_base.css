@@ -1,0 +1,88 @@
+/* ═══ 新版卡片公共样式（所有卡片共用） ═══ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #101318;
+  --bg-2: #181C23;
+  --bg-3: #232832;
+  --line: rgba(255, 255, 255, .07);
+  --line-2: rgba(255, 255, 255, .13);
+  --text: #EEF1F6;
+  --text-2: #A3ABBA;
+  --text-3: #6F7787;
+  --up: #3DDC97;
+  --down: #FF5D6E;
+  --warn: #FFB547;
+  --accent: var(--tier, #62AFFF);
+  --num: 'Barlow Condensed', 'Roboto Condensed', 'Arial Narrow', sans-serif;
+  --sans: 'Noto Sans SC', 'Noto Sans CJK SC', 'Source Han Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+body.light {
+  --bg: #FFFFFF;
+  --bg-2: #F3F5F9;
+  --bg-3: #E4E8EF;
+  --line: rgba(16, 24, 40, .08);
+  --line-2: rgba(16, 24, 40, .14);
+  --text: #11151D;
+  --text-2: #586172;
+  --text-3: #8D95A5;
+  --up: #0E9E67;
+  --down: #D72C44;
+  --warn: #B87300;
+  --accent: var(--tier-deep, #1E66CC);
+}
+
+body {
+  font-family: var(--sans);
+  color: var(--text);
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  width: 720px;
+  background: var(--bg);
+  border-radius: 26px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.num { font-family: var(--num); font-variant-numeric: tabular-nums; }
+
+.ic { width: 1em; height: 1em; fill: currentColor; flex-shrink: 0; }
+
+/* 区块：统一的标题行 */
+.block { padding: 16px 24px 18px; border-top: 1px solid var(--line); }
+.block-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.block-title { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; letter-spacing: .5px; }
+.block-title .ic { font-size: 18px; color: var(--accent); }
+.block-meta { margin-left: auto; font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 10px; }
+
+/* 小标签 */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 10px; border-radius: 8px;
+  font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+.chip .ic { font-size: 15px; }
+.chip.up { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.chip.down { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+
+.up { color: var(--up); }
+.down { color: var(--down); }
+.flat { color: var(--text-2); }
+
+/* 页脚 */
+.foot {
+  padding: 12px 24px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 11px; color: var(--text-3);
+  text-align: center; letter-spacing: .2px;
+}
+.foot b { color: var(--text-2); font-weight: 600; }
