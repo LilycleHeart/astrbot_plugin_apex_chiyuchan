@@ -51,6 +51,7 @@ LEGEND_ZH = {
 
 # ── 赛季名中文映射 ──
 SEASON_NAME_ZH = {
+    "Cipher": "破译天机",
     "Marked": "诸神烙印",
     "Overclocked": "超频",
     "Breach": "突破",
@@ -86,15 +87,17 @@ SEASON_NAME_ZH = {
 # ALS legend icon base URL
 ALS_ICON_BASE = "https://apexlegendsstatus.com/assets/legends"
 
-# ── 赛季日期 (数据源: ALS, 时区为 UTC) ──
-# Season 30: 开始 2026-08-04 17:00 UTC, Split 1 结束 2026-09-15 17:00 UTC,
-#            赛季结束 2026-11-03 17:00 UTC (esportstales 预估)
-# Apex 更新惯例为 17:00 UTC (= 北京时间次日 01:00), 抓取时统一转成北京时间。
-# 参考: ALS new-season-countdown 显示 "Season 30: Marked, split 2 releases 16/09 @ 01:00" (北京)
-_SPLIT_DATES_S30 = {
-    "season_start": _dt.datetime(2026, 8, 4, 17, 0, tzinfo=_UTC),
-    "split1_end": _dt.datetime(2026, 9, 15, 17, 0, tzinfo=_UTC),
-    "season_end": _dt.datetime(2026, 11, 3, 17, 0, tzinfo=_UTC),
+# ── 赛季日期 (数据源: ALS / wiki.gg, 时区为 UTC) ──
+# Season 31: 开始 2026-11-03 18:00 UTC (北京 2026-11-04 02:00),
+#            Split 1 结束 2026-12-15 18:00 UTC (北京 2026-12-16 02:00),
+#            赛季结束 2027-02-09 18:00 UTC (北京 2027-02-10 02:00, 预估)
+# Apex 更新惯例为 10:00 PT = 18:00 UTC (= 北京时间次日 02:00), 抓取时统一转成北京时间。
+# 参考: ALS new-season-countdown 显示 "Releases 16/12 @ 02:00" (北京, unix 1797357600);
+#       wiki.gg Season_31 赛季结束 Feb 9, 2027。抓取日期 2026-11-16。
+_SPLIT_DATES_S31 = {
+    "season_start": _dt.datetime(2026, 11, 3, 18, 0, tzinfo=_UTC),
+    "split1_end": _dt.datetime(2026, 12, 15, 18, 0, tzinfo=_UTC),
+    "season_end": _dt.datetime(2027, 2, 9, 18, 0, tzinfo=_UTC),
 }
 
 
@@ -106,15 +109,15 @@ def _utc_to_bj(dt: _dt.datetime) -> _dt.datetime:
 def _determine_split_and_end() -> tuple[int, int, int, int]:
     """Determine current split and compute countdown. Returns (days, hours, minutes, split)."""
     now = _dt.datetime.now(tz=_CST)
-    split1_end = _utc_to_bj(_SPLIT_DATES_S30["split1_end"])
-    s30_end = _utc_to_bj(_SPLIT_DATES_S30["season_end"])
+    split1_end = _utc_to_bj(_SPLIT_DATES_S31["split1_end"])
+    s31_end = _utc_to_bj(_SPLIT_DATES_S31["season_end"])
 
     if now < split1_end:
         split = 1
         split_end = split1_end
     else:
         split = 2
-        split_end = s30_end
+        split_end = s31_end
 
     delta = split_end - now
     days = max(0, delta.days)
@@ -133,12 +136,12 @@ async def fetch_season_info() -> SeasonInfo | None:
 
     days_left, hours_left, minutes_left, split = _determine_split_and_end()
     split_label = f"Split {split}"
-    season_name_zh = SEASON_NAME_ZH.get("Marked", "诸神烙印")
-    season_start_bj = _utc_to_bj(_SPLIT_DATES_S30["season_start"]).strftime("%Y-%m-%d")
-    season_end_bj = _utc_to_bj(_SPLIT_DATES_S30["season_end"]).strftime("%Y-%m-%d")
+    season_name_zh = SEASON_NAME_ZH.get("Cipher", "破译天机")
+    season_start_bj = _utc_to_bj(_SPLIT_DATES_S31["season_start"]).strftime("%Y-%m-%d")
+    season_end_bj = _utc_to_bj(_SPLIT_DATES_S31["season_end"]).strftime("%Y-%m-%d")
 
     result = SeasonInfo(
-        season_number=30,
+        season_number=31,
         season_name=season_name_zh,
         season_start=season_start_bj,
         season_end=season_end_bj,
